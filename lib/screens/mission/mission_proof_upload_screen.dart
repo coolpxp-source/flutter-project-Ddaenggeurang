@@ -25,6 +25,9 @@ class _MissionProofUploadScreenState
 
   XFile? _selectedImage;
 
+  bool _isSubmitting = false;
+  bool _isSubmitted = false;
+
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -56,6 +59,54 @@ class _MissionProofUploadScreenState
 
       debugPrint('이미지 선택 오류: $error');
     }
+  }
+
+  Future<void> _submitProof() async {
+    final description = _descriptionController.text.trim();
+
+    if (_selectedImage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('인증 사진을 선택해 주세요.'),
+        ),
+      );
+      return;
+    }
+
+    if (description.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('인증 설명을 입력해 주세요.'),
+        ),
+      );
+      return;
+    }
+
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    // Firebase Storage 및 Firestore 대신 Mock 제출 처리
+    await Future.delayed(const Duration(seconds: 1));
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = false;
+      _isSubmitted = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('사진 인증이 제출되었습니다.'),
+      ),
+    );
   }
 
   void _showImageSourceSheet() {
@@ -475,23 +526,84 @@ class _MissionProofUploadScreenState
   }
 
   Widget _buildSubmitButton() {
+    if (_isSubmitted) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0F5),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFFFC5D9),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                color: Color(0xFFE66A9F),
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '승인 대기 중',
+                    style: TextStyle(
+                      color: Color(0xFF3D3237),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '관리자가 인증 내용을 확인하고 있어요.',
+                    style: TextStyle(
+                      color: Color(0xFF8B737D),
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: () {
-          // 다음 단계에서 Mock 제출 기능 연결
-          debugPrint('인증 제출 버튼 클릭');
-        },
+        onPressed: _isSubmitting ? null : _submitProof,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE66A9F),
+          disabledBackgroundColor: const Color(0xFFFFB8D0),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: const Text(
+        child: _isSubmitting
+            ? const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Colors.white,
+          ),
+        )
+            : const Text(
           '인증 제출하기',
           style: TextStyle(
             fontSize: 16,
