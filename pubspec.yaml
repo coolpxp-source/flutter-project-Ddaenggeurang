@@ -50,8 +50,8 @@ dependencies:
   # 알림
   flutter_local_notifications:
 
-  # 이미지
-  image_picker:
+  # 이미지 (영수증/미션 사진 인증)
+  image_picker: ^1.2.3
 
   cupertino_icons: ^1.0.8
 
