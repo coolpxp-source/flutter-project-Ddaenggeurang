@@ -85,4 +85,33 @@ class CommunityService {
       'likeCount': FieldValue.increment(isLiking ? 1 : -1),
     });
   }
+
+  Future<void> createPost({
+    required String authorId,
+    required String authorName,
+    required String category,
+    required String content,
+  }) async {
+    await _db.collection('communityPosts').add({
+      'authorId': authorId,
+      'authorName': authorName,
+      'category': category,
+      'content': content,
+      'likeCount': 0,
+      'commentCount': 0,
+      'createdAt': Timestamp.now(),
+    });
+  }
+
+  // 홈 배너 TOP3용 — 저축 금액 기준
+  Stream<List<CommunityStat>> getAmountRanking({int limit = 3}) {
+    return _db
+        .collection('communityStats')
+        .orderBy('savingAmount', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map((d) => CommunityStat.fromFirestore(d)).toList());
+  }
+
+
 }

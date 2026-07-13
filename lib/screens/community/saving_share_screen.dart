@@ -12,6 +12,7 @@ class SavingShareScreen extends StatefulWidget {
 class _SavingShareScreenState extends State<SavingShareScreen> {
   final _service = CommunityService();
   final _nicknameController = TextEditingController();
+  final _amountController = TextEditingController();
   double _savingRate = 30;
   String _ageGroup = '20대';
   String _job = '학생';
@@ -28,6 +29,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
       userId: currentUserId,
       nicknameMasked: _nicknameController.text.trim(),
       savingRate: _savingRate,
+      savingAmount: num.tryParse(_amountController.text) ?? 0,
       ageGroup: _ageGroup,
       job: _job,
       updatedAt: DateTime.now(),
@@ -64,6 +66,15 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
               divisions: 100,
               activeColor: const Color(0xFFEE5586),
               onChanged: (v) => setState(() => _savingRate = v),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: '이번 달 저축 금액 (원)',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(

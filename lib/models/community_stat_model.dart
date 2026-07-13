@@ -4,6 +4,7 @@ class CommunityStat {
   final String userId; // doc.id
   final String nicknameMasked;
   final num savingRate;
+  final num savingAmount;
   final String ageGroup;
   final String job;
   final DateTime updatedAt;
@@ -12,6 +13,7 @@ class CommunityStat {
     required this.userId,
     required this.nicknameMasked,
     required this.savingRate,
+    required this.savingAmount,
     required this.ageGroup,
     required this.job,
     required this.updatedAt,
@@ -22,6 +24,7 @@ class CommunityStat {
       userId: userId,
       nicknameMasked: map['nicknameMasked'] ?? '',
       savingRate: map['savingRate'] ?? 0,
+      savingAmount: map['savingAmount'] ?? 0,
       ageGroup: map['ageGroup'] ?? '',
       job: map['job'] ?? '',
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
@@ -37,6 +40,7 @@ class CommunityStat {
     return {
       'nicknameMasked': nicknameMasked,
       'savingRate': savingRate,
+      'savingAmount': savingAmount,
       'ageGroup': ageGroup,
       'job': job,
       'updatedAt': Timestamp.fromDate(updatedAt),

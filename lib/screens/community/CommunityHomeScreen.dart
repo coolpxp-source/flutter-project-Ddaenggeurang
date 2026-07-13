@@ -1,4 +1,5 @@
 import 'package:ddaenggeurang/screens/community/post_detail_screen.dart';
+import 'package:ddaenggeurang/screens/community/post_write_screen.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../models/community_post_model.dart';
@@ -15,7 +16,7 @@ class CommunityHomeScreen extends StatefulWidget {
 class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   final _service = CommunityService();
   String _selectedCategory = '전체';
-  static const _categories = ['전체', '절약팁', '소비고민', '자유'];
+  static const _categories = ['전체', '절약팁', '소비고민', '자유', '거지방'];
 
   // 메인 컬러: 초록 계열
   static const _green = Color(0xFF3B8B5E);
@@ -140,6 +141,14 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: _green,
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PostWriteScreen()),
+        ),
+        child: const Icon(Icons.edit, color: Colors.white),
+      ),
       bottomNavigationBar: BottomNavBar(
         currentTab: NavTab.community,
         onTabSelected: (tab) {},
@@ -156,50 +165,90 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _green,
+          color: Colors.black,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('이번 달', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('이번 달', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                Text('7.1 - 7.13 기준',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 11)),
+              ],
+            ),
             const SizedBox(height: 4),
-            const Text('최다 저축 랭킹 TOP 3',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('최다 저축 랭킹 TOP 3',
+                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 6),
+                const Text('👑', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 20),
             StreamBuilder(
-              stream: _service.getRanking(limit: 3),
+              stream: _service.getAmountRanking(limit: 3),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return const Text('아직 랭킹 데이터가 없어요',
                       style: TextStyle(color: Colors.white70, fontSize: 12));
                 }
                 final top3 = snapshot.data!;
+                if (top3.length < 3) {
+                  // 3개 미만이면 그냥 순서대로만 표시 (재배치 로직 생략)
+                  return Row(
+                    children: top3
+                        .asMap()
+                        .entries
+                        .map((e) => Expanded(child: _rankBox(e.value, e.key)))
+                        .toList(),
+                  );
+                }
+
+                // 화면 순서: 2등 - 1등 - 3등
+                final ordered = [top3[1], top3[0], top3[2]];
+                final ranks = [2, 1, 3];
+
                 return Row(
-                  children: List.generate(top3.length, (i) {
-                    final stat = top3[i];
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: List.generate(3, (i) {
+                    final stat = ordered[i];
+                    final rank = ranks[i];
+                    final isFirst = rank == 1;
+
                     return Expanded(
-                      child: Container(
-                        margin: EdgeInsets.only(right: i < top3.length - 1 ? 8 : 0),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: i == 0 ? Colors.white : Colors.white.withOpacity(0.3),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                      child: Padding(
+                        padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
                         child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            Text('${stat.savingRate}%',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: i == 0 ? _green : Colors.white,
-                                )),
-                            const SizedBox(height: 4),
-                            Text('${i + 1}',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: i == 0 ? _green : Colors.white,
-                                )),
+                            Text('${_formatAmount(stat.savingAmount)}원',
+                                style: const TextStyle(
+                                    color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: isFirst ? 110 : 90,
+                              decoration: BoxDecoration(
+                                color: isFirst
+                                    ? const Color(0xFF3B8B5E)
+                                    : const Color(0xFF3B8B5E).withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text('$rank',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  )),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(stat.nicknameMasked,
+                                style: const TextStyle(color: Colors.white, fontSize: 12),
+                                overflow: TextOverflow.ellipsis),
                           ],
                         ),
                       ),
@@ -211,6 +260,36 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _rankBox(dynamic stat, int index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        children: [
+          Container(
+            height: 90,
+            decoration: BoxDecoration(
+              color: const Color(0xFF6B5A1E),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text('${index + 1}', style: const TextStyle(color: Colors.white, fontSize: 20)),
+          ),
+          const SizedBox(height: 8),
+          Text(stat.nicknameMasked, style: const TextStyle(color: Colors.white, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  String _formatAmount(num value) {
+    // 저축률(%)이 아니라 금액(원) 표시가 필요하면 이 함수에서 계산
+    // 지금은 savingRate 값을 그대로 "원"처럼 보여주는 임시 처리
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
     );
   }
 
