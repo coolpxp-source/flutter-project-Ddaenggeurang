@@ -5,11 +5,13 @@ import '../../models/mission_definition_model.dart';
 class MissionCard extends StatelessWidget {
   final MissionDefinition mission;
   final VoidCallback? onTap;
+  final bool isCompleted;
 
   const MissionCard({
     super.key,
     required this.mission,
     this.onTap,
+    this.isCompleted = false,
   });
 
   @override
@@ -17,15 +19,30 @@ class MissionCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        onTap: onTap,
-        leading: const CircleAvatar(
-          child: Icon(Icons.flag),
+        onTap: isCompleted ? null : onTap,
+        leading: CircleAvatar(
+          child: Icon(
+            isCompleted ? Icons.check : Icons.flag,
+          ),
         ),
-        title: Text(mission.title),
+        title: Text(
+          mission.title,
+          style: TextStyle(
+            decoration: isCompleted
+                ? TextDecoration.lineThrough
+                : TextDecoration.none,
+          ),
+        ),
         subtitle: Text(
-          '${mission.frequency} · ${mission.points} 포인트',
+          isCompleted
+              ? '완료 · ${mission.points} 포인트 획득'
+              : '${mission.frequency} · ${mission.points} 포인트',
         ),
-        trailing: const Icon(Icons.chevron_right),
+        trailing: isCompleted
+            ? const Chip(
+          label: Text('완료'),
+        )
+            : const Icon(Icons.chevron_right),
       ),
     );
   }
