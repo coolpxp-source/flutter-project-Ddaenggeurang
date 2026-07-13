@@ -30,7 +30,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cloud_firestore: ^6.6.0
 
   # Firebase
   firebase_core: ^4.11.0
@@ -38,23 +37,21 @@ dependencies:
   cloud_firestore:
   google_sign_in:
 
-  # AI 통신 (땡코치 Ollama)
+  # AI 통신
   http: ^1.2.0
 
   # 로컬 저장
   shared_preferences:
 
-  # 차트 (홈 대시보드)
+  # 차트
   fl_chart:
 
-  # 알림 (구독 결제일 등)
+  # 알림
   flutter_local_notifications:
 
-  # 이미지 (영수증/미션 사진 인증)
+  # 이미지
   image_picker:
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
