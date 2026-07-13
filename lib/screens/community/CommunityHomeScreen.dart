@@ -1,171 +1,250 @@
+import 'package:ddaenggeurang/screens/community/post_detail_screen.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
+import '../../models/community_post_model.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import 'ranking_screen.dart';
-import 'peer_compare_screen.dart';
-import 'saving_share_screen.dart';
 
-class CommunityHomeScreen extends StatelessWidget {
+class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
 
-  // TODO: 실제 로그인 유저 정보로 교체
-  static const String currentUserId = 'test_user_id';
-  static const String myAgeGroup = '20대';
-  static const String myJob = '학생';
+  @override
+  State<CommunityHomeScreen> createState() => _CommunityHomeScreenState();
+}
+
+class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
+  final _service = CommunityService();
+  String _selectedCategory = '전체';
+  static const _categories = ['전체', '절약팁', '소비고민', '자유'];
+
+  // 메인 컬러: 초록 계열
+  static const _green = Color(0xFF3B8B5E);
+  static const _greenLight = Color(0xFFE6F4EB);
 
   @override
   Widget build(BuildContext context) {
-    final service = CommunityService();
-
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('커뮤니티'),
+        backgroundColor: Colors.white,
         elevation: 0,
+        title: const Text('커뮤니티', style: TextStyle(color: Colors.black)),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(child: Text('땡그랑', style: TextStyle(color: Colors.grey[500]))),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 내 저축 비율 카드
-            _buildMySavingCard(context, service),
-            const SizedBox(height: 16),
-
-            // 랭킹 / 또래비교 진입 버튼 2개
-            Row(
+        children: [
+          // 히어로 배너 (연한 초록 배경 + 초록 텍스트)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _greenLight,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: _green.withOpacity(0.2)),
+            ),
+            child: Row(
               children: [
                 Expanded(
-                  child: _buildEntryButton(
-                    context,
-                    icon: Icons.emoji_events,
-                    label: '랭킹 보기',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RankingScreen()),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('돈 이야기, 편하게 해요',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                      const SizedBox(height: 4),
+                      Text('절약 팁부터 소소한 이야기까지',
+                          style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildEntryButton(
-                    context,
-                    icon: Icons.groups,
-                    label: '또래 비교',
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PeerCompareScreen(
-                          ageGroup: myAgeGroup,
-                          job: myJob,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                CircleAvatar(radius: 20, backgroundColor: _green),
               ],
             ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 16),
 
-            // 저축 비율 공유 안내
-            _buildShareBanner(context),
-          ],
-        ),
+          // 카테고리 탭
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final cat = _categories[i];
+                final selected = cat == _selectedCategory;
+                return ChoiceChip(
+                  label: Text(cat),
+                  selected: selected,
+                  onSelected: (_) => setState(() => _selectedCategory = cat),
+                  selectedColor: _green,
+                  backgroundColor: Colors.white,
+                  side: BorderSide(color: selected ? _green : Colors.grey[300]!),
+                  labelStyle: TextStyle(
+                    color: selected ? Colors.white : Colors.black87,
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 검색바
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey[300]!),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: Colors.grey[500], size: 20),
+                const SizedBox(width: 8),
+                Text('궁금한 주제나 태그를 검색해보세요',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 랭킹 TOP3 배너 (초록 배경)
+          _buildRankingBanner(),
+          const SizedBox(height: 16),
+
+          // 피드
+          StreamBuilder<List<CommunityPost>>(
+            stream: _service.getPosts(category: _selectedCategory),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final posts = snapshot.data!;
+              if (posts.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: Text('아직 게시글이 없어요')),
+                );
+              }
+              return Column(
+                children: posts.map((p) => _buildPostCard(p)).toList(),
+              );
+            },
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavBar(
         currentTab: NavTab.community,
-        onTabSelected: (tab) {
-          // TODO: 팀 라우팅 구조 확정되면 연결
-        },
+        onTabSelected: (tab) {},
       ),
     );
   }
 
-  Widget _buildMySavingCard(BuildContext context, CommunityService service) {
-    return StreamBuilder(
-      stream: service.getRanking(limit: 1000),
-      builder: (context, snapshot) {
-        num? myRate;
-        if (snapshot.hasData) {
-          final mine = snapshot.data!
-              .where((s) => s.userId == currentUserId)
-              .toList();
-          if (mine.isNotEmpty) myRate = mine.first.savingRate;
-        }
-
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEE5586).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '내 저축 비율',
-                style: TextStyle(fontSize: 13, color: Color(0xFFEE5586)),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                myRate != null ? '$myRate%' : '아직 공유 안 함',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFFEE5586),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildEntryButton(
-      BuildContext context, {
-        required IconData icon,
-        required String label,
-        required VoidCallback onTap,
-      }) {
+  Widget _buildRankingBanner() {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RankingScreen()),
+      ),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey[100],
-          borderRadius: BorderRadius.circular(12),
+          color: _green,
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: Colors.grey[700]),
-            const SizedBox(height: 6),
-            Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+            const Text('이번 달', style: TextStyle(color: Colors.white70, fontSize: 12)),
+            const SizedBox(height: 4),
+            const Text('최다 저축 랭킹 TOP 3',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            StreamBuilder(
+              stream: _service.getRanking(limit: 3),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                  return const Text('아직 랭킹 데이터가 없어요',
+                      style: TextStyle(color: Colors.white70, fontSize: 12));
+                }
+                final top3 = snapshot.data!;
+                return Row(
+                  children: List.generate(top3.length, (i) {
+                    final stat = top3[i];
+                    return Expanded(
+                      child: Container(
+                        margin: EdgeInsets.only(right: i < top3.length - 1 ? 8 : 0),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: i == 0 ? Colors.white : Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          children: [
+                            Text('${stat.savingRate}%',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: i == 0 ? _green : Colors.white,
+                                )),
+                            const SizedBox(height: 4),
+                            Text('${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: i == 0 ? _green : Colors.white,
+                                )),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildShareBanner(BuildContext context) {
+  Widget _buildPostCard(CommunityPost post) {
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+        MaterialPageRoute(builder: (_) => PostDetailScreen(post: post)),
       ),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey[300]!),
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.grey[200]!),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Expanded(
-              child: Text('내 저축 비율 공유하고 랭킹에 참여해보세요',
-                  style: TextStyle(fontSize: 13)),
+            Row(
+              children: [
+                CircleAvatar(radius: 6, backgroundColor: _green),
+                const SizedBox(width: 8),
+                Text(post.authorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
             ),
-            Icon(Icons.chevron_right, color: Colors.grey[500]),
+            const SizedBox(height: 8),
+            Text(post.content, style: const TextStyle(fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 8),
+            Text('#${post.category}', style: TextStyle(fontSize: 11, color: _green)),
+            const SizedBox(height: 8),
+            Text('좋아요 ${post.likeCount} · 댓글 ${post.commentCount}',
+                style: TextStyle(fontSize: 11, color: Colors.grey[500])),
           ],
         ),
       ),

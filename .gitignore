@@ -51,3 +51,4 @@ app.*.map.json
  .env
 android/app/google-services.json
 lib/firebase_options.dart
+lib/main_test_*.dart

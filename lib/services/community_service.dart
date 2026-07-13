@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/community_post_model.dart';
 import '../models/community_stat_model.dart';
+import '../models/post_comment_model.dart';
 
 class CommunityService {
   final _db = FirebaseFirestore.instance;
@@ -36,5 +38,51 @@ class CommunityService {
   // 내 저축 비율 공유/갱신 (61_저축비율공유)
   Future<void> updateMyStat(String userId, CommunityStat stat) async {
     await _db.collection('communityStats').doc(userId).set(stat.toMap());
+  }
+
+  Stream<List<CommunityPost>> getPosts({String? category}) {
+    Query query = _db.collection('communityPosts').orderBy('createdAt', descending: true);
+    if (category != null && category != '전체') {
+      query = query.where('category', isEqualTo: category);
+    }
+    return query.snapshots().map(
+          (s) => s.docs.map((d) => CommunityPost.fromFirestore(d)).toList(),
+    );
+  }
+
+  // 댓글 목록 (실시간)
+  Stream<List<PostComment>> getComments(String postId) {
+    return _db
+        .collection('communityPosts')
+        .doc(postId)
+        .collection('comments')
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map((d) => PostComment.fromFirestore(d)).toList());
+  }
+
+// 댓글 작성
+  Future<void> addComment({
+    required String postId,
+    required String authorId,
+    required String authorName,
+    required String content,
+  }) async {
+    final postRef = _db.collection('communityPosts').doc(postId);
+    await postRef.collection('comments').add({
+      'authorId': authorId,
+      'authorName': authorName,
+      'content': content,
+      'likeCount': 0,
+      'createdAt': Timestamp.now(),
+    });
+    await postRef.update({'commentCount': FieldValue.increment(1)});
+  }
+
+// 게시글 좋아요
+  Future<void> togglePostLike(String postId, bool isLiking) async {
+    await _db.collection('communityPosts').doc(postId).update({
+      'likeCount': FieldValue.increment(isLiking ? 1 : -1),
+    });
   }
 }
