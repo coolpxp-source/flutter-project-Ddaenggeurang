@@ -48,6 +48,22 @@ app.*.map.json
 /android/app/release
 . e n v
 
+# 자동 생성 파일 (매번 충돌 남)
+**/generated_plugin_registrant.*
+**/GeneratedPluginRegistrant.*
+**/generated_plugins.cmake
+
+# 안 쓰는 플랫폼 (안드로이드 전용)
+/macos/
+/windows/
+/linux/
+/ios/
+/web/
+
+# 환경변수 / 모델 파일
+.env
+*.gguf
+
  .env
 android/app/google-services.json
 lib/firebase_options.dart
