@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class MissionProofUploadScreen extends StatefulWidget {
   const MissionProofUploadScreen({
@@ -18,8 +21,150 @@ class _MissionProofUploadScreenState
   final TextEditingController _descriptionController =
   TextEditingController();
 
-  // 다음 단계에서 실제 선택한 이미지 정보를 저장할 예정
-  bool _hasSelectedImage = false;
+  final ImagePicker _imagePicker = ImagePicker();
+
+  XFile? _selectedImage;
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 85,
+      );
+
+      if (image == null || !mounted) {
+        return;
+      }
+
+      setState(() {
+        _selectedImage = image;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == ImageSource.camera
+                ? '카메라를 실행하지 못했습니다.'
+                : '이미지를 불러오지 못했습니다.',
+          ),
+        ),
+      );
+
+      debugPrint('이미지 선택 오류: $error');
+    }
+  }
+
+  void _showImageSourceSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 18,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD9D9D9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  '인증 사진 추가',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildImageSourceButton(
+                        icon: Icons.camera_alt_rounded,
+                        label: '사진 촬영',
+                        onTap: () {
+                          Navigator.pop(bottomSheetContext);
+                          _pickImage(ImageSource.camera);
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildImageSourceButton(
+                        icon: Icons.photo_library_rounded,
+                        label: '갤러리 선택',
+                        onTap: () {
+                          Navigator.pop(bottomSheetContext);
+                          _pickImage(ImageSource.gallery);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildImageSourceButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF1F6),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFFFD3E2),
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              color: const Color(0xFFE66A9F),
+              size: 30,
+            ),
+            const SizedBox(height: 9),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF4B4146),
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   void dispose() {
@@ -183,10 +328,7 @@ class _MissionProofUploadScreenState
 
   Widget _buildImageArea() {
     return InkWell(
-      onTap: () {
-        // 다음 단계에서 이미지 선택 기능 연결
-        debugPrint('이미지 선택 버튼 클릭');
-      },
+      onTap: _showImageSourceSheet,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         width: double.infinity,
@@ -199,36 +341,69 @@ class _MissionProofUploadScreenState
             width: 1.5,
           ),
         ),
-        child: _hasSelectedImage
-            ? const Center(
-          child: Text('선택한 이미지 미리보기 영역'),
-        )
-            : const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.add_photo_alternate_outlined,
-              color: Color(0xFFE66A9F),
-              size: 46,
-            ),
-            SizedBox(height: 12),
-            Text(
-              '사진을 선택해 주세요',
-              style: TextStyle(
-                color: Color(0xFF4B4146),
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: _selectedImage != null
+              ? Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.file(
+                File(_selectedImage!.path),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Text('이미지를 표시할 수 없습니다.'),
+                  );
+                },
               ),
-            ),
-            SizedBox(height: 6),
-            Text(
-              '갤러리에서 인증 사진을 가져올 수 있어요.',
-              style: TextStyle(
-                color: Color(0xFF999096),
-                fontSize: 12,
+              Positioned(
+                top: 12,
+                right: 12,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _showImageSourceSheet,
+                    tooltip: '사진 변경',
+                    icon: const Icon(
+                      Icons.edit_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ],
+            ],
+          )
+              : const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.add_photo_alternate_outlined,
+                color: Color(0xFFE66A9F),
+                size: 46,
+              ),
+              SizedBox(height: 12),
+              Text(
+                '사진을 선택해 주세요',
+                style: TextStyle(
+                  color: Color(0xFF4B4146),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                '갤러리에서 인증 사진을 가져올 수 있어요.',
+                style: TextStyle(
+                  color: Color(0xFF999096),
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
