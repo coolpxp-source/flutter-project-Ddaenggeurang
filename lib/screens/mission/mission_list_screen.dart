@@ -14,6 +14,7 @@ class MissionListScreen extends StatefulWidget {
 
 class _MissionListScreenState extends State<MissionListScreen> {
   final MissionService _missionService = MissionService();
+  bool _isAttendanceCompleted = false;
 
   late Future<List<MissionDefinition>> _missionsFuture;
 
@@ -57,20 +58,25 @@ class _MissionListScreenState extends State<MissionListScreen> {
             itemCount: missions.length,
             itemBuilder: (context, index) {
               final mission = missions[index];
-
               return MissionCard(
                 mission: mission,
-                onTap: () {
+                isCompleted:
+                mission.type == 'attendance' && _isAttendanceCompleted,
+                onTap: () async {
                   if (mission.type == 'attendance') {
-                    Navigator.push(
+                    final result = await Navigator.push<bool>(
                       context,
                       MaterialPageRoute(
                         builder: (_) => const AttendanceCheckScreen(),
                       ),
                     );
+                    if (result == true && mounted) {
+                      setState(() {
+                        _isAttendanceCompleted = true;
+                      });
+                    }
                     return;
                   }
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${mission.title} 선택'),

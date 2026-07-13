@@ -42,6 +42,12 @@ class _AttendanceCheckScreenState
           content: Text('출석 완료! 10포인트를 획득했습니다.'),
         ),
       );
+
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (!mounted) return;
+
+      Navigator.pop(context, true);
     }
   }
 
