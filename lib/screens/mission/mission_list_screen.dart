@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/mission_definition_model.dart';
 import '../../services/mission_service.dart';
 import '../../widgets/mission/mission_card.dart';
+import 'attendance_check_screen.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -60,6 +61,16 @@ class _MissionListScreenState extends State<MissionListScreen> {
               return MissionCard(
                 mission: mission,
                 onTap: () {
+                  if (mission.type == 'attendance') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AttendanceCheckScreen(),
+                      ),
+                    );
+                    return;
+                  }
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('${mission.title} 선택'),
