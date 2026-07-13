@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'attendance_check_screen.dart';
+import 'mission_proof_upload_screen.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -99,6 +100,19 @@ class _MissionListScreenState extends State<MissionListScreen> {
           _completedDays.add(DateTime.now().day);
         });
       }
+
+      return;
+    }
+
+    if (mission['id'] == 'photo_proof') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => MissionProofUploadScreen(
+            missionTitle: mission['title'] as String,
+          ),
+        ),
+      );
 
       return;
     }

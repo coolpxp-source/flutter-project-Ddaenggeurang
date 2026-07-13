@@ -39,6 +39,9 @@ class _MissionProofUploadScreenState
           onPressed: () {
             Navigator.pop(context);
           },
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
           icon: const Icon(
             Icons.arrow_back_ios_new_rounded,
             color: Color(0xFF333333),

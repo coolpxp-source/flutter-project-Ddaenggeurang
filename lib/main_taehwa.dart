@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/mission/mission_proof_upload_screen.dart';
+import 'screens/mission/mission_list_screen.dart';
 
 void main() {
   runApp(const TaehwaTestApp());
@@ -12,7 +12,7 @@ class TaehwaTestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: MissionProofUploadScreen(),
+      home: MissionListScreen(),
     );
   }
 }
