@@ -16,7 +16,7 @@ class TaehwaTestApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: GroupCreateJoinScreen(),
+      home: MissionListScreen(),
     );
   }
 }

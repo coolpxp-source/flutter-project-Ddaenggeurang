@@ -71,6 +71,32 @@ class GroupService {
     ),
   ];
 
+  Future<void> addSharedExpense(SharedExpenseModel expense) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    _sharedExpenses.add(expense);
+  }
+
+  void deleteSharedExpense({
+    required String expenseId,
+  }) {
+    _sharedExpenses.removeWhere(
+          (expense) => expense.id == expenseId,
+    );
+  }
+
+  void updateSharedExpense(
+      SharedExpenseModel updatedExpense,
+      ) {
+    final index = _sharedExpenses.indexWhere(
+          (expense) => expense.id == updatedExpense.id,
+    );
+    if (index == -1) {
+      return;
+    }
+    _sharedExpenses[index] = updatedExpense;
+  }
+
   final List<GroupModel> _groups = [
     GroupModel(
       id: 'group_001',
