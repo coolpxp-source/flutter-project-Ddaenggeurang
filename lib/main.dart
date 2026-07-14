@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'models/user_model.dart';
 import 'firebase_options.dart';
 import 'services/user_service.dart';
 import 'screens/onboarding/onboarding_screen.dart';
@@ -67,15 +67,16 @@ class AppGate extends StatelessWidget {
         }
 
         // ── 로그인 상태 ──
-        return FutureBuilder<bool>(
-          future: UserService().isNewUser(user.uid),
+        return StreamBuilder<UserModel?>(
+          stream: UserService().watchUser(user.uid),
           builder: (context, snap) {
+            if (snap.connectionState == ConnectionState.waiting) {
+              return const DdaengLoading();
+            }
             if (snap.hasError) {
               return _ErrorView(message: '${snap.error}');
             }
-            if (!snap.hasData) return const DdaengLoading();
-
-            return snap.data!
+            return snap.data == null
                 ? SignupExtraScreen(uid: user.uid, email: user.email ?? '')
                 : const HomeScreen();
           },
