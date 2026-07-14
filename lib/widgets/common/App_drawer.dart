@@ -28,7 +28,7 @@ class AppDrawer extends StatelessWidget {
           const DrawerSectionLabel(label: '내역 입력 및 조회'),
           DrawerMenuItem(
             icon: Icons.edit_note,
-            title: '내역 입력 (수입/지출)',
+            title: '수입/지출 기록하기',
             destinationScreen: const ExpenseInputScreen(),
           ),
           const DrawerMenuItem(
