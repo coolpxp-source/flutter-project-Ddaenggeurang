@@ -6,7 +6,6 @@ import '../../services/budget_service.dart';
 import 'category_budget_setting_screen.dart';
 
 class BudgetSettingScreen extends StatefulWidget {
-  // 현재 로그인 사용자 UID
   final String userId;
 
   const BudgetSettingScreen({
@@ -33,22 +32,24 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   // 고정지출 합계
   int _fixedExpenseTotal = 0;
 
-  // 구독료 합계
+  // 활성 구독료 합계
   int _subscriptionTotal = 0;
 
   // 카테고리별 예산
   Map<String, int> _categoryBudgets = {};
 
+  // 로딩 및 저장 상태
   bool _isLoading = true;
   bool _isSaving = false;
 
-  /// 현재 월을 2026-07 형식으로 반환
+  /// 현재 연월을 YYYY-MM 형식으로 반환
   String get _currentMonth {
     final DateTime now = DateTime.now();
 
     return '${now.year}-${now.month.toString().padLeft(2, '0')}';
   }
 
+  /// 입력된 전체 예산
   int get _totalBudget {
     return int.tryParse(
       _totalBudgetController.text
@@ -65,8 +66,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
         _subscriptionTotal;
   }
 
+  /// 카테고리별 예산 합계
   int get _categoryTotal {
-    return _categoryBudgets.values.fold(
+    return _categoryBudgets.values.fold<int>(
       0,
           (sum, amount) => sum + amount,
     );
@@ -76,29 +78,47 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   void initState() {
     super.initState();
 
+    // 전체 예산 입력값이 바뀌면 계산 결과를 다시 표시
     _totalBudgetController.addListener(_refreshScreen);
+
+    // 기존 예산과 구독료 조회
     _loadBudget();
   }
 
+  /// 전체 예산 변경 시 화면 갱신
   void _refreshScreen() {
     if (mounted) {
       setState(() {});
     }
   }
 
-  /// 기존 예산과 구독료 불러오기
+  /// 기존 예산과 활성 구독료 불러오기
   Future<void> _loadBudget() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
     try {
-      final results = await Future.wait([
+      final List<Object?> results = await Future.wait<Object?>([
+        // 현재 월 예산 조회
         _budgetService.getBudget(
           userId: widget.userId,
           month: _currentMonth,
         ),
-        _budgetService.getSubscriptionTotal(widget.userId),
+
+        // 활성 구독료 합계 조회
+        _budgetService.getSubscriptionTotal(
+          widget.userId,
+        ),
       ]);
 
-      final BudgetModel? budget = results[0] as BudgetModel?;
-      final int subscriptionTotal = results[1] as int;
+      final BudgetModel? budget =
+      results[0] as BudgetModel?;
+
+      final int subscriptionTotal =
+      results[1] as int;
 
       if (!mounted) {
         return;
@@ -107,14 +127,20 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
       setState(() {
         _subscriptionTotal = subscriptionTotal;
 
+        // 저장된 예산이 있으면 화면에 자동 반영
         if (budget != null) {
           _totalBudgetController.text =
               budget.totalBudget.toString();
 
           _startDay = budget.startDay;
-          _fixedExpenseTotal = budget.fixedExpenseTotal;
+
+          _fixedExpenseTotal =
+              budget.fixedExpenseTotal;
+
           _categoryBudgets =
-          Map<String, int>.from(budget.categoryBudgets);
+          Map<String, int>.from(
+            budget.categoryBudgets,
+          );
         }
 
         _isLoading = false;
@@ -130,7 +156,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('예산 정보를 불러오지 못했습니다.\n$e'),
+          content: Text(
+            '예산 정보를 불러오지 못했습니다.\n$e',
+          ),
         ),
       );
     }
@@ -138,7 +166,8 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
   /// 예산 시작일 선택
   Future<void> _selectStartDay() async {
-    final int? selectedDay = await showModalBottomSheet<int>(
+    final int? selectedDay =
+    await showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
       builder: (bottomSheetContext) {
@@ -188,7 +217,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
       },
     );
 
-    if (selectedDay != null) {
+    if (selectedDay != null && mounted) {
       setState(() {
         _startDay = selectedDay;
       });
@@ -200,7 +229,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     if (_totalBudget <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('먼저 전체 예산을 입력해 주세요.'),
+          content: Text(
+            '먼저 전체 예산을 입력해 주세요.',
+          ),
         ),
       );
       return;
@@ -209,48 +240,64 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     if (_availableBudget < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('전체 예산이 고정지출과 구독료보다 적습니다.'),
+          content: Text(
+            '전체 예산이 고정지출과 구독료보다 적습니다.',
+          ),
         ),
       );
       return;
     }
 
-    final result = await Navigator.push<Map<String, int>>(
+    final Map<String, int>? result =
+    await Navigator.push<Map<String, int>>(
       context,
       MaterialPageRoute(
-        builder: (_) => CategoryBudgetSettingScreen(
-          availableBudget: _availableBudget,
-          initialCategoryBudgets: _categoryBudgets,
-        ),
+        builder: (_) =>
+            CategoryBudgetSettingScreen(
+              availableBudget: _availableBudget,
+              initialCategoryBudgets:
+              Map<String, int>.from(
+                _categoryBudgets,
+              ),
+            ),
       ),
     );
 
+    // 카테고리 설정 결과 반영
     if (result != null && mounted) {
       setState(() {
-        _categoryBudgets = result;
+        _categoryBudgets =
+        Map<String, int>.from(result);
       });
     }
   }
 
-  /// Firestore에 예산 저장
+  /// 예산 저장 및 수정
   Future<void> _saveBudget() async {
+    // 전체 예산 입력값 검사
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
+    // 고정지출과 구독료가 전체 예산보다 큰 경우
     if (_availableBudget < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('전체 예산이 고정지출과 구독료보다 적습니다.'),
+          content: Text(
+            '전체 예산이 고정지출과 구독료보다 적습니다.',
+          ),
         ),
       );
       return;
     }
 
+    // 카테고리 예산 합계가 가용 예산보다 큰 경우
     if (_categoryTotal > _availableBudget) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('카테고리 예산 합계가 가용 예산을 초과했습니다.'),
+          content: Text(
+            '카테고리 예산 합계가 가용 예산을 초과했습니다.',
+          ),
         ),
       );
       return;
@@ -261,6 +308,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     });
 
     try {
+      // Firestore에 신규 저장 또는 기존 문서 수정
       await _budgetService.saveBudget(
         userId: widget.userId,
         month: _currentMonth,
@@ -268,7 +316,10 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
         startDay: _startDay,
         fixedExpenseTotal: _fixedExpenseTotal,
         subscriptionTotal: _subscriptionTotal,
-        categoryBudgets: _categoryBudgets,
+        categoryBudgets:
+        Map<String, int>.from(
+          _categoryBudgets,
+        ),
       );
 
       if (!mounted) {
@@ -277,9 +328,14 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('예산 설정이 저장되었습니다.'),
+          content: Text(
+            '예산 설정이 저장되었습니다.',
+          ),
         ),
       );
+
+      // 저장된 값을 다시 조회해 화면 동기화
+      await _loadBudget();
     } catch (e) {
       if (!mounted) {
         return;
@@ -287,7 +343,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('예산 저장 중 오류가 발생했습니다.\n$e'),
+          content: Text(
+            '예산 저장 중 오류가 발생했습니다.\n$e',
+          ),
         ),
       );
     } finally {
@@ -301,7 +359,10 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
   @override
   void dispose() {
-    _totalBudgetController.removeListener(_refreshScreen);
+    _totalBudgetController.removeListener(
+      _refreshScreen,
+    );
+
     _totalBudgetController.dispose();
 
     super.dispose();
@@ -309,18 +370,24 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 예산 정보 조회 중
     if (_isLoading) {
       return const Scaffold(
+        backgroundColor: Colors.white,
         body: Center(
           child: CircularProgressIndicator(),
         ),
       );
     }
 
-    final bool isAvailableBudgetNegative = _availableBudget < 0;
+    final bool isAvailableBudgetNegative =
+        _availableBudget < 0;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
         title: const Text(
           '예산 설정',
           style: TextStyle(
@@ -335,17 +402,18 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
               20,
-              12,
+              16,
               20,
               32,
             ),
             children: [
-              // 전체 예산 카드
+              // 전체 예산 입력 카드
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius:
+                  BorderRadius.circular(18),
                   border: Border.all(
                     color: const Color(0xFFE4E7EC),
                   ),
@@ -367,13 +435,15 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
                     TextFormField(
-                      controller: _totalBudgetController,
+                      controller:
+                      _totalBudgetController,
                       textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
+                      keyboardType:
+                      TextInputType.number,
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
+                        FilteringTextInputFormatter
+                            .digitsOnly,
                       ],
                       style: const TextStyle(
                         fontSize: 28,
@@ -387,19 +457,24 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                         fillColor: Color(0xFFF0FDF4),
                         border: OutlineInputBorder(
                           borderSide: BorderSide.none,
-                          borderRadius: BorderRadius.all(
+                          borderRadius:
+                          BorderRadius.all(
                             Radius.circular(12),
                           ),
                         ),
                       ),
                       validator: (value) {
-                        final int amount = int.tryParse(
-                          value
-                              ?.replaceAll(',', '')
-                              .trim() ??
-                              '',
-                        ) ??
-                            0;
+                        final int amount =
+                            int.tryParse(
+                              value
+                                  ?.replaceAll(
+                                ',',
+                                '',
+                              )
+                                  .trim() ??
+                                  '',
+                            ) ??
+                                0;
 
                         if (amount <= 0) {
                           return '전체 예산을 입력하세요.';
@@ -416,24 +491,29 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               // 예산 시작일 설정
               _buildSettingTile(
                 title: '예산 시작일',
-                subtitle: '매월 $_startDay일부터 예산을 계산합니다.',
+                subtitle:
+                '매월 $_startDay일부터 예산을 계산합니다.',
                 trailingText: '$_startDay일',
-                icon: Icons.calendar_today_outlined,
+                icon:
+                Icons.calendar_today_outlined,
                 onTap: _selectStartDay,
               ),
               const SizedBox(height: 12),
 
-              // 카테고리별 예산 안내
+              // 안내 카드
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius:
+                  BorderRadius.circular(14),
                   border: Border.all(
                     color: const Color(0xFFE4E7EC),
                   ),
                 ),
                 child: const Row(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Icon(
                       Icons.info_outline,
@@ -455,7 +535,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               ),
               const SizedBox(height: 12),
 
-              // 카테고리 예산 설정 버튼
+              // 카테고리별 예산 설정 버튼
               SizedBox(
                 height: 50,
                 child: OutlinedButton.icon(
@@ -467,9 +547,14 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                         : '카테고리 예산 수정',
                   ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF12B76A),
+                    foregroundColor:
+                    const Color(0xFF12B76A),
                     side: const BorderSide(
                       color: Color(0xFF12B76A),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                      BorderRadius.circular(12),
                     ),
                   ),
                 ),
@@ -480,8 +565,12 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               Container(
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
-                  borderRadius: BorderRadius.circular(16),
+                  color: Colors.white,
+                  borderRadius:
+                  BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFE4E7EC),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -503,16 +592,28 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                     _buildAmountRow(
                       label: '가용 예산',
                       amount: _availableBudget,
-                      valueColor: isAvailableBudgetNegative
+                      valueColor:
+                      isAvailableBudgetNegative
                           ? Colors.red
-                          : const Color(0xFF12B76A),
+                          : const Color(
+                        0xFF12B76A,
+                      ),
                       isBold: true,
                     ),
-                    if (_categoryBudgets.isNotEmpty) ...[
+                    if (_categoryBudgets
+                        .isNotEmpty) ...[
                       const SizedBox(height: 12),
                       _buildAmountRow(
                         label: '카테고리 배분 합계',
                         amount: _categoryTotal,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildAmountRow(
+                        label: '미배분 예산',
+                        amount: _availableBudget -
+                            _categoryTotal,
+                        valueColor:
+                        const Color(0xFF2F6BFF),
                       ),
                     ],
                   ],
@@ -520,20 +621,27 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               ),
               const SizedBox(height: 24),
 
-              // 최종 저장 버튼
+              // 저장 버튼
               SizedBox(
                 width: double.infinity,
                 height: 52,
                 child: FilledButton(
-                  onPressed: _isSaving ? null : _saveBudget,
+                  onPressed:
+                  _isSaving ? null : _saveBudget,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF101828),
+                    backgroundColor:
+                    const Color(0xFF101828),
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                      BorderRadius.circular(12),
+                    ),
                   ),
                   child: _isSaving
                       ? const SizedBox(
                     width: 22,
                     height: 22,
-                    child: CircularProgressIndicator(
+                    child:
+                    CircularProgressIndicator(
                       strokeWidth: 2,
                       color: Colors.white,
                     ),
@@ -542,7 +650,8 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                     '저장하기',
                     style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight:
+                      FontWeight.bold,
                     ),
                   ),
                 ),
@@ -554,6 +663,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     );
   }
 
+  /// 설정 메뉴 카드
   Widget _buildSettingTile({
     required String title,
     required String subtitle,
@@ -562,23 +672,36 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: const Color(0xFFF9FAFB),
+      color: Colors.white,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
-        child: Padding(
+        child: Container(
           padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius:
+            BorderRadius.circular(14),
+            border: Border.all(
+              color: const Color(0xFFE4E7EC),
+            ),
+          ),
           child: Row(
             children: [
-              Icon(
-                icon,
-                color: const Color(0xFF475467),
+              CircleAvatar(
+                backgroundColor:
+                const Color(0xFFF0FDF4),
+                child: Icon(
+                  icon,
+                  color: const Color(0xFF12B76A),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
@@ -616,21 +739,25 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     );
   }
 
+  /// 금액 요약 행
   Widget _buildAmountRow({
     required String label,
     required int amount,
-    Color valueColor = const Color(0xFF101828),
+    Color valueColor =
+    const Color(0xFF101828),
     bool isBold = false,
   }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment:
+      MainAxisAlignment.spaceBetween,
       children: [
         Text(
           label,
           style: TextStyle(
             fontSize: 14,
-            fontWeight:
-            isBold ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isBold
+                ? FontWeight.bold
+                : FontWeight.normal,
             color: const Color(0xFF667085),
           ),
         ),
@@ -638,8 +765,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
           '${_formatAmount(amount)}원',
           style: TextStyle(
             fontSize: isBold ? 17 : 14,
-            fontWeight:
-            isBold ? FontWeight.bold : FontWeight.w600,
+            fontWeight: isBold
+                ? FontWeight.bold
+                : FontWeight.w600,
             color: valueColor,
           ),
         ),
@@ -647,9 +775,12 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     );
   }
 
+  /// 천 단위 쉼표 적용
   static String _formatAmount(int amount) {
     final bool isNegative = amount < 0;
-    final String number = amount.abs().toString().replaceAllMapped(
+
+    final String number =
+    amount.abs().toString().replaceAllMapped(
       RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
           (match) => '${match[1]},',
     );
