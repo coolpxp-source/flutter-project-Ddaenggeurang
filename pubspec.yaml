@@ -92,6 +92,12 @@ flutter_launcher_icons:
   image_path: "assets/images/Icon.png" # assets 폴더에 아이콘 파일이 있어야 합니다
   min_sdk_android: 21
 
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/Icon.png" # assets 폴더에 아이콘 파일이 있어야 합니다
+  min_sdk_android: 21
+
   # To add assets to your application, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
