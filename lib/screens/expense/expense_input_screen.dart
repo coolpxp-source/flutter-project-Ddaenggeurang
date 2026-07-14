@@ -9,11 +9,21 @@ import '../../widgets/expense/category_quick_chip.dart';
 /// TODO: 사진 촬영/갤러리 버튼은 ML Kit OCR 연동 후 결과를 아래 폼에 자동 채우는 방식으로 연결
 /// TODO: "일시불" 태그 탭 시 할부 개월 선택 바텀시트 → InstallmentPlanService와 연결
 /// TODO: 카테고리 "+ 추가"는 category/category_management_screen.dart로 이동
+/// TODO: 퀵카테고리 categoryId는 임시 슬러그값 — category_service로 실제 Firestore
+///       categories 컬렉션에서 nature별로 조회하도록 교체 필요
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({super.key});
 
   @override
   State<ExpenseInputScreen> createState() => _ExpenseInputScreenState();
+}
+
+/// 퀵카테고리 하나(임시 데이터) - 실제로는 CategoryModel에서 옴
+class _QuickCategory {
+  final String categoryId; // TODO: 실제 Firestore 문서ID로 교체
+  final String label;
+  final IconData icon;
+  const _QuickCategory(this.categoryId, this.label, this.icon);
 }
 
 class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
@@ -25,19 +35,41 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   DateTime _selectedDate = DateTime.now();
   String? _selectedCategoryId;
   String? _selectedCategoryLabel;
-  bool _isFixed = false; // 고정지출 토글 (false = 변동비 → 감정태그 활성화)
+
+  // 지출 성격 3분류 — 카테고리의 nature 필드와 항상 일치해야 함
+  ExpenseNature _selectedNature = ExpenseNature.variable;
+
   EmotionTag? _selectedEmotionTag;
   bool _isInstallment = false; // "일시불" 태그 탭 시 true로 전환 (할부 개월 선택 필요)
 
-  // 하단 퀵 카테고리 - 실제로는 category_service에서 자주쓰는 카테고리 불러오는 걸로 교체 예정
-  final _quickCategories = const [
-    {'icon': Icons.restaurant, 'label': '식비'},
-    {'icon': Icons.local_cafe, 'label': '카페'},
-    {'icon': Icons.directions_bus, 'label': '교통'},
-    {'icon': Icons.shopping_bag, 'label': '쇼핑'},
-    {'icon': Icons.home, 'label': '생활비'},
-    {'icon': Icons.medical_services, 'label': '의료'},
-  ];
+  // nature별 퀵카테고리 - TODO: category_service.getCategories(nature: ...)로 교체
+  static const Map<ExpenseNature, List<_QuickCategory>> _quickCategoriesByNature = {
+    ExpenseNature.fixed: [
+      _QuickCategory('rent', '월세', Icons.home_outlined),
+      _QuickCategory('maintenance_fee', '관리비', Icons.apartment_outlined),
+      _QuickCategory('phone_bill', '휴대폰요금', Icons.smartphone_outlined),
+      _QuickCategory('internet', '인터넷', Icons.wifi),
+      _QuickCategory('insurance', '보험료', Icons.health_and_safety_outlined),
+      _QuickCategory('ott', 'OTT/구독', Icons.subscriptions_outlined),
+    ],
+    ExpenseNature.variable: [
+      _QuickCategory('meal', '식사', Icons.restaurant),
+      _QuickCategory('cafe', '카페/디저트', Icons.local_cafe),
+      _QuickCategory('mart', '마트/장보기', Icons.shopping_cart_outlined),
+      _QuickCategory('public_transport', '대중교통', Icons.directions_bus),
+      _QuickCategory('clothes', '의류/잡화', Icons.shopping_bag),
+      _QuickCategory('hospital', '병원', Icons.medical_services),
+    ],
+    ExpenseNature.other: [
+      _QuickCategory('congratulation_money', '축의금/조의금', Icons.card_giftcard),
+      _QuickCategory('birthday_gift', '생일선물', Icons.redeem),
+      _QuickCategory('holiday_money', '명절용돈', Icons.celebration_outlined),
+      _QuickCategory('uncategorized', '미분류(기타)', Icons.category_outlined),
+    ],
+  };
+
+  List<_QuickCategory> get _currentQuickCategories =>
+      _quickCategoriesByNature[_selectedNature]!;
 
   @override
   void dispose() {
@@ -59,11 +91,23 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }
   }
 
-  void _selectQuickCategory(String label) {
+  /// nature 탭을 바꾸면 이전 nature의 카테고리가 남아있으면 안 되니 초기화
+  void _selectNature(ExpenseNature nature) {
+    if (_selectedNature == nature) return;
     setState(() {
-      _selectedCategoryLabel = label;
-      // TODO: 실제 categoryId는 category_service에서 label로 조회해서 채워야 함
-      _selectedCategoryId = label;
+      _selectedNature = nature;
+      _selectedCategoryId = null;
+      _selectedCategoryLabel = null;
+      if (nature != ExpenseNature.variable) {
+        _selectedEmotionTag = null;
+      }
+    });
+  }
+
+  void _selectQuickCategory(_QuickCategory category) {
+    setState(() {
+      _selectedCategoryLabel = category.label;
+      _selectedCategoryId = category.categoryId;
     });
   }
 
@@ -105,8 +149,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       amount: amount,
       date: _selectedDate,
       categoryId: _selectedCategoryId!,
-      nature: _isFixed ? ExpenseNature.fixed : ExpenseNature.variable,
-      emotionTag: _isFixed ? null : _selectedEmotionTag?.code,
+      nature: _selectedNature,
+      emotionTag:
+      _selectedNature == ExpenseNature.variable ? _selectedEmotionTag?.code : null,
       memo: _memoController.text.isEmpty ? null : _memoController.text,
     );
 
@@ -137,7 +182,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             const Center(
               child: Text('또는 직접 입력', style: TextStyle(color: Colors.grey, fontSize: 12)),
             ),
+            const SizedBox(height: 16),
+
+            // 지출 성격 3분류 — 가장 먼저 선택, 이 선택에 따라 아래 카테고리 목록이 필터링됨
+            _buildNatureSegment(),
             const SizedBox(height: 12),
+
             _buildFormRow(
               label: '일시',
               child: InkWell(
@@ -213,16 +263,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 ),
               ),
             ),
-            _buildFormRow(
-              label: '고정지출',
-              child: Switch(
-                value: _isFixed,
-                onChanged: (v) => setState(() => _isFixed = v),
-              ),
-            ),
 
-            // 변동비일 때만 감정태그 노출 (시안엔 없었지만 모델 규칙상 필요)
-            if (!_isFixed) ...[
+            // 변동비일 때만 감정태그 노출
+            if (_selectedNature == ExpenseNature.variable) ...[
               const SizedBox(height: 8),
               const Text('감정태그', style: TextStyle(fontSize: 13, color: Colors.grey)),
               const SizedBox(height: 8),
@@ -268,19 +311,43 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               crossAxisCount: 3,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              children: _quickCategories.map((c) {
-                final label = c['label'] as String;
+              children: _currentQuickCategories.map((c) {
                 return CategoryQuickChip(
-                  icon: c['icon'] as IconData,
-                  label: label,
-                  isSelected: _selectedCategoryLabel == label,
-                  onTap: () => _selectQuickCategory(label),
+                  icon: c.icon,
+                  label: c.label,
+                  isSelected: _selectedCategoryLabel == c.label,
+                  onTap: () => _selectQuickCategory(c),
                 );
               }).toList(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  /// 고정비 / 변동비 / 기타 3분류 세그먼트
+  /// 여기서 고른 값에 따라 아래 퀵카테고리 목록 + 감정태그 노출 여부가 결정됨
+  Widget _buildNatureSegment() {
+    return Row(
+      children: ExpenseNature.values.map((nature) {
+        final selected = _selectedNature == nature;
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: ChoiceChip(
+              label: Center(child: Text(nature.label)),
+              selected: selected,
+              onSelected: (_) => _selectNature(nature),
+              selectedColor: Colors.green.withOpacity(0.15),
+              labelStyle: TextStyle(
+                color: selected ? Colors.green[800] : Colors.black87,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 
