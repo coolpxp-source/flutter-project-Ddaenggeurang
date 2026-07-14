@@ -1,10 +1,10 @@
-import 'package:ddaenggeurang/screens/community/post_detail_screen.dart';
-import 'package:ddaenggeurang/screens/community/post_write_screen.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../models/community_post_model.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import 'ranking_screen.dart';
+import 'post_detail_screen.dart';
+import 'post_write_screen.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});

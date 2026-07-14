@@ -362,14 +362,27 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                   child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
                 ),
                 Positioned(
-                  right: 4,
-                  top: 4,
+                  right: 8,
+                  top: 8,
                   child: GestureDetector(
                     onTap: () => _toggleFavorite(product.productId),
-                    child: Icon(
-                      isFav ? Icons.favorite : Icons.favorite_border,
-                      size: 18,
-                      color: isFav ? Colors.redAccent : Colors.grey[400],
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isFav ? Icons.favorite : Icons.favorite_border,
+                        size: 15,
+                        color: isFav ? Colors.redAccent : Colors.grey[400],
+                      ),
                     ),
                   ),
                 ),

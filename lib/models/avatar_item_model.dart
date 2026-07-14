@@ -19,6 +19,31 @@ class AvatarItem {
     this.isEquipped = false,
   });
 
+  factory AvatarItem.fromMap(
+      String id,
+      Map<String, dynamic> map,
+      ) {
+    return AvatarItem(
+      id: id,
+      name: map['name'] as String? ?? '',
+      slot: map['slot'] as String? ?? '',
+      price: (map['price'] as num?)?.toInt() ?? 0,
+      unlockLevel:
+      (map['unlockLevel'] as num?)?.toInt() ?? 1,
+      imageUrl: map['imageUrl'] as String? ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'slot': slot,
+      'price': price,
+      'unlockLevel': unlockLevel,
+      'imageUrl': imageUrl,
+    };
+  }
+
   AvatarItem copyWith({
     bool? isOwned,
     bool? isEquipped,

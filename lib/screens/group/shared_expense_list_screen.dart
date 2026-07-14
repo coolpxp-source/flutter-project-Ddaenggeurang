@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/group_model.dart';
 import '../../models/shared_expense_model.dart';
 import '../../services/group_service.dart';
+import 'shared_expense_add_screen.dart';
+import 'shared_expense_edit_screen.dart';
 
 class SharedExpenseListScreen extends StatefulWidget {
   const SharedExpenseListScreen({
@@ -116,15 +118,29 @@ class _SharedExpenseListScreenState
       ),
       floatingActionButton:
       FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                '공동지출 등록 기능은 다음 단계에서 연결합니다.',
+        onPressed: () async {
+          final bool? isAdded = await Navigator.push<bool>(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SharedExpenseAddScreen(
+                groupId: widget.group.id,
               ),
             ),
           );
+          if (isAdded == true) {
+            _loadExpenses();
+
+            if (!mounted) {
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '공동 지출이 등록되었습니다.',
+                ),
+              ),
+            );
+          }
         },
         backgroundColor:
         const Color(0xFFE66A9F),
@@ -299,9 +315,7 @@ class _SharedExpenseListScreenState
 
     return InkWell(
       onTap: () {
-        debugPrint(
-          '공동지출 선택: ${expense.id}',
-        );
+        _showExpenseDetail(expense);
       },
       borderRadius:
       BorderRadius.circular(20),
@@ -499,6 +513,394 @@ class _SharedExpenseListScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showExpenseDetail(
+      SharedExpenseModel expense,
+      ) {
+    final color = _getCategoryColor(
+      expense.category,
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(
+            20,
+            14,
+            20,
+            28,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(
+                        0xFFD8D6DE,
+                      ),
+                      borderRadius:
+                      BorderRadius.circular(
+                        999,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 22),
+
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: color.withValues(
+                          alpha: 0.12,
+                        ),
+                        borderRadius:
+                        BorderRadius.circular(
+                          16,
+                        ),
+                      ),
+                      child: Icon(
+                        _getCategoryIcon(
+                          expense.category,
+                        ),
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment
+                            .start,
+                        children: [
+                          Text(
+                            expense.title,
+                            style:
+                            const TextStyle(
+                              color: Color(
+                                0xFF252735,
+                              ),
+                              fontSize: 20,
+                              fontWeight:
+                              FontWeight
+                                  .w900,
+                            ),
+                          ),
+                          const SizedBox(
+                            height: 4,
+                          ),
+                          Text(
+                            expense.category,
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 13,
+                              fontWeight:
+                              FontWeight
+                                  .bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 26),
+
+                _buildDetailRow(
+                  icon: Icons.payments_outlined,
+                  label: '금액',
+                  value:
+                  '${_formatAmount(expense.amount)}원',
+                ),
+
+                _buildDetailRow(
+                  icon: Icons.person_outline,
+                  label: '결제자',
+                  value:
+                  expense.paidByNickname,
+                ),
+
+                _buildDetailRow(
+                  icon:
+                  Icons.calendar_month_outlined,
+                  label: '날짜',
+                  value: _formatFullDate(
+                    expense.date,
+                  ),
+                ),
+
+                if (expense.memo != null &&
+                    expense.memo!.isNotEmpty)
+                  _buildDetailRow(
+                    icon:
+                    Icons.edit_note_outlined,
+                    label: '메모',
+                    value: expense.memo!,
+                  ),
+
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(
+                            bottomSheetContext,
+                          );
+
+                          final bool? isUpdated =
+                          await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  SharedExpenseEditScreen(
+                                    expense: expense,
+                                  ),
+                            ),
+                          );
+
+                          if (isUpdated == true) {
+                            _loadExpenses();
+
+                            if (!mounted) {
+                              return;
+                            }
+
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  '공동 지출이 수정되었습니다.',
+                                ),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.edit_outlined,
+                        ),
+                        label:
+                        const Text('수정'),
+                        style:
+                        OutlinedButton
+                            .styleFrom(
+                          foregroundColor:
+                          const Color(
+                            0xFF8566FF,
+                          ),
+                          side:
+                          const BorderSide(
+                            color: Color(
+                              0xFF8566FF,
+                            ),
+                          ),
+                          padding:
+                          const EdgeInsets
+                              .symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child:
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          _confirmDeleteExpense(
+                            bottomSheetContext,
+                            expense,
+                          );
+                        },
+                        icon: const Icon(
+                          Icons
+                              .delete_outline_rounded,
+                        ),
+                        label:
+                        const Text('삭제'),
+                        style:
+                        ElevatedButton
+                            .styleFrom(
+                          backgroundColor:
+                          const Color(
+                            0xFFE66A9F,
+                          ),
+                          foregroundColor:
+                          Colors.white,
+                          elevation: 0,
+                          padding:
+                          const EdgeInsets
+                              .symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(
+        bottom: 16,
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 21,
+            color: const Color(
+              0xFF92949E,
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 62,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(
+                  0xFF92949E,
+                ),
+                fontSize: 13,
+                fontWeight:
+                FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(
+                  0xFF252735,
+                ),
+                fontSize: 14,
+                fontWeight:
+                FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatFullDate(
+      DateTime date,
+      ) {
+    return '${date.year}년 '
+        '${date.month}월 '
+        '${date.day}일';
+  }
+
+  Future<void> _confirmDeleteExpense(
+      BuildContext bottomSheetContext,
+      SharedExpenseModel expense,
+      ) async {
+    final bool? shouldDelete =
+    await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            '공동 지출 삭제',
+          ),
+          content: Text(
+            '"${expense.title}" 지출 내역을 삭제할까요?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: const Text(
+                '취소',
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text(
+                '삭제',
+                style: TextStyle(
+                  color: Colors.red,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    _groupService.deleteSharedExpense(
+      expenseId: expense.id,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.pop(
+      bottomSheetContext,
+    );
+
+    _loadExpenses();
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content: Text(
+          '공동 지출이 삭제되었습니다.',
+        ),
       ),
     );
   }
