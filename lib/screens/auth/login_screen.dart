@@ -33,6 +33,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _afterAuthSuccess(User? user) async {
     if (user == null) return;
+
+    // 신규 사용자라면 닉네임 설정(SignupExtraScreen)으로 이동
     if (await UserService().isNewUser(user.uid)) {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -40,12 +42,13 @@ class _LoginScreenState extends State<LoginScreen> {
           builder: (_) => SignupExtraScreen(
             uid: user.uid,
             email: user.email ?? '',
+            // 온보딩에서 미리 입력받은 데이터가 있다면 여기서 전달됩니다
             onboardingData: widget.onboardingData,
           ),
         ),
       );
     }
-    // 기존 사용자는 AppGate가 자동으로 홈으로 보냄
+    // 기존 사용자는 앱 로직에 따라 홈으로 자동 이동
   }
 
   Future<void> _signInWithGoogle() async {
@@ -97,10 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _goToSignUp() {
+    // 가입하기를 누르면 온보딩 화면으로 이동 (아직 가입 전이므로 데이터는 null)
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => EmailSignUpScreen(onboardingData: widget.onboardingData),
-      ),
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
     );
   }
 

@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/coach_tone.dart';
 import '../../utils/formatters.dart';
 import '../auth/login_screen.dart';
+// 기존 import 문들 아래에 추가
+import '../auth/email_signup_screen.dart'; // EmailSignUpScreen 파일 경로에 맞게 수정 필요
 
 // ══════════════════════ 브랜드 색상 ══════════════════════
 class DdaengColors {
@@ -50,21 +52,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<Map<String, dynamic>> _fetchMeta() async {
-    const fallbackAges = ['10대', '20대', '30대', '40대', '50대 이상'];
+    // 🔥 연령대를 세분화하고 10대 미만을 제외했습니다
+    const fallbackAges = [
+      '10대',
+      '20대 초반',
+      '20대 후반',
+      '30대 초반',
+      '30대 후반',
+      '40대',
+      '50대',
+      '60대 이상'
+    ];
+
     const fallbackJobs = ['개발·데이터 엔지니어', '기획·전략·마케팅', '학생', '기타'];
     const fallbackIcons = {'기타': '✨'};
+
     try {
       final doc = await FirebaseFirestore.instance
           .collection('metadata')
           .doc('options')
           .get();
       final data = doc.data() ?? {};
+
+      final ageGroups = data['ageGroups'] != null
+          ? List<String>.from(data['ageGroups'])
+          : fallbackAges;
+
       return {
-        'ages': data['ageGroups'] != null
-            ? List<String>.from(data['ageGroups'])
-            : fallbackAges,
-        'jobs':
-        data['jobs'] != null ? List<String>.from(data['jobs']) : fallbackJobs,
+        'ages': ageGroups,
+        'jobs': data['jobs'] != null ? List<String>.from(data['jobs']) : fallbackJobs,
         'jobIcons': data['jobIcons'] != null
             ? Map<String, String>.from(data['jobIcons'])
             : fallbackIcons,
@@ -95,23 +111,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void _back() => _pageCtrl.previousPage(
       duration: const Duration(milliseconds: 380), curve: Curves.easeOutCubic);
 
+  // OnboardingScreen.dart의 _finish() 메서드 수정
   Future<void> _finish() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('seenOnboarding', true);
     if (!mounted) return;
+
+    final data = OnboardingData(
+      salary: _salary,
+      ageGroup: _ageGroup!,
+      job: _selectedJob!,
+      tone: _tone,
+      budget: _recommendedBudget,
+    );
+
+
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => LoginScreen(
-          onboardingData: _step2Valid
-              ? OnboardingData(
-            salary: _salary,
-            ageGroup: _ageGroup!,
-            job: _selectedJob!,
-            tone: _tone,
-            budget: _recommendedBudget,
-          )
-              : null,
-        ),
+        builder: (_) => EmailSignUpScreen(onboardingData: data as OnboardingData),
       ),
     );
   }
@@ -463,6 +480,15 @@ class _InfoPage extends StatelessWidget {
 
   String _iconOf(String j) => jobIcons[j] ?? '✨';
 
+  void _openAgePicker(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AgePickerSheet(ages: ages, selected: ageGroup, onSelect: onAge),
+    );
+  }
+
   void _openJobPicker(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -487,18 +513,10 @@ class _InfoPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text('거의 다 왔어요!\n딱 3가지만 알려주세요',
-              style: TextStyle(
-                  fontSize: 25,
-                  fontWeight: FontWeight.w800,
-                  height: 1.4,
-                  letterSpacing: -0.6,
-                  color: DdaengColors.ink)),
+              style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800, height: 1.4, letterSpacing: -0.6, color: DdaengColors.ink)),
           const SizedBox(height: 10),
           const Text('입력하신 정보는 예산 추천과 또래 비교에만 쓰여요',
-              style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w500,
-                  color: DdaengColors.inkSub)),
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w500, color: DdaengColors.inkSub)),
           const SizedBox(height: 38),
 
           const _QLabel(step: '1', title: '한 달에 얼마를 벌고 계신가요?'),
@@ -507,108 +525,98 @@ class _InfoPage extends StatelessWidget {
             controller: salaryCtrl,
             keyboardType: TextInputType.number,
             inputFormatters: [ThousandsFormatter()],
-            style: const TextStyle(
-                fontSize: 19, fontWeight: FontWeight.w800, color: DdaengColors.ink),
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: DdaengColors.ink),
             decoration: InputDecoration(
               hintText: '2,800,000',
-              hintStyle: const TextStyle(
-                  color: Color(0xFFB0B8C1), fontWeight: FontWeight.w700),
+              hintStyle: const TextStyle(color: Color(0xFFB0B8C1), fontWeight: FontWeight.w700),
               suffixText: '원',
-              suffixStyle: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: DdaengColors.inkSub),
+              suffixStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: DdaengColors.inkSub),
               filled: true,
               fillColor: DdaengColors.bg,
-              contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: DdaengColors.blue, width: 1.6),
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+              focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: DdaengColors.blue, width: 1.6)),
             ),
           ),
           if (amount > 0) ...[
             const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: Text(koreanAmount(amount),
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: DdaengColors.blue)),
-            ),
+            Padding(padding: const EdgeInsets.only(left: 4), child: Text(koreanAmount(amount), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: DdaengColors.blue))),
           ],
           const SizedBox(height: 38),
 
+          // 연령대 선택 (직군과 동일한 디자인 적용)
           const _QLabel(step: '2', title: '연령대가 어떻게 되시나요?'),
           const SizedBox(height: 14),
-          _ChipGroup(items: ages, selected: ageGroup, onSelect: onAge),
+          _SelectBox(
+            hint: '연령대를 선택해주세요',
+            icon: '🎂',
+            value: ageGroup,
+            onTap: () => _openAgePicker(context),
+          ),
           const SizedBox(height: 38),
 
+          // 직군 선택
           const _QLabel(step: '3', title: '어떤 일을 하고 계신가요?'),
           const SizedBox(height: 14),
-          GestureDetector(
+          _SelectBox(
+            hint: '직군을 선택해주세요',
+            icon: selectedJob != null ? _iconOf(selectedJob!) : '💭',
+            value: selectedJob,
             onTap: () => _openJobPicker(context),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: selectedJob != null ? DdaengColors.blueSoft : DdaengColors.bg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color:
-                  selectedJob != null ? DdaengColors.blue : Colors.transparent,
-                  width: 1.6,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: selectedJob != null
-                          ? Colors.white
-                          : const Color(0xFFE8EAED),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                        selectedJob != null ? _iconOf(selectedJob!) : '💭',
-                        style: const TextStyle(fontSize: 22)),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      selectedJob ?? '직군을 선택해주세요',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight:
-                        selectedJob != null ? FontWeight.w800 : FontWeight.w600,
-                        letterSpacing: -0.3,
-                        color: selectedJob != null
-                            ? DdaengColors.ink
-                            : const Color(0xFFB0B8C1),
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.keyboard_arrow_down_rounded,
-                      color: selectedJob != null
-                          ? DdaengColors.blue
-                          : DdaengColors.inkSub),
-                ],
-              ),
-            ),
           ),
         ],
       ),
     );
   }
 }
+
+// ══════════════════════ 공통 선택 박스 위젯 ══════════════════════
+class _SelectBox extends StatelessWidget {
+  final String hint, icon;
+  final String? value;
+  final VoidCallback onTap;
+
+  const _SelectBox({required this.hint, required this.icon, required this.value, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: value != null ? DdaengColors.blueSoft : DdaengColors.bg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: value != null ? DdaengColors.blue : Colors.transparent, width: 1.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(color: value != null ? Colors.white : const Color(0xFFE8EAED), borderRadius: BorderRadius.circular(12)),
+              alignment: Alignment.center,
+              child: Text(icon, style: const TextStyle(fontSize: 22)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                value ?? hint,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: value != null ? FontWeight.w800 : FontWeight.w600,
+                  color: value != null ? DdaengColors.ink : const Color(0xFFB0B8C1),
+                ),
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: DdaengColors.inkSub),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 class _QLabel extends StatelessWidget {
   final String step;
@@ -652,31 +660,44 @@ class _ChipGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 9,
-      runSpacing: 10,
-      children: items.map((e) {
+    return GridView.builder(
+      shrinkWrap: true, // 리스트 크기만큼만 공간 차지
+      physics: const NeverScrollableScrollPhysics(), // 스크롤 방지
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, // 2열 정렬
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 3.2, // 가로/세로 비율 (원하는 만큼 조절 가능)
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final e = items[i];
         final sel = e == selected;
         return GestureDetector(
           onTap: () => onSelect(e),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               color: sel ? DdaengColors.blueSoft : DdaengColors.bg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                  color: sel ? DdaengColors.blue : Colors.transparent, width: 1.5),
+                color: sel ? DdaengColors.blue : Colors.transparent,
+                width: 1.4,
+              ),
             ),
-            child: Text(e,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
-                    letterSpacing: -0.2,
-                    color: sel ? DdaengColors.blueDeep : DdaengColors.inkSub)),
+            alignment: Alignment.center,
+            child: Text(
+              e,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
+                color: sel ? DdaengColors.blueDeep : const Color(0xFF333D4B),
+              ),
+            ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 }
@@ -832,6 +853,58 @@ class _JobPickerSheetState extends State<_JobPickerSheet> {
           ),
         );
       },
+    );
+  }
+}
+// ══════════════════════ 연령대 바텀시트 ══════════════════════
+class _AgePickerSheet extends StatelessWidget {
+  final List<String> ages;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+
+  const _AgePickerSheet({
+    required this.ages,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 30),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+              width: 40, height: 5,
+              decoration: BoxDecoration(color: DdaengColors.line, borderRadius: BorderRadius.circular(10))
+          ),
+          const SizedBox(height: 20),
+          const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('연령대를 선택해주세요', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800))
+          ),
+          const SizedBox(height: 10),
+          ...ages.map((age) => ListTile(
+            onTap: () {
+              onSelect(age);
+              Navigator.pop(context);
+            },
+            title: Text(
+                age,
+                style: TextStyle(
+                    fontWeight: age == selected ? FontWeight.w800 : FontWeight.w600,
+                    color: age == selected ? DdaengColors.blue : DdaengColors.ink
+                )
+            ),
+            trailing: age == selected ? const Icon(Icons.check_circle_rounded, color: DdaengColors.blue) : null,
+          )),
+        ],
+      ),
     );
   }
 }
