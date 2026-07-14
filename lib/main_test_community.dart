@@ -1,33 +1,9 @@
-// import 'package:flutter/material.dart';
-// import 'package:firebase_core/firebase_core.dart';
-// import 'firebase_options.dart';
-// import 'screens/community/community_home_screen.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
-//
-// void main() async {
-//   WidgetsFlutterBinding.ensureInitialized();
-//   await Firebase.initializeApp(
-//     options: DefaultFirebaseOptions.currentPlatform,
-//   );
-//
-//   await FirebaseAuth.instance.signInWithEmailAndPassword(
-//     email: 'test@ddaenggeurang.com',
-//     password: 'test1234',
-//   );
-//
-//   runApp(const MaterialApp(
-//     home: CommunityHomeScreen(),
-//   ));
-// }
-
-// 채팅 화면 test
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'screens/chat/chat_list_screen.dart'; // 채팅 목록
-import 'screens/market/market_home_screen.dart';   // 마켓 홈
+import 'screens/market/market_home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,27 +15,46 @@ void main() async {
     email: 'test@ddaenggeurang.com',
     password: 'test1234',
   );
+
   final db = FirebaseFirestore.instance;
 
-  // 기존 chat1, 메시지 2개 만드는 코드 아래에 추가
-  await db.collection('chats').doc('chat1').collection('messages').add({
-    'senderId': 'user2',
-    'type': 'text',
-    'text': '이거 아직 판매중이에요?',
-    'imageUrl': null,
-    'productId': null,
-    'sentAt': Timestamp.now(),
+  // 더미 상품 1
+  await db.collection('marketProducts').doc('product1').set({
+    'sellerId': 'user2',
+    'sellerName': '판매자',
+    'sellerAvatarUrl': '',
+    'title': '무선 이어폰',
+    'price': 39900,
+    'description': '거의 새 제품입니다. 직거래 가능해요',
+    'images': <String>[],
+    'status': 'selling',
+    'category': '전자기기',
+    'priceComparisons': <Map<String, dynamic>>[],
+    'locationGeo': null,
+    'verifiedDong': null,
+    'createdAt': Timestamp.now(),
+    'updatedAt': Timestamp.now(),
   });
 
-// unreadCount 수동으로 증가 (실제로는 sendMessage()가 자동으로 하지만, 테스트용 직접 세팅)
-  await db.collection('chats').doc('chat1').update({
-    'lastMessage': '이거 아직 판매중이에요?',
-    'lastMessageAt': Timestamp.now(),
-    'unreadCount.test_user_id': 3,  // 임의로 3개 안읽음 상태 만들기
+  // 더미 상품 2
+  await db.collection('marketProducts').doc('product2').set({
+    'sellerId': FirebaseAuth.instance.currentUser!.uid,
+    'sellerName': '나',
+    'sellerAvatarUrl': '',
+    'title': '무선 키보드 팝니다',
+    'price': 25000,
+    'description': '사용감 적어요',
+    'images': <String>[],
+    'status': 'selling',
+    'category': '전자기기',
+    'priceComparisons': <Map<String, dynamic>>[],
+    'locationGeo': null,
+    'verifiedDong': null,
+    'createdAt': Timestamp.now(),
+    'updatedAt': Timestamp.now(),
   });
 
   runApp(const MaterialApp(
-    // home: ChatListScreen(), // 채팅목록
-    home: MarketHomeScreen(),   // ← 화면 변경
+    home: MarketHomeScreen(),
   ));
 }
