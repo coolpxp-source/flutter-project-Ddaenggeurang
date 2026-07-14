@@ -81,4 +81,11 @@ class ChatService {
       'unreadCount.$myId': 0,
     });
   }
+
+  // 채팅방 단건 조회
+  Future<Chat?> getChat(String chatId) async {
+    final doc = await _db.collection('chats').doc(chatId).get();
+    if (!doc.exists) return null;
+    return Chat.fromFirestore(doc);
+  }
 }

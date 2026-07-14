@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../services/chat_service.dart';
 import '../../models/message_model.dart';
+import '../../models/chat_model.dart';
+import '../../utils/stickers.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId;
@@ -14,14 +16,25 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _chatService = ChatService();
   final _messageController = TextEditingController();
   static const _green = Color(0xFF3B8B5E);
-
-  // TODO: 로그인 연결되면 교체
   static const _myId = 'test_user_id';
+
+  ChatParticipant? _otherParticipant;
+  bool _showStickers = false;
 
   @override
   void initState() {
     super.initState();
     _chatService.markAsRead(widget.chatId, _myId);
+    _loadOtherParticipant();
+  }
+
+  Future<void> _loadOtherParticipant() async {
+    final chat = await _chatService.getChat(widget.chatId);
+    if (chat != null && mounted) {
+      setState(() {
+        _otherParticipant = chat.getOtherParticipant(_myId);
+      });
+    }
   }
 
   void _send() {
@@ -36,14 +49,38 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       sentAt: DateTime.now(),
     );
 
-    // TODO: 상대방 ID 실제로 넘겨야 함 (지금은 채팅방 정보에서 참여자 조회 필요)
     _chatService.sendMessage(
       chatId: widget.chatId,
       message: message,
-      otherUserId: '',
+      otherUserId: _otherParticipant != null
+          ? _findOtherId()
+          : '',
     );
 
     _messageController.clear();
+  }
+
+  void _sendSticker(String stickerId) {
+    final message = Message(
+      messageId: '',
+      senderId: _myId,
+      type: MessageType.sticker,
+      stickerId: stickerId,
+      sentAt: DateTime.now(),
+    );
+
+    _chatService.sendMessage(
+      chatId: widget.chatId,
+      message: message,
+      otherUserId: _otherParticipant != null ? _findOtherId() : '',
+    );
+
+    setState(() => _showStickers = false);
+  }
+
+  String _findOtherId() {
+    // TODO: chat.participantIds에서 본인 제외한 ID 정확히 가져오도록 개선 필요
+    return '';
   }
 
   @override
@@ -53,7 +90,29 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('채팅', style: TextStyle(color: Colors.black)),
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: _green,
+              backgroundImage: (_otherParticipant?.avatarUrl.isNotEmpty ?? false)
+                  ? NetworkImage(_otherParticipant!.avatarUrl)
+                  : null,
+              child: (_otherParticipant?.avatarUrl.isEmpty ?? true)
+                  ? Text(
+                _otherParticipant?.name.isNotEmpty == true
+                    ? _otherParticipant!.name.substring(0, 1)
+                    : '?',
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+              )
+                  : null,
+            ),
+            const SizedBox(width: 8),
+            Text(_otherParticipant?.name ?? '채팅',
+                style: const TextStyle(color: Colors.black, fontSize: 16)),
+          ],
+        ),
       ),
       body: Column(
         children: [
@@ -74,6 +133,21 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   itemBuilder: (context, index) {
                     final msg = messages[index];
                     final isMine = msg.senderId == _myId;
+
+                    // 스티커 메시지는 다르게 렌더링
+                    if (msg.type == MessageType.sticker) {
+                      final path = stickerAssets[msg.stickerId] ?? '';
+                      return Align(
+                        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: path.isNotEmpty
+                              ? Image.asset(path, width: 80, height: 80)
+                              : const SizedBox(),
+                        ),
+                      );
+                    }
+
                     return Align(
                       alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
@@ -97,11 +171,41 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               },
             ),
           ),
+
+          // 이모티콘 패널
+          if (_showStickers)
+            Container(
+              height: 160,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Colors.grey[200]!)),
+              ),
+              child: GridView.count(
+                crossAxisCount: 4,
+                children: stickerAssets.entries.map((entry) {
+                  return GestureDetector(
+                    onTap: () => _sendSticker(entry.key),
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Image.asset(entry.value),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(
+                      _showStickers ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                      color: Colors.grey[600],
+                    ),
+                    onPressed: () => setState(() => _showStickers = !_showStickers),
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
