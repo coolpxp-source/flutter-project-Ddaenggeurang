@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 
@@ -16,8 +17,8 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
   static const _green = Color(0xFF3B8B5E);
 
   // TODO: 로그인 연결되면 교체
-  static const _myId = 'test_user_id';
-  static const _myName = '나';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
+  final String _myName = FirebaseAuth.instance.currentUser?.displayName ?? '나';
 
   Future<void> _submit() async {
     if (_contentController.text.trim().isEmpty) return;

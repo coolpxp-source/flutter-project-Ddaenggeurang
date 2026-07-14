@@ -81,4 +81,27 @@ class ChatService {
       'unreadCount.$myId': 0,
     });
   }
+
+  // 채팅방 단건 조회
+  Future<Chat?> getChat(String chatId) async {
+    final doc = await _db.collection('chats').doc(chatId).get();
+    if (!doc.exists) return null;
+    return Chat.fromFirestore(doc);
+  }
+
+  // 전체 채팅방의 안읽음 총합 (뱃지 표시용)
+  Stream<int> getTotalUnreadCount(String userId) {
+    return _db
+        .collection('chats')
+        .where('participantIds', arrayContains: userId)
+        .snapshots()
+        .map((snap) {
+      int total = 0;
+      for (final doc in snap.docs) {
+        final unreadMap = Map<String, dynamic>.from(doc['unreadCount'] ?? {});
+        total += (unreadMap[userId] ?? 0) as int;
+      }
+      return total;
+    });
+  }
 }

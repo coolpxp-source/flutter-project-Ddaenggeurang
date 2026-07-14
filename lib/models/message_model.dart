@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum MessageType { text, image, product }
+enum MessageType { text, image, product, sticker }
 
 extension MessageTypeX on MessageType {
   String get value => name; // "text" | "image" | "product"
@@ -20,6 +20,7 @@ class Message {
   final String? text;
   final String? imageUrl;
   final String? productId; // type이 product일 때만 사용
+  final String? stickerId;
   final DateTime sentAt;
 
   Message({
@@ -29,6 +30,7 @@ class Message {
     this.text,
     this.imageUrl,
     this.productId,
+    this.stickerId,
     required this.sentAt,
   });
 
@@ -40,6 +42,7 @@ class Message {
       text: map['text'] as String?,
       imageUrl: map['imageUrl'] as String?,
       productId: map['productId'] as String?,
+      stickerId: map['stickerId'] as String?,
       sentAt: (map['sentAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -56,6 +59,7 @@ class Message {
       'text': text,
       'imageUrl': imageUrl,
       'productId': productId,
+      'stickerId': stickerId,
       'sentAt': Timestamp.fromDate(sentAt),
     };
   }
@@ -69,6 +73,8 @@ class Message {
         return '사진을 보냈습니다';
       case MessageType.product:
         return '상품을 공유했습니다';
+      case MessageType.sticker:
+        return '이모티콘을 보냈습니다';
     }
   }
 }

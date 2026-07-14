@@ -1,15 +1,16 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/chat_service.dart';
 import '../../models/chat_model.dart';
 import 'chat_room_screen.dart';
 
 class ChatListScreen extends StatelessWidget {
-  const ChatListScreen({super.key});
+  ChatListScreen({super.key});
 
   static const _green = Color(0xFF3B8B5E);
 
   // TODO: 로그인 연결되면 교체
-  static const _myId = 'test_user_id';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   @override
   Widget build(BuildContext context) {

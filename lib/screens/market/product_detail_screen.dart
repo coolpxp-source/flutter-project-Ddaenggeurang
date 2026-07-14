@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/market_product_model.dart';
 import '../../services/chat_service.dart';
@@ -7,14 +8,14 @@ import 'price_comparison_screen.dart';
 
 class ProductDetailScreen extends StatelessWidget {
   final MarketProduct product;
-  const ProductDetailScreen({super.key, required this.product});
+  ProductDetailScreen({super.key, required this.product});
 
   static const _green = Color(0xFF3B8B5E);
   static const _greenLight = Color(0xFFE6F4EB);
 
   // TODO: 로그인 연결되면 교체
-  static const _myId = 'test_user_id';
-  static const _myName = '나';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
+  final String _myName = FirebaseAuth.instance.currentUser?.displayName ?? '나';
 
   Future<void> _startChat(BuildContext context) async {
     if (product.sellerId == _myId) {

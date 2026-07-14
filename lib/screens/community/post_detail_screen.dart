@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../models/community_post_model.dart';
@@ -17,8 +18,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   static const _green = Color(0xFF3B8B5E);
   static const _greenLight = Color(0xFFE6F4EB);
 
-  static const _myId = 'test_user_id';
-  static const _myName = '나';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
+  final String _myName = FirebaseAuth.instance.currentUser?.displayName ?? '나';
 
   void _submitComment() {
     if (_commentController.text.trim().isEmpty) return;
