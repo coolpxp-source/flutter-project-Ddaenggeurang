@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
@@ -20,6 +21,7 @@ class AuthService {
     final result = await _auth.signInWithCredential(credential);
     return result.user;
   }
+
 
   /// 이메일 회원가입
   Future<User?> signUpWithEmail(String email, String password) async {
