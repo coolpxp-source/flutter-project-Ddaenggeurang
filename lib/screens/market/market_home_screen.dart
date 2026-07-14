@@ -1,7 +1,11 @@
+import 'package:ddaenggeurang/services/chat_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/market_service.dart';
 import '../../models/market_product_model.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
+import '../chat/chat_list_screen.dart';
 import 'product_detail_screen.dart';
 
 class MarketHomeScreen extends StatefulWidget {
@@ -13,9 +17,27 @@ class MarketHomeScreen extends StatefulWidget {
 
 class _MarketHomeScreenState extends State<MarketHomeScreen> {
   final _service = MarketService();
-  int _tabIndex = 0; // 0: 땡그랑 마켓, 1: 플리마켓
+  int _tabIndex = 0;
   static const _green = Color(0xFF3B8B5E);
   static const _greenLight = Color(0xFFE6F4EB);
+
+  // TODO: 로그인 연결되면 교체
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
+
+  Set<String> _favoriteIds = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _service.getFavoriteIds(_myId).listen((ids) {
+      if (mounted) setState(() => _favoriteIds = ids);
+    });
+  }
+
+  void _toggleFavorite(String productId) {
+    final isFav = _favoriteIds.contains(productId);
+    _service.toggleFavorite(_myId, productId, !isFav);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -25,14 +47,75 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('땡그랑 마켓',
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text('가격 비교부터 알뜰한 상품 추천까지',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600])),
-            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('땡그랑 마켓',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 4),
+                      Text('가격 비교부터 알뜰한 상품 추천까지',
+                          style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                StreamBuilder<int>(
+                  stream: ChatService().getTotalUnreadCount(_myId),
+                  builder: (context, snapshot) {
+                    final unreadCount = snapshot.data ?? 0;
 
-            // 탭 전환
+                    return SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.center,
+                        children: [
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => ChatListScreen()),
+                            ),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: _greenLight,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.chat_bubble_outline, color: _green, size: 20),
+                            ),
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: 2,
+                              top: 2,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : '$unreadCount',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
             Row(
               children: [
                 _tabButton('땡그랑 마켓', 0),
@@ -42,7 +125,6 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             ),
             const Divider(height: 24),
 
-            // 검색바
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
@@ -66,7 +148,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         ),
       ),
       bottomNavigationBar: BottomNavBar(
-        currentTab: NavTab.community, // TODO: NavTab에 market 추가되면 교체
+        currentTab: NavTab.community,
         onTabSelected: (tab) {},
       ),
     );
@@ -85,23 +167,38 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                 color: selected ? Colors.black : Colors.grey[400],
               )),
           const SizedBox(height: 6),
-          Container(
-            height: 2,
-            width: 50,
-            color: selected ? _green : Colors.transparent,
-          ),
+          Container(height: 2, width: 50, color: selected ? _green : Colors.transparent),
         ],
       ),
     );
   }
 
-  // 땡그랑 마켓 탭 — 최저가 비교 (임시 더미)
   List<Widget> _buildDdaengMarketTab() {
     final dummyItems = [
-      {'name': '무선 블루투스 이어폰', 'price': '39,900원', 'tag': '최저가'},
-      {'name': '캡슐 커피 세트', 'price': '24,500원', 'tag': '23% 할인'},
-      {'name': '무선 키보드', 'price': '31,800원', 'tag': '가격 비교'},
-      {'name': '생활용품 묶음', 'price': '19,900원', 'tag': '추천'},
+      {
+        'name': '무선 블루투스 이어폰',
+        'price': '39,900원',
+        'tag': '최저가',
+        'url': 'https://www.coupang.com/np/search?q=무선+블루투스+이어폰',
+      },
+      {
+        'name': '캡슐 커피 세트',
+        'price': '24,500원',
+        'tag': '23% 할인',
+        'url': 'https://www.coupang.com/np/search?q=캡슐+커피',
+      },
+      {
+        'name': '무선 키보드',
+        'price': '31,800원',
+        'tag': '가격 비교',
+        'url': 'https://www.coupang.com/np/search?q=무선+키보드',
+      },
+      {
+        'name': '생활용품 묶음',
+        'price': '19,900원',
+        'tag': '추천',
+        'url': 'https://www.coupang.com/np/search?q=생활용품',
+      },
     ];
 
     return [
@@ -111,20 +208,18 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
           color: _greenLight,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
+        child: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('오늘의 절약 추천',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            const SizedBox(height: 4),
+            Text('오늘의 절약 추천', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            SizedBox(height: 4),
             Text('여러 쇼핑몰 가격을 비교해 더 저렴하게!',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+                style: TextStyle(fontSize: 12, color: Colors.grey)),
           ],
         ),
       ),
       const SizedBox(height: 20),
-      const Text('지금 최저가 상품',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      const Text('지금 최저가 상품', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       const SizedBox(height: 12),
       GridView.count(
         crossAxisCount: 2,
@@ -133,51 +228,78 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
         childAspectRatio: 0.85,
-        children: dummyItems.map((item) => _priceCard(item)).toList(),
+        children: dummyItems.map((item) => _dummyPriceCard(item)).toList(),
       ),
     ];
   }
 
-  Widget _priceCard(Map<String, String> item) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.grey[200]!),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 70,
-            decoration: BoxDecoration(
-              color: _greenLight,
-              borderRadius: BorderRadius.circular(10),
+  Widget _dummyPriceCard(Map<String, String> item) {
+    return GestureDetector(
+      onTap: () async {
+        final url = Uri.parse(item['url']!);
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
-          ),
-          const SizedBox(height: 8),
-          Text(item['name']!, style: const TextStyle(fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(item['price']!,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 4),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: _greenLight,
-              borderRadius: BorderRadius.circular(6),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    height: 80,
+                    width: double.infinity,
+                    color: _greenLight,
+                    child: Icon(Icons.image_outlined, color: _green.withOpacity(0.35), size: 28),
+                  ),
+                ),
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Icon(Icons.favorite_border, size: 18, color: Colors.grey[400]),
+                ),
+                Positioned(
+                  left: 6,
+                  bottom: 6,
+                  child: Icon(Icons.open_in_new, size: 14, color: Colors.white70),
+                ),
+              ],
             ),
-            child: Text(item['tag']!,
-                style: TextStyle(fontSize: 10, color: _green)),
-          ),
-        ],
+            const SizedBox(height: 10),
+            Text(item['name']!,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Text(item['price']!,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              decoration: BoxDecoration(color: _greenLight, borderRadius: BorderRadius.circular(6)),
+              child: Text(item['tag']!,
+                  style: TextStyle(fontSize: 10, color: _green, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // 플리마켓 탭 — 실제 marketProducts 연동
   List<Widget> _buildFleaMarketTab() {
     return [
       StreamBuilder<List<MarketProduct>>(
@@ -211,6 +333,8 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   }
 
   Widget _productCard(MarketProduct product) {
+    final isFav = _favoriteIds.contains(product.productId);
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -226,16 +350,34 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 70,
-              decoration: BoxDecoration(
-                color: _greenLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
+            Stack(
+              children: [
+                Container(
+                  height: 70,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: _greenLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
+                  child: GestureDetector(
+                    onTap: () => _toggleFavorite(product.productId),
+                    child: Icon(
+                      isFav ? Icons.favorite : Icons.favorite_border,
+                      size: 18,
+                      color: isFav ? Colors.redAccent : Colors.grey[400],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
-            Text(product.title, style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(product.title,
+                style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text('${product.price}원',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),

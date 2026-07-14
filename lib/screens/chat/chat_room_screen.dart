@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/chat_service.dart';
 import '../../models/message_model.dart';
@@ -16,7 +17,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _chatService = ChatService();
   final _messageController = TextEditingController();
   static const _green = Color(0xFF3B8B5E);
-  static const _myId = 'test_user_id';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   ChatParticipant? _otherParticipant;
   bool _showStickers = false;

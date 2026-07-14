@@ -61,4 +61,24 @@ class MarketService {
         .snapshots()
         .map((s) => s.docs.map((d) => MarketProduct.fromFirestore(d)).toList());
   }
+
+  // 찜 토글
+  Future<void> toggleFavorite(String userId, String productId, bool isFavorite) async {
+    final ref = _db.collection('users').doc(userId).collection('favorites').doc(productId);
+    if (isFavorite) {
+      await ref.set({'createdAt': Timestamp.now()});
+    } else {
+      await ref.delete();
+    }
+  }
+
+// 찜한 상품 ID 목록 (실시간)
+  Stream<Set<String>> getFavoriteIds(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toSet());
+  }
 }

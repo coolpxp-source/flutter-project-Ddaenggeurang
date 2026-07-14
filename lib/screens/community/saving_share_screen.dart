@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../models/community_stat_model.dart';
@@ -19,14 +20,14 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
   bool _saving = false;
 
   // TODO: 실제 로그인 유저 ID로 교체
-  static const String currentUserId = 'test_user_id';
+  final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   Future<void> _submit() async {
     if (_nicknameController.text.trim().isEmpty) return;
     setState(() => _saving = true);
 
     final stat = CommunityStat(
-      userId: currentUserId,
+      userId: _myId,
       nicknameMasked: _nicknameController.text.trim(),
       savingRate: _savingRate,
       savingAmount: num.tryParse(_amountController.text) ?? 0,
@@ -35,7 +36,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
       updatedAt: DateTime.now(),
     );
 
-    await _service.updateMyStat(currentUserId, stat);
+    await _service.updateMyStat(_myId, stat);
 
     setState(() => _saving = false);
     if (context.mounted) Navigator.pop(context);
