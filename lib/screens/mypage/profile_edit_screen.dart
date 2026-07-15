@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
 import '../../utils/formatters.dart';
@@ -426,7 +427,8 @@ class _PreviewCard extends StatelessWidget {
           CircleAvatar(
             radius: 26,
             backgroundColor: Colors.white,
-            child: Text(user?.coachTone.emoji ?? '🐭', style: const TextStyle(fontSize: 24)),
+            backgroundImage:
+                AssetImage(user?.coachTone.imagePath ?? CoachTone.ddaengjwi.imagePath),
           ),
           const SizedBox(width: 14),
           Expanded(

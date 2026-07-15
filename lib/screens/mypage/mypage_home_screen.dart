@@ -199,7 +199,7 @@ class _ProfileCard extends StatelessWidget {
               CircleAvatar(
                 radius: 28,
                 backgroundColor: Colors.white,
-                child: Text(user.coachTone.emoji, style: const TextStyle(fontSize: 26)),
+                backgroundImage: AssetImage(user.coachTone.imagePath),
               ),
               const SizedBox(width: 14),
               Expanded(

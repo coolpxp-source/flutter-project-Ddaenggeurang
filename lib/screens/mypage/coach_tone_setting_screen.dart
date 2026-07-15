@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
+import '../../widgets/common/coach_avatar.dart';
 
 const _accent = Color(0xFFF5A623);
 const _accentSoft = Color(0xFFFFF0A6);
@@ -131,7 +132,7 @@ class _CoachCard extends StatelessWidget {
                       color: selected ? Colors.white : const Color(0xFFFFF8E5),
                       shape: BoxShape.circle),
                   alignment: Alignment.center,
-                  child: Text(tone.emoji, style: const TextStyle(fontSize: 26)),
+                  child: CoachAvatar(imagePath: tone.imagePath, size: 40),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

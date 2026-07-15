@@ -215,198 +215,238 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height -
-                  MediaQuery.of(context).padding.top -
-                  MediaQuery.of(context).padding.bottom -
-                  24,
-            ),
-            // 🔥 Spacer 사용을 위해 IntrinsicHeight로 감싸주었습니다!
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
-                  const Spacer(flex: 3),
+      backgroundColor: const Color(0xFFFFF9F0),
+      body: Stack(
+        children: [
+          // ─── 은은하게 떠다니는 배경 블롭 ───
+          const Positioned(top: 60, left: -30, child: _LoginBlob(color: Color(0xFFFFE3EC), size: 150)),
+          const Positioned(top: 140, right: -40, child: _LoginBlob(color: Color(0xFFECE6FF), size: 130)),
+          const Positioned(bottom: 40, left: -20, child: _LoginBlob(color: Color(0xFFFFF0C2), size: 120)),
 
-                  // ─── 로고 ───
-                  Image.asset(
-                    'assets/images/logo.png',
-                    width: 200,
-                    fit: BoxFit.contain,
-                  ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: MediaQuery.of(context).size.height -
+                      MediaQuery.of(context).padding.top -
+                      MediaQuery.of(context).padding.bottom -
+                      24,
+                ),
+                // 🔥 Spacer 사용을 위해 IntrinsicHeight로 감싸주었습니다!
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      const Spacer(flex: 3),
 
-                  const Spacer(flex: 2),
+                      // ─── 로고 ───
+                      Image.asset(
+                        'assets/images/ddaeng_logo_transparent_trimmed.png',
+                        width: 236,
+                        fit: BoxFit.contain,
+                      ),
 
-                  // ─── 이메일 로그인 (토글) ───
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 240),
-                    curve: Curves.easeOutCubic,
-                    child: _showEmailForm
-                        ? Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          _EmailField(
-                            controller: _emailCtrl,
-                            hint: '이메일',
-                            icon: Icons.mail_outline_rounded,
-                          ),
-                          const SizedBox(height: 10),
-                          _EmailField(
-                            controller: _pwCtrl,
-                            hint: '비밀번호',
-                            icon: Icons.lock_outline_rounded,
-                            obscure: _obscurePw,
-                            onToggleObscure: () =>
-                                setState(() => _obscurePw = !_obscurePw),
-                          ),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: TextButton(
-                              onPressed: _loading ? null : _forgotPassword,
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: Size.zero,
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      const Spacer(flex: 2),
+
+                      // ─── 이메일 로그인 (토글) ───
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutCubic,
+                        child: _showEmailForm
+                            ? Padding(
+                          padding: const EdgeInsets.only(bottom: 14),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _EmailField(
+                                controller: _emailCtrl,
+                                hint: '이메일',
+                                icon: Icons.mail_outline_rounded,
                               ),
-                              child: const Text('비밀번호를 잊으셨나요?',
-                                  style: TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: Color(0xFF667085))),
+                              const SizedBox(height: 10),
+                              _EmailField(
+                                controller: _pwCtrl,
+                                hint: '비밀번호',
+                                icon: Icons.lock_outline_rounded,
+                                obscure: _obscurePw,
+                                onToggleObscure: () =>
+                                    setState(() => _obscurePw = !_obscurePw),
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: _loading ? null : _forgotPassword,
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: const Text('비밀번호를 잊으셨나요?',
+                                      style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF667085))),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              _SocialButton(
+                                label: '이메일로 로그인',
+                                bg: const Color(0xFF1D4ED8),
+                                fg: Colors.white,
+                                onTap: _loading ? null : _signInWithEmail,
+                              ),
+                              const SizedBox(height: 14),
+                              const _Divider(),
+                              const SizedBox(height: 14),
+                            ],
+                          ),
+                        )
+                            : const SizedBox.shrink(),
+                      ),
+
+                      // ─── 소셜 로그인 ───
+                      _SocialButton(
+                        label: '카카오로 계속하기',
+                        bg: const Color(0xFFFEE500),
+                        fg: const Color(0xFF191919),
+                        icon: Image.asset('assets/images/카카오.png', width: 26, height: 26),
+                        onTap: _loading ? null : _comingSoon,
+                      ),
+                      const SizedBox(height: 10),
+                      _SocialButton(
+                        label: '네이버로 계속하기',
+                        bg: const Color(0xFF03C75A),
+                        fg: Colors.white,
+                        icon: const _SocialBadge(
+                          bg: Colors.white,
+                          child: Text('N',
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF03C75A))),
+                        ),
+                        onTap: _loading ? null : _comingSoon,
+                      ),
+                      const SizedBox(height: 10),
+                      _SocialButton(
+                        label: 'Google로 계속하기',
+                        bg: Colors.white,
+                        fg: const Color(0xFF1F2937),
+                        border: const Color(0xFFE8ECF3),
+                        icon: Image.asset('assets/images/구글.png', width: 22, height: 22),
+                        onTap: _loading ? null : _signInWithGoogle,
+                      ),
+                      const SizedBox(height: 10),
+                      _SocialButton(
+                        label: 'Apple로 계속하기',
+                        bg: const Color(0xFF1A1F2E),
+                        fg: Colors.white,
+                        icon: const Icon(Icons.apple_rounded, size: 22, color: Colors.white),
+                        onTap: _loading ? null : _comingSoon,
+                      ),
+
+                      const SizedBox(height: 18),
+                      const _Divider(),
+                      const SizedBox(height: 18),
+
+                      // ─── 이메일로 계속하기 (아웃라인 CTA) ───
+                      SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: OutlinedButton(
+                          onPressed: _loading
+                              ? null
+                              : () => setState(() => _showEmailForm = !_showEmailForm),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFB8860B),
+                            side: const BorderSide(color: Color(0xFFFFC93C), width: 1.6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                          ),
+                          child: Text(
+                            _showEmailForm ? '이메일 로그인 닫기' : '이메일로 계속하기',
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        height: 24,
+                        child: _loading
+                            ? const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2.4, color: Color(0xFFFFC93C)),
+                          ),
+                        )
+                            : null,
+                      ),
+
+                      const Spacer(flex: 2),
+
+                      // ─── 회원가입 안내 ───
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            '아직 통장이 없으신가요?',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF98A2B3)),
+                          ),
+                          TextButton(
+                            onPressed: _goToSignUp,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              '통장 만들기',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF2F6BFF),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          _SocialButton(
-                            label: '이메일로 로그인',
-                            bg: const Color(0xFF1D4ED8),
-                            fg: Colors.white,
-                            onTap: _loading ? null : _signInWithEmail,
-                          ),
-                          const SizedBox(height: 14),
-                          _Divider(),
-                          const SizedBox(height: 14),
                         ],
                       ),
-                    )
-                        : const SizedBox.shrink(),
-                  ),
-
-                  // ─── 소셜 로그인 ───
-                  _SocialButton(
-                    label: 'Kakao',
-                    bg: const Color(0xFFFEE500),
-                    fg: const Color(0xFF191919),
-                    onTap: _loading ? null : _comingSoon,
-                  ),
-                  const SizedBox(height: 10),
-                  _SocialButton(
-                    label: 'Naver',
-                    bg: const Color(0xFF03C75A),
-                    fg: Colors.white,
-                    onTap: _loading ? null : _comingSoon,
-                  ),
-                  const SizedBox(height: 10),
-                  _SocialButton(
-                    label: 'Google',
-                    bg: Colors.white,
-                    fg: const Color(0xFF1F2937),
-                    border: const Color(0xFFE8ECF3),
-                    onTap: _loading ? null : _signInWithGoogle,
-                  ),
-                  const SizedBox(height: 10),
-                  _SocialButton(
-                    label: 'Apple',
-                    bg: const Color(0xFF1A1F2E),
-                    fg: Colors.white,
-                    onTap: _loading ? null : _comingSoon,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  // ─── 이메일 토글 링크 ───
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => setState(() => _showEmailForm = !_showEmailForm),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: Text(
-                      _showEmailForm ? '이메일 로그인 닫기' : '이메일로 로그인',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF667085),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    height: 24,
-                    child: _loading
-                        ? const Center(
-                      child: SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.4, color: Color(0xFFFFC93C)),
-                      ),
-                    )
-                        : null,
-                  ),
-
-                  const Spacer(flex: 2),
-
-                  // ─── 회원가입 안내 ───
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                      const SizedBox(height: 12),
                       const Text(
-                        '아직 통장이 없으신가요?',
+                        '땡그랑',
                         style: TextStyle(
-                            fontSize: 13, color: Color(0xFF98A2B3)),
-                      ),
-                      TextButton(
-                        onPressed: _goToSignUp,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          '통장 만들기',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2F6BFF),
-                          ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF667085),
                         ),
                       ),
+                      const SizedBox(height: 12),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '땡그랑',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF667085),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                ),
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LoginBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _LoginBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(
+          colors: [color, color.withValues(alpha: 0.0)],
         ),
       ),
     );
@@ -414,6 +454,8 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _Divider extends StatelessWidget {
+  const _Divider();
+
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -495,6 +537,7 @@ class _SocialButton extends StatelessWidget {
   final Color bg;
   final Color fg;
   final Color? border;
+  final Widget? icon;
   final VoidCallback? onTap;
 
   const _SocialButton({
@@ -502,6 +545,7 @@ class _SocialButton extends StatelessWidget {
     required this.bg,
     required this.fg,
     this.border,
+    this.icon,
     this.onTap,
   });
 
@@ -509,26 +553,51 @@ class _SocialButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 50,
+      height: 56,
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: bg,
           foregroundColor: fg,
-          disabledBackgroundColor: bg.withOpacity(0.6),
+          disabledBackgroundColor: bg.withValues(alpha: 0.6),
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(28),
             side: border != null
                 ? BorderSide(color: border!, width: 1.2)
                 : BorderSide.none,
           ),
         ),
-        child: Text(
-          label,
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[icon!, const SizedBox(width: 10)],
+            Text(
+              label,
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: fg),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// 소셜 로그인 버튼용 원형 아이콘 배지 (전용 로고 이미지가 없는 서비스는
+/// 컬러/이니셜만으로 구분한다).
+class _SocialBadge extends StatelessWidget {
+  final Widget child;
+  final Color bg;
+  const _SocialBadge({required this.child, required this.bg});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: child,
     );
   }
 }

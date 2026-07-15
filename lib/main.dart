@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -10,6 +11,7 @@ import 'screens/auth/signup_extra_screen.dart';
 import 'screens/auth/email_verification_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/splash_screen.dart'; // 방금 만든 스플래시 파일 import
+import 'widgets/common/brand_loading_dots.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,10 +46,17 @@ class _DdaengAppState extends State<DdaengApp> {
         // 화면도 별도 수정 없이 자동으로 폰트만 좋아짐.
         textTheme: GoogleFonts.gothicA1TextTheme(),
       ),
-      // 스플래시 상태에 따라 분기
-      home: _showSplash
-          ? SplashScreen(onFinished: () => setState(() => _showSplash = false))
-          : const AppGate(),
+      // 스플래시 상태에 따라 분기 (전환 시 부드럽게 크로스페이드)
+      home: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 450),
+        switchInCurve: Curves.easeOut,
+        child: _showSplash
+            ? SplashScreen(
+                key: const ValueKey('splash'),
+                onFinished: () => setState(() => _showSplash = false),
+              )
+            : const AppGate(key: ValueKey('gate')),
+      ),
     );
   }
 }
@@ -104,24 +113,44 @@ class AppGate extends StatelessWidget {
   }
 }
 
-/// 공용 로딩 화면
+/// 공용 로딩 화면 — 스플래시와 같은 톤(민트 그라데이션 + 브랜드 로고 + 점 3개)으로
+/// 인증 상태/유저 데이터를 기다리는 짧은 순간에도 톤이 끊기지 않도록 한다.
 class DdaengLoading extends StatelessWidget {
   const DdaengLoading({super.key});
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
-    backgroundColor: Colors.white,
-    body: Center(
-      child: SizedBox(
-        width: 34,
-        height: 34,
-        child: CircularProgressIndicator(
-          strokeWidth: 3,
-          color: Color(0xFFFFC93C),
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.white, Color(0xFFD9F2EC), Colors.white],
+            stops: [0.0, 0.55, 1.0],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/ddaeng_logo_transparent_trimmed.png',
+                width: 96,
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scaleXY(
+                      begin: 0.95, end: 1.05, duration: 1100.ms, curve: Curves.easeInOut),
+              const SizedBox(height: 20),
+              const BrandLoadingDots(),
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _ErrorView extends StatelessWidget {

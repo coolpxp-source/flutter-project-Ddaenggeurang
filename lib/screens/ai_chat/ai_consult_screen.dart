@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/ai_service.dart' as ai;
 import '../../services/user_service.dart';
+import '../../widgets/common/coach_avatar.dart';
 
 // 로컬 AI 코치(은동 PC의 Ollama 서버, lib/services/ai_service.dart)에
 // 실시간으로 물어보는 "살까 말까" 상담 채팅 화면.
@@ -85,7 +86,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
     });
     _scrollToBottom();
 
-    final tone = ai.CoachTone.fromCode(_user?.coachTone.code);
+    final tone = _user?.coachTone ?? ai.CoachTone.ddaengjwi;
     try {
       final result = await _service.consult(
         tone,
@@ -127,7 +128,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final emoji = _user?.coachTone.emoji ?? '🐭';
+    final imagePath = (_user?.coachTone ?? ai.CoachTone.ddaengjwi).imagePath;
     return Container(
       color: _bg,
       child: Column(
@@ -135,14 +136,14 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
           _RemainingBanner(remaining: _service.consultRemaining),
           Expanded(
             child: _messages.isEmpty
-                ? _EmptyState(emoji: emoji)
+                ? _EmptyState(imagePath: imagePath)
                 : ListView.builder(
               controller: _scrollCtrl,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               itemCount: _messages.length + (_sending ? 1 : 0),
               itemBuilder: (context, i) {
                 if (i == _messages.length) return const _TypingBubble();
-                return _MessageBubble(entry: _messages[i], emoji: emoji);
+                return _MessageBubble(entry: _messages[i], imagePath: imagePath);
               },
             ),
           ),
@@ -170,8 +171,8 @@ class _RemainingBanner extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  final String emoji;
-  const _EmptyState({required this.emoji});
+  final String imagePath;
+  const _EmptyState({required this.imagePath});
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +182,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 44)),
+            CoachAvatar(imagePath: imagePath, size: 72),
             const SizedBox(height: 14),
             const Text('살까 말까 고민되는 걸 물어보세요',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
@@ -198,8 +199,8 @@ class _EmptyState extends StatelessWidget {
 
 class _MessageBubble extends StatelessWidget {
   final _ChatEntry entry;
-  final String emoji;
-  const _MessageBubble({required this.entry, required this.emoji});
+  final String imagePath;
+  const _MessageBubble({required this.entry, required this.imagePath});
 
   Color? _verdictColor() {
     switch (entry.verdict) {
@@ -249,7 +250,7 @@ class _MessageBubble extends StatelessWidget {
           CircleAvatar(
               radius: 16,
               backgroundColor: _accentSoft,
-              child: Text(emoji, style: const TextStyle(fontSize: 15))),
+              backgroundImage: AssetImage(imagePath)),
           const SizedBox(width: 8),
           Flexible(
             child: Container(
