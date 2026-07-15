@@ -84,12 +84,14 @@ class CommunityService {
     required String authorName,
     required String category,
     required String content,
+    List<String> imageUrls = const [],
   }) async {
     await _db.collection('communityPosts').add({
       'authorId': authorId,
       'authorName': authorName,
       'category': category,
       'content': content,
+      'imageUrls': imageUrls,
       'likeCount': 0,
       'commentCount': 0,
       'createdAt': Timestamp.now(),

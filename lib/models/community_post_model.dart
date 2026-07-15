@@ -10,6 +10,7 @@ class CommunityPost {
   final int commentCount;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final List<String> imageUrls;
 
   CommunityPost({
     required this.postId,
@@ -21,6 +22,7 @@ class CommunityPost {
     required this.commentCount,
     required this.createdAt,
     this.updatedAt,
+    required this.imageUrls,
   });
 
   factory CommunityPost.fromFirestore(DocumentSnapshot doc) {
@@ -35,6 +37,7 @@ class CommunityPost {
       commentCount: map['commentCount'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      imageUrls: List<String>.from(map['imageUrls'] ?? []),
     );
   }
 }
