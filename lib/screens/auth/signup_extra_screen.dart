@@ -9,6 +9,17 @@ import '../onboarding/onboarding_screen.dart'; // OnboardingData, DdaengColors
 import '../../utils/formatters.dart';
 import '../home/home_screen.dart';
 
+/// 온보딩에서 입력받은 데이터를 이메일 인증 화면까지 임시로 들고 가기 위한 홀더.
+/// main.dart의 AppGate는 Firebase 인증 상태만 보고 라우팅하기 때문에,
+/// 회원가입 직전 로컬 위젯에만 있던 OnboardingData를 AppGate가
+/// SignupExtraScreen을 만들 때 넘겨줄 방법이 없어서 이 정적 홀더를 거쳐간다.
+/// (이메일 인증 게이트를 통과해 SignupExtraScreen에 도달하면 다 쓴 것이므로
+///  값을 계속 들고 있어도 무방 — 다음 로그인 때는 온보딩을 다시 안 거치므로
+///  null로 남아 전체 입력 폼이 뜬다)
+class PendingOnboarding {
+  static OnboardingData? data;
+}
+
 class DBCoach {
   final String id;
   final String name;

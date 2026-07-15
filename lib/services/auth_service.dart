@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
@@ -41,6 +40,28 @@ class AuthService {
     return result.user;
   }
 
+  /// 이메일/비밀번호로 가입한 계정만 인증 메일을 보낸다.
+  /// 구글 로그인 계정은 이미 구글이 이메일 소유를 검증했으므로
+  /// Firebase가 emailVerified를 자동으로 true로 채워준다 — 별도 처리 불필요.
+  Future<void> sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null || user.emailVerified) return;
+    await user.sendEmailVerification();
+  }
+
+  /// 현재 로그인된 사용자 정보를 서버에서 새로 받아온다.
+  /// (다른 기기/메일 앱에서 인증 링크를 눌렀을 수 있으므로 emailVerified를
+  ///  다시 확인하려면 reload 후 currentUser를 읽어야 한다)
+  Future<bool> refreshEmailVerified() async {
+    await _auth.currentUser?.reload();
+    return _auth.currentUser?.emailVerified ?? false;
+  }
+
+  /// 비밀번호 찾기 — Firebase가 발송하는 재설정 링크 메일을 이용한다.
+  Future<void> sendPasswordResetEmail(String email) {
+    return _auth.sendPasswordResetEmail(email: email);
+  }
+
   String getErrorMessage(FirebaseAuthException e) {
     switch (e.code) {
       case 'email-already-in-use':
@@ -50,6 +71,7 @@ class AuthService {
       case 'weak-password':
         return '비밀번호는 6자 이상이어야 해요';
       case 'user-not-found':
+        return '가입되지 않은 이메일이에요';
       case 'wrong-password':
       case 'invalid-credential':
         return '이메일 또는 비밀번호가 올바르지 않아요';

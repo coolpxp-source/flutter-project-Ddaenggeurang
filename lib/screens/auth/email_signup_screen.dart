@@ -4,7 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../onboarding/onboarding_screen.dart'; // OnboardingData, DdaengColors
-import 'signup_extra_screen.dart';
+import 'signup_extra_screen.dart' show PendingOnboarding;
 
 enum _PwStrength { weak, medium, strong }
 
@@ -80,16 +80,15 @@ class _EmailSignUpScreenState extends State<EmailSignUpScreen> {
       await _auth.signUpWithEmail(_emailCtrl.text.trim(), _pwCtrl.text);
       if (user == null) return;
 
+      await _auth.sendEmailVerification();
+      PendingOnboarding.data = widget.onboardingData;
+
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => SignupExtraScreen(
-            uid: user.uid,
-            email: user.email ?? '',
-            onboardingData: widget.onboardingData,
-          ),
-        ),
-      );
+      // pushReplacement로 SignupExtraScreen을 직접 열면 main.dart의 AppGate가
+      // 트리에서 떨어져 나가서 이메일 인증 게이트를 못 거친다.
+      // 대신 루트(AppGate)까지 pop해서 AppGate가 authStateChanges를 보고
+      // 이메일 인증 화면 → 프로필 입력 → 홈 순서로 알아서 라우팅하게 한다.
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       await DdaengModal.alert(
