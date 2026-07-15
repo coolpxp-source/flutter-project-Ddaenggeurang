@@ -12,11 +12,11 @@ dependencies:
 
   lottie: ^3.0.0
   url_launcher: ^6.3.0
-  firebase_storage: ^13.4.3
+  firebase_storage: ^13.4.5
   circular_menu: ^4.0.0
 
   # Firebase
-  firebase_core: ^4.11.0
+  firebase_core: ^4.12.1
   firebase_auth: ^6.5.6
   cloud_firestore: ^6.7.1
   cloud_functions: ^6.3.3
