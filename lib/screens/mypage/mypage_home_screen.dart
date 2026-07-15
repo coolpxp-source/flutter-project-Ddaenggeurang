@@ -7,7 +7,7 @@ import '../../widgets/common/ddaeng_modal.dart';
 import '../avatar/my_avatar_screen.dart';
 import '../avatar/point_shop_screen.dart';
 import '../mission/mission_list_screen.dart';
-import '../../widgets/common/Placeholder_screen.dart';
+import '../../widgets/common/placeholder_screen.dart';
 import 'coach_tone_setting_screen.dart';
 import 'notification_setting_screen.dart';
 import 'profile_edit_screen.dart';
