@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/mission_definition_model.dart';
@@ -20,23 +21,11 @@ class _MissionListScreenState extends State<MissionListScreen> {
 
   bool _isLoading = true;
   List<MissionDefinition> _missions = [];
+  List<Map<String, dynamic>> _recentRewards = [];
 
   Map<String, Map<String, dynamic>> _missionProgress = {};
 
-  final Set<int> _completedDays = {
-    1,
-    2,
-    3,
-    5,
-    6,
-    8,
-    9,
-    10,
-    12,
-    13,
-    14,
-    15,
-  };
+  Set<int> _completedDays = {};
 
   @override
   void initState() {
@@ -46,13 +35,24 @@ class _MissionListScreenState extends State<MissionListScreen> {
 
   Future<void> _loadMissions() async {
     try {
+      final now = DateTime.now();
+
       final results = await Future.wait([
         _missionService.getMissions(),
         _missionService.getMissionProgress(),
         _missionService.isTodayAttendanceCompleted(),
+        _missionService.getMonthlyAttendanceDays(
+          year: now.year,
+          month: now.month,
+        ),
+        _missionService.getRecentMissionRewards(),
       ]);
       final isTodayAttendanceCompleted =
       results[2] as bool;
+      final completedDays =
+      results[3] as Set<int>;
+      final recentRewards =
+      results[4] as List<Map<String, dynamic>>;
 
 
       final missions =
@@ -68,11 +68,11 @@ class _MissionListScreenState extends State<MissionListScreen> {
       setState(() {
         _missions = missions;
         _missionProgress = missionProgress;
-
         _isAttendanceCompleted =
             isTodayAttendanceCompleted;
-
         _isLoading = false;
+        _completedDays = completedDays;
+        _recentRewards = recentRewards;
       });
     } catch (e) {
       if (!mounted) {
@@ -130,16 +130,29 @@ class _MissionListScreenState extends State<MissionListScreen> {
         };
 
       case 'photo_proof':
+        final approvalStatus =
+        progressData?['approvalStatus'] as String?;
+
+        final isApproved =
+            approvalStatus == 'approved';
+
         return {
           'id': mission.id,
           'title': mission.title,
-          'description': '사진 인증 후 관리자 승인이 필요해요',
-          'progress': isCompleted ? 1 : 0,
+          'description': approvalStatus == 'pending'
+              ? '관리자 승인 대기 중이에요'
+              : approvalStatus == 'rejected'
+              ? '인증이 반려되었습니다. 다시 제출해 주세요'
+              : isApproved
+              ? '미션 인증이 승인되었습니다'
+              : '사진 인증 후 관리자 승인이 필요해요',
+          'progress': isApproved ? 1 : 0,
           'target': 1,
           'points': mission.points,
           'icon': Icons.camera_alt_outlined,
           'color': const Color(0xFF5B8DEF),
           'requiresApproval': mission.requiresApproval,
+          'approvalStatus': approvalStatus,
         };
 
       default:
@@ -217,6 +230,39 @@ class _MissionListScreenState extends State<MissionListScreen> {
         ? monthlyMissions
         : challengeMissions;
 
+    final completedMissionCount = _missions.where((mission) {
+      if (mission.type == 'attendance') {
+        return _isAttendanceCompleted;
+      }
+
+      final progressData = _missionProgress[mission.id];
+
+      if (mission.requiresApproval) {
+        return progressData?['approvalStatus'] == 'approved';
+      }
+
+      return progressData?['status'] == 'completed';
+    }).length;
+
+    final earnedPoints = _missionProgress.values.fold<int>(
+      0,
+          (sum, progress) {
+        final points =
+            (progress['pointsEarned'] as num?)?.toInt() ?? 0;
+
+        return sum + points;
+      },
+    );
+
+    final achievementRate = _missions.isEmpty
+        ? 0
+        : ((completedMissionCount / _missions.length) * 100)
+        .round();
+
+    final achievementProgress = _missions.isEmpty
+        ? 0.0
+        : completedMissionCount / _missions.length;
+
     if (_isLoading) {
       return const Scaffold(
         backgroundColor: Color(0xFFF5F5F8),
@@ -246,6 +292,10 @@ class _MissionListScreenState extends State<MissionListScreen> {
           _buildSummaryCard(
             pinkColor: pinkColor,
             purpleColor: purpleColor,
+            completedMissionCount: completedMissionCount,
+            earnedPoints: earnedPoints,
+            achievementRate: achievementRate,
+            achievementProgress: achievementProgress,
           ),
           const SizedBox(height: 18),
           _buildMissionSection(
@@ -268,6 +318,10 @@ class _MissionListScreenState extends State<MissionListScreen> {
   Widget _buildSummaryCard({
     required Color pinkColor,
     required Color purpleColor,
+    required int completedMissionCount,
+    required int earnedPoints,
+    required int achievementRate,
+    required double achievementProgress,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -292,9 +346,9 @@ class _MissionListScreenState extends State<MissionListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '7월 미션 성과',
-            style: TextStyle(
+          Text(
+            '${DateTime.now().month}월 미션 성과',
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 13,
             ),
@@ -314,29 +368,29 @@ class _MissionListScreenState extends State<MissionListScreen> {
               Expanded(
                 child: _buildSummaryStat(
                   label: '완료 미션',
-                  value: '8개',
+                  value: '$completedMissionCount개',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildSummaryStat(
                   label: '획득 포인트',
-                  value: '850 P',
+                  value: '$earnedPoints P',
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildSummaryStat(
                   label: '달성률',
-                  value: '72%',
+                  value: '$achievementRate%',
                 ),
               ),
             ],
           ),
           const SizedBox(height: 18),
-          const Row(
+          Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Text(
                   '월간 진행률',
                   style: TextStyle(
@@ -346,8 +400,8 @@ class _MissionListScreenState extends State<MissionListScreen> {
                 ),
               ),
               Text(
-                '72%',
-                style: TextStyle(
+                '$achievementRate%',
+                style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                 ),
@@ -358,7 +412,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: LinearProgressIndicator(
-              value: 0.72,
+              value: achievementProgress,
               minHeight: 10,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation<Color>(
@@ -653,18 +707,18 @@ class _MissionListScreenState extends State<MissionListScreen> {
       ),
       child: Column(
         children: [
-          const Row(
+          Row(
             children: [
               Expanded(
                 child: Text(
-                  '7월 미션 캘린더',
-                  style: TextStyle(
+                  '${DateTime.now().month}월 미션 캘린더',
+                  style: const TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              Icon(
+              const Icon(
                 Icons.calendar_month_outlined,
                 color: Color(0xFF979AA6),
               ),
@@ -760,24 +814,68 @@ class _MissionListScreenState extends State<MissionListScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          _buildRewardItem(
-            icon: Icons.calendar_month,
-            title: '7일 연속 출석',
-            date: '7월 14일',
-            points: '+70 P',
-            color: const Color(0xFFFF68AE),
-          ),
-          const Divider(height: 24),
-          _buildRewardItem(
-            icon: Icons.savings_outlined,
-            title: '주간 예산 지키기',
-            date: '7월 10일',
-            points: '+150 P',
-            color: const Color(0xFF8566FF),
-          ),
+
+          if (_recentRewards.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(
+                vertical: 12,
+              ),
+              child: Text(
+                '아직 획득한 보상이 없습니다.',
+                style: TextStyle(
+                  color: Color(0xFF9699A4),
+                  fontSize: 13,
+                ),
+              ),
+            )
+          else
+            ...List.generate(
+              _recentRewards.length,
+                  (index) {
+                final reward =
+                _recentRewards[index];
+
+                final isAttendance =
+                    reward['type'] == 'attendance';
+
+                return Column(
+                  children: [
+                    _buildRewardItem(
+                      icon: isAttendance
+                          ? Icons.calendar_month
+                          : Icons.emoji_events_outlined,
+                      title:
+                      reward['title'] as String,
+                      date: _formatRewardDate(
+                        reward['date'] as Timestamp?,
+                      ),
+                      points:
+                      '+${reward['points']} P',
+                      color: isAttendance
+                          ? const Color(0xFFFF68AE)
+                          : const Color(0xFF8566FF),
+                    ),
+                    if (index !=
+                        _recentRewards.length - 1)
+                      const Divider(height: 24),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
+  }
+  String _formatRewardDate(
+      Timestamp? timestamp,
+      ) {
+    if (timestamp == null) {
+      return '';
+    }
+
+    final date = timestamp.toDate();
+
+    return '${date.month}월 ${date.day}일';
   }
 
   Widget _buildRewardItem({

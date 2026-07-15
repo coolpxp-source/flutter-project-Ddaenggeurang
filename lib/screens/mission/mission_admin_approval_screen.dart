@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/mission_service.dart';
 
 class MissionAdminApprovalScreen extends StatefulWidget {
   const MissionAdminApprovalScreen({super.key});
@@ -10,31 +12,120 @@ class MissionAdminApprovalScreen extends StatefulWidget {
 
 class _MissionAdminApprovalScreenState
     extends State<MissionAdminApprovalScreen> {
-  final List<Map<String, dynamic>> _pendingProofs = [
-    {
-      'id': 'proof_001',
-      'nickname': '절약왕김땡',
-      'missionTitle': '절약 인증 사진 올리기',
-      'description': '오늘은 카페 대신 집에서 커피를 마셨어요.',
-      'submittedAt': '7월 14일 13:20',
-      'status': 'pending',
-      'imageUrl':
-      'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085',
-    },
-    {
-      'id': 'proof_002',
-      'nickname': '통장지킴이',
-      'missionTitle': '절약 인증 사진 올리기',
-      'description': '점심을 도시락으로 해결했습니다.',
-      'submittedAt': '7월 14일 11:05',
-      'status': 'pending',
-      'imageUrl':
-      'https://images.unsplash.com/photo-1547592180-85f173990554',
-    },
-  ];
+  final MissionService _missionService = MissionService();
+
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _pendingProofs = [];
+
+  void _showProofImage(
+      String imageUrl,
+      ) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: const EdgeInsets.all(16),
+          child: Stack(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: MediaQuery.of(context).size.height * 0.75,
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.network(
+                      imageUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (
+                          context,
+                          error,
+                          stackTrace,
+                          ) {
+                        return const Center(
+                          child: Text(
+                            '이미지를 불러올 수 없습니다.',
+                            style: TextStyle(
+                              color: Colors.white,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton(
+                  onPressed: () {
+                    Navigator.pop(dialogContext);
+                  },
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingProofs();
+  }
+
+  Future<void> _loadPendingProofs() async {
+    try {
+      final proofs =
+      await _missionService.getPendingMissionVerifications();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pendingProofs = proofs;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '승인 대기 목록을 불러오지 못했습니다: $e',
+          ),
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F5F8),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F8),
       appBar: AppBar(
@@ -63,16 +154,46 @@ class _MissionAdminApprovalScreenState
     );
   }
 
-  void _approveProof(Map<String, dynamic> proof) {
+  Future<void> _approveProof(
+      Map<String, dynamic> proof,
+      ) async {
+    final verificationId =
+    proof['id'] as String;
+
+    final success =
+    await _missionService
+        .approveMissionVerification(
+      verificationId,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '미션 인증 승인에 실패했습니다.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
     setState(() {
       _pendingProofs.removeWhere(
-            (item) => item['id'] == proof['id'],
+            (item) =>
+        item['id'] == verificationId,
       );
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('미션 인증을 승인했습니다.'),
+        content: Text(
+          '미션 인증을 승인했습니다.',
+        ),
       ),
     );
   }
@@ -80,10 +201,9 @@ class _MissionAdminApprovalScreenState
   Future<void> _showRejectDialog(
       Map<String, dynamic> proof,
       ) async {
-    final TextEditingController reasonController =
-    TextEditingController();
+    final reasonController = TextEditingController();
 
-    final bool? shouldReject = await showDialog<bool>(
+    final String? rejectReason = await showDialog<String>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
@@ -139,7 +259,7 @@ class _MissionAdminApprovalScreenState
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(dialogContext, false);
+                Navigator.pop(dialogContext);
               },
               child: const Text(
                 '취소',
@@ -150,25 +270,26 @@ class _MissionAdminApprovalScreenState
             ),
             ElevatedButton(
               onPressed: () {
-                final reason = reasonController.text.trim();
+                final reason =
+                reasonController.text.trim();
 
                 if (reason.isEmpty) {
-                  ScaffoldMessenger.of(dialogContext).showSnackBar(
-                    const SnackBar(
-                      content: Text('반려 사유를 입력해 주세요.'),
-                    ),
-                  );
                   return;
                 }
 
-                Navigator.pop(dialogContext, true);
+                Navigator.pop(
+                  dialogContext,
+                  reason,
+                );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE65C5C),
+                backgroundColor:
+                const Color(0xFFE65C5C),
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                  BorderRadius.circular(12),
                 ),
               ),
               child: const Text('반려하기'),
@@ -178,10 +299,32 @@ class _MissionAdminApprovalScreenState
       },
     );
 
-    final rejectReason = reasonController.text.trim();
-    reasonController.dispose();
+    if (rejectReason == null ||
+        rejectReason.isEmpty ||
+        !mounted) {
+      return;
+    }
 
-    if (shouldReject != true || !mounted) {
+    final success =
+    await _missionService
+        .rejectMissionVerification(
+      verificationId: proof['id'] as String,
+      reason: rejectReason,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '미션 인증 반려에 실패했습니다.',
+          ),
+        ),
+      );
+
       return;
     }
 
@@ -191,13 +334,11 @@ class _MissionAdminApprovalScreenState
       );
     });
 
-    debugPrint(
-      '반려 처리: ${proof['id']} / 사유: $rejectReason',
-    );
-
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('미션 인증을 반려했습니다.'),
+        content: Text(
+          '미션 인증을 반려했습니다.',
+        ),
       ),
     );
   }
@@ -273,25 +414,36 @@ class _MissionAdminApprovalScreenState
             ],
           ),
           const SizedBox(height: 16),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: AspectRatio(
-              aspectRatio: 16 / 10,
-              child: Image.network(
+          GestureDetector(
+            onTap: () {
+              _showProofImage(
                 proof['imageUrl'] as String,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: const Color(0xFFF0F1F5),
-                    child: const Center(
-                      child: Icon(
-                        Icons.broken_image_outlined,
-                        color: Color(0xFF999CA7),
-                        size: 40,
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: AspectRatio(
+                aspectRatio: 16 / 10,
+                child: Image.network(
+                  proof['imageUrl'] as String,
+                  fit: BoxFit.cover,
+                  errorBuilder: (
+                      context,
+                      error,
+                      stackTrace,
+                      ) {
+                    return Container(
+                      color: const Color(0xFFF0F1F5),
+                      child: const Center(
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: Color(0xFF999CA7),
+                          size: 40,
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),

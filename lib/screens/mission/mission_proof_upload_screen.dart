@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../services/mission_service.dart';
 
 class MissionProofUploadScreen extends StatefulWidget {
   const MissionProofUploadScreen({
@@ -20,13 +21,52 @@ class _MissionProofUploadScreenState
     extends State<MissionProofUploadScreen> {
   final TextEditingController _descriptionController =
   TextEditingController();
-
+  final MissionService _missionService = MissionService();
   final ImagePicker _imagePicker = ImagePicker();
 
   XFile? _selectedImage;
 
   bool _isSubmitting = false;
-  bool _isSubmitted = false;
+  String? _approvalStatus;
+  bool _isInitialLoading = true;
+  String? _rejectionReason;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSubmissionStatus();
+  }
+
+  Future<void> _loadSubmissionStatus() async {
+    try {
+      final data =
+      await _missionService.getMissionProgressData(
+        'photo_proof',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _approvalStatus =
+        data?['approvalStatus'] as String?;
+
+        _rejectionReason =
+        data?['rejectionReason'] as String?;
+
+        _isInitialLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     try {
@@ -90,8 +130,11 @@ class _MissionProofUploadScreenState
       _isSubmitting = true;
     });
 
-    // Firebase Storage 및 Firestore 대신 Mock 제출 처리
-    await Future.delayed(const Duration(seconds: 1));
+    final success = await _missionService.submitMissionProof(
+      missionDefId: 'photo_proof',
+      image: _selectedImage!,
+      description: description,
+    );
 
     if (!mounted) {
       return;
@@ -99,14 +142,25 @@ class _MissionProofUploadScreenState
 
     setState(() {
       _isSubmitting = false;
-      _isSubmitted = true;
+
+      if (success) {
+        _approvalStatus = 'pending';
+      }
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('사진 인증이 제출되었습니다.'),
-      ),
-    );
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('사진 인증이 제출되었습니다.'),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('사진 인증 제출에 실패했습니다.'),
+        ),
+      );
+    }
   }
 
   void _showImageSourceSheet() {
@@ -225,6 +279,14 @@ class _MissionProofUploadScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitialLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFF8FB),
       appBar: AppBar(
@@ -526,7 +588,7 @@ class _MissionProofUploadScreenState
   }
 
   Widget _buildSubmitButton() {
-    if (_isSubmitted) {
+    if (_approvalStatus == 'pending') {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(18),
@@ -537,29 +599,21 @@ class _MissionProofUploadScreenState
             color: const Color(0xFFFFC5D9),
           ),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.hourglass_top_rounded,
-                color: Color(0xFFE66A9F),
-              ),
+            Icon(
+              Icons.hourglass_top_rounded,
+              color: Color(0xFFE66A9F),
             ),
-            const SizedBox(width: 14),
-            const Expanded(
+            SizedBox(width: 14),
+            Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
                 children: [
                   Text(
                     '승인 대기 중',
                     style: TextStyle(
-                      color: Color(0xFF3D3237),
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
                     ),
@@ -567,10 +621,6 @@ class _MissionProofUploadScreenState
                   SizedBox(height: 4),
                   Text(
                     '관리자가 인증 내용을 확인하고 있어요.',
-                    style: TextStyle(
-                      color: Color(0xFF8B737D),
-                      fontSize: 13,
-                    ),
                   ),
                 ],
               ),
@@ -580,18 +630,116 @@ class _MissionProofUploadScreenState
       );
     }
 
+    if (_approvalStatus == 'approved') {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: const Color(0xFFEFFAF4),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.check_circle_rounded,
+              color: Color(0xFF36BFA0),
+            ),
+            SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '인증 승인 완료',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    '미션이 완료되고 포인트가 지급되었습니다.',
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_approvalStatus == 'rejected') {
+      return Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF1F1),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: const Color(0xFFFFC9C9),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.cancel_rounded,
+                      color: Color(0xFFE65C5C),
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      '인증이 반려되었습니다',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _rejectionReason?.isNotEmpty == true
+                      ? '반려 사유: $_rejectionReason'
+                      : '내용을 확인한 뒤 다시 제출해 주세요.',
+                  style: const TextStyle(
+                    color: Color(0xFF8B5E5E),
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          _buildDefaultSubmitButton(),
+        ],
+      );
+    }
+
+    return _buildDefaultSubmitButton();
+  }
+  Widget _buildDefaultSubmitButton() {
     return SizedBox(
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _isSubmitting ? null : _submitProof,
+        onPressed:
+        _isSubmitting ? null : _submitProof,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE66A9F),
-          disabledBackgroundColor: const Color(0xFFFFB8D0),
+          backgroundColor:
+          const Color(0xFFE66A9F),
+          disabledBackgroundColor:
+          const Color(0xFFFFB8D0),
           foregroundColor: Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius:
+            BorderRadius.circular(18),
           ),
         ),
         child: _isSubmitting
