@@ -69,7 +69,7 @@ class _CategoryBudgetSettingScreenState
           widget.initialCategoryBudgets[category.keyName] ?? 0;
 
       _controllers[category.keyName] = TextEditingController(
-        text: amount > 0 ? amount.toString() : '',
+        text: amount > 0 ? _formatAmount(amount) : '',
       );
 
       _controllers[category.keyName]!.addListener(_refreshTotal);
