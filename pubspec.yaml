@@ -17,9 +17,9 @@ dependencies:
 
   # Firebase
   firebase_core: ^4.11.0
-  firebase_auth:
-  cloud_firestore:
-  cloud_functions:
+  firebase_auth: ^6.5.6
+  cloud_firestore: ^6.7.1
+  cloud_functions: ^6.3.3
   google_sign_in: ^6.2.1
 
   # AI 통신
