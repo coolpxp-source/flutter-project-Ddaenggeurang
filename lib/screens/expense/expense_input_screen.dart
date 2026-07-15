@@ -3,6 +3,8 @@ import '../../models/expense_model.dart';
 import '../../models/emotion_tag_model.dart';
 import '../../services/expense_service.dart';
 import '../../widgets/expense/category_quick_chip.dart';
+import '../../utils/seed_expense_categories.dart'; // TODO(임시): 시딩 끝나면 이 import 삭제
+import '../../utils/seed_saving_categories.dart'; // TODO(임시): 시딩 끝나면 이 import 삭제
 
 /// 10_내역입력_기본 - 지출 입력 화면
 ///
@@ -42,6 +44,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   EmotionTag? _selectedEmotionTag;
   bool _isInstallment = false; // "일시불" 태그 탭 시 true로 전환 (할부 개월 선택 필요)
+
+  // TODO(임시): 시딩 중복 방지용 - 버튼 누르는 동안 다시 못 누르게 막는 플래그
+  bool _isSeeding = false;
 
   // nature별 퀵카테고리 - TODO: category_service.getCategories(nature: ...)로 교체
   static const Map<ExpenseNature, List<_QuickCategory>> _quickCategoriesByNature = {
@@ -125,6 +130,50 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     setState(() => _isInstallment = !_isInstallment);
   }
 
+  // ─────────────────────────────────────────────
+  // TODO(임시): 카테고리 시딩용 - Firestore에 categories 컬렉션 채우기.
+  // 딱 한 번만 실행할 것! 실행 확인 후 이 메서드 + AppBar의 아이콘 버튼 + 상단 import 2줄 삭제.
+  // ─────────────────────────────────────────────
+  Future<void> _runSeedOnce() async {
+    if (_isSeeding) return; // 중복 클릭 방지
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('카테고리 시딩'),
+        content: const Text(
+          '지출(34개) + 저축(5개) 기본 카테고리를 Firestore에 추가합니다.\n'
+              '이미 시딩했다면 중복 생성되니 다시 누르지 마세요.\n계속할까요?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('실행')),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isSeeding = true);
+    try {
+      await seedExpenseCategories();
+      await seedSavingCategories();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('카테고리 시딩 완료! Firestore 콘솔에서 확인해보세요.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('시딩 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSeeding = false);
+    }
+  }
+
   Future<void> _save() async {
     if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -172,6 +221,20 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         title: const Text('지출 입력'),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          // TODO(임시): 카테고리 시딩 버튼 - 딱 한 번 누르고 나면 이 IconButton 통째로 삭제
+          IconButton(
+            icon: _isSeeding
+                ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+                : const Icon(Icons.cloud_upload_outlined),
+            tooltip: '[임시] 카테고리 시딩',
+            onPressed: _isSeeding ? null : _runSeedOnce,
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

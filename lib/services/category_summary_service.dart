@@ -1,65 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-
 import '../models/category_summary_model.dart';
+import '../services/expense_service.dart';
 
+/// 특정 월의 카테고리별 지출 집계.
+///
+/// ⚠️ 기존 초안과 다른 점:
+/// - `users/{uid}/expenses` 서브컬렉션이 아니라, 실제 구조인 최상위 `expenses` 컬렉션
+///   (+ userId 필드)을 그대로 쓰는 ExpenseService를 재사용함.
+/// - categoryId가 'food'/'transport' 같은 하드코딩 키가 아니라 실제 Firestore 문서ID이므로,
+///   categories 컬렉션에서 이름을 직접 조회해서 매칭함.
 class CategorySummaryService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  /// Firestore 카테고리 키와 화면 표시 이름
-  static const Map<String, String> categoryNames = {
-    'food': '식비',
-    'transport': '교통',
-    'shopping': '쇼핑',
-    'culture': '문화',
-    'housing': '주거',
-    'etc': '기타',
-  };
-
-  /// 현재 로그인 사용자 확인
-  User _requireCurrentUser(String userId) {
-    final User? currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw Exception('로그인된 사용자가 없습니다.');
-    }
-
-    if (currentUser.uid != userId) {
-      throw Exception('사용자 UID가 일치하지 않습니다.');
-    }
-
-    return currentUser;
-  }
-
-  /// 사용자의 expenses 서브컬렉션
-  ///
-  /// 경로:
-  /// users/{userId}/expenses/{expenseId}
-  CollectionReference<Map<String, dynamic>> _expenseCollection(
-      String userId,
-      ) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('expenses');
-  }
-
-  /// 조회 월의 시작일
-  DateTime _getMonthStart({
-    required int year,
-    required int month,
-  }) {
-    return DateTime(year, month, 1);
-  }
-
-  /// 다음 달 시작일
-  DateTime _getNextMonthStart({
-    required int year,
-    required int month,
-  }) {
-    return DateTime(year, month + 1, 1);
-  }
+  final _expenseService = ExpenseService();
+  final _db = FirebaseFirestore.instance;
 
   /// 특정 월의 카테고리별 지출 집계
   Future<List<CategorySummaryModel>> getCategorySummary({
@@ -67,92 +19,44 @@ class CategorySummaryService {
     required int year,
     required int month,
   }) async {
-    _requireCurrentUser(userId);
+    final monthStart = DateTime(year, month, 1);
+    final nextMonthStart = DateTime(year, month + 1, 1);
+    // 해당 월의 마지막 순간 (다음 달 시작 1ms 전)
+    final monthEnd = nextMonthStart.subtract(const Duration(milliseconds: 1));
 
-    final DateTime monthStart = _getMonthStart(
-      year: year,
-      month: month,
+    // 1. 실제 지출 데이터 조회 (기존 expense_service 재사용)
+    final expenses = await _expenseService.getExpensesByDateRangeOnce(
+      userId: userId,
+      start: monthStart,
+      end: monthEnd,
     );
 
-    final DateTime nextMonthStart = _getNextMonthStart(
-      year: year,
-      month: month,
-    );
+    if (expenses.isEmpty) return [];
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot =
-    await _expenseCollection(userId)
-        .where(
-      'date',
-      isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart),
-    )
-        .where(
-      'date',
-      isLessThan: Timestamp.fromDate(nextMonthStart),
-    )
-        .get();
+    // 2. 지출에 등장하는 categoryId들의 실제 이름을 categories 컬렉션에서 조회
+    final categoryIds = expenses.map((e) => e.categoryId).toSet();
+    final categoryNames = await _fetchCategoryNames(categoryIds);
 
-    final Map<String, int> categoryTotals = {
-      for (final String key in categoryNames.keys) key: 0,
-    };
-
-    for (final QueryDocumentSnapshot<Map<String, dynamic>> document
-    in snapshot.docs) {
-      final Map<String, dynamic> data = document.data();
-
-      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
-
-      if (amount <= 0) {
-        continue;
-      }
-
-      // 설계 기준 필드명은 categoryId
-      final String categoryId =
-          data['categoryId'] as String? ?? 'etc';
-
-      final String normalizedCategory =
-      categoryNames.containsKey(categoryId)
-          ? categoryId
-          : 'etc';
-
-      categoryTotals[normalizedCategory] =
-          (categoryTotals[normalizedCategory] ?? 0) + amount;
+    // 3. categoryId 기준으로 합산
+    final Map<String, int> totals = {};
+    for (final expense in expenses) {
+      totals[expense.categoryId] = (totals[expense.categoryId] ?? 0) + expense.amount;
     }
 
-    final int totalExpense = categoryTotals.values.fold<int>(
-      0,
-          (int sum, int amount) => sum + amount,
-    );
+    final totalExpense = totals.values.fold<int>(0, (sum, v) => sum + v);
+    if (totalExpense == 0) return [];
 
-    final List<CategorySummaryModel> summaries =
-    categoryTotals.entries
-        .where(
-          (MapEntry<String, int> entry) => entry.value > 0,
-    )
-        .map(
-          (MapEntry<String, int> entry) {
-        final double percentage = totalExpense == 0
-            ? 0
-            : entry.value / totalExpense * 100;
+    final summaries = totals.entries.map((entry) {
+      final percentage = entry.value / totalExpense * 100;
+      return CategorySummaryModel(
+        categoryKey: entry.key, // 실제 categoryId (Firestore 문서ID)
+        categoryName: categoryNames[entry.key] ?? '알 수 없음',
+        totalAmount: entry.value,
+        percentage: percentage,
+      );
+    }).toList();
 
-        return CategorySummaryModel(
-          categoryKey: entry.key,
-          categoryName:
-          categoryNames[entry.key] ?? '기타',
-          totalAmount: entry.value,
-          percentage: percentage,
-        );
-      },
-    )
-        .toList();
-
-    summaries.sort(
-          (
-          CategorySummaryModel a,
-          CategorySummaryModel b,
-          ) =>
-          b.totalAmount.compareTo(a.totalAmount),
-    );
-
+    summaries.sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
     return summaries;
   }
 
@@ -162,20 +66,29 @@ class CategorySummaryService {
     required int year,
     required int month,
   }) async {
-    final List<CategorySummaryModel> summaries =
-    await getCategorySummary(
-      userId: userId,
-      year: year,
-      month: month,
-    );
+    final summaries = await getCategorySummary(userId: userId, year: year, month: month);
+    return summaries.fold<int>(0, (sum, item) => sum + item.totalAmount);
+  }
 
-    return summaries.fold<int>(
-      0,
-          (
-          int sum,
-          CategorySummaryModel item,
-          ) =>
-      sum + item.totalAmount,
-    );
+  /// categoryId 목록을 받아서 {categoryId: name} 맵으로 반환.
+  /// Firestore의 whereIn은 최대 30개 제한이 있어 넘으면 나눠서 조회.
+  Future<Map<String, String>> _fetchCategoryNames(Set<String> categoryIds) async {
+    if (categoryIds.isEmpty) return {};
+
+    final ids = categoryIds.toList();
+    final result = <String, String>{};
+
+    for (var i = 0; i < ids.length; i += 30) {
+      final chunk = ids.sublist(i, i + 30 > ids.length ? ids.length : i + 30);
+      final snap = await _db
+          .collection('categories')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        result[doc.id] = doc.data()['name'] as String? ?? '알 수 없음';
+      }
+    }
+
+    return result;
   }
 }
