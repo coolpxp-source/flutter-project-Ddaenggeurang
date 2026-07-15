@@ -19,6 +19,9 @@
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/coach_tone.dart';
+
+export '../models/coach_tone.dart' show CoachTone;
 
 // ═══════════════════════ [서버 설정] ═══════════════════════
 // AI 서버 = 은동 PC. 은동 PC가 켜져 있어야 AI 기능이 동작합니다.
@@ -29,27 +32,6 @@ const String kAiServerIp = '192.168.30.55';
 const String kAiServerPort = '11434';
 const String kAiModel = 'ddaengcoach-v3';
 // ════════════════════════════════════════════════════════════
-
-/// 땡코치 3인방 (학습 모델 태그와 label이 정확히 일치해야 함!)
-enum CoachTone {
-  ddaenggu('땡구', '🐶', '착한 잔소리', '다정하게 다독여주는 응원가'),
-  ddaengjwi('땡쥐', '🐭', '현실적인 조언', '데이터로 뼈를 때리는 현실파'),
-  ddaengnyang('땡냥이', '🐱', '매운맛 독설', '츤데레 독설가, 칭찬도 툴툴');
-
-  final String label; // 프롬프트 태그 & Firestore 저장값의 근거
-  final String emoji;
-  final String title;
-  final String desc;
-  const CoachTone(this.label, this.emoji, this.title, this.desc);
-
-  /// Firestore 저장용 코드값 (ddaenggu | ddaengjwi | ddaengnyang)
-  String get code => name;
-
-  static CoachTone fromCode(String? code) => CoachTone.values.firstWhere(
-        (t) => t.name == code,
-    orElse: () => CoachTone.ddaengjwi,
-  );
-}
 
 /// 살까말까 판정
 enum Verdict {

@@ -1,3 +1,19 @@
+/// 홈 대시보드 "최근 지출" 목록용 — users/{userId}/expenses 서브컬렉션은
+/// amount/categoryId/date만 갖고 있어(가맹점명 없음) 카테고리명을 대표 라벨로 쓴다.
+class RecentExpenseEntry {
+  final String categoryKey;
+  final String categoryName;
+  final int amount;
+  final DateTime date;
+
+  const RecentExpenseEntry({
+    required this.categoryKey,
+    required this.categoryName,
+    required this.amount,
+    required this.date,
+  });
+}
+
 class CategorySummaryModel {
   // Firestore에 저장된 카테고리 키
   // food, transport, shopping 등

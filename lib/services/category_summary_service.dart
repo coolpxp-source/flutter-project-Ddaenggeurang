@@ -178,4 +178,78 @@ class CategorySummaryService {
       sum + item.totalAmount,
     );
   }
+
+  /// [weekStart] 00:00부터 7일간의 지출 합계 (홈 대시보드 "이번 주 지출" 카드용)
+  Future<int> getWeeklyTotalExpense({
+    required String userId,
+    required DateTime weekStart,
+  }) async {
+    _requireCurrentUser(userId);
+
+    final DateTime start = DateTime(weekStart.year, weekStart.month, weekStart.day);
+    final DateTime end = start.add(const Duration(days: 7));
+
+    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .get();
+
+    return snapshot.docs.fold<int>(0, (int sum, doc) {
+      final int amount = (doc.data()['amount'] as num?)?.toInt() ?? 0;
+      return amount > 0 ? sum + amount : sum;
+    });
+  }
+
+  /// 특정 월의 일자별 지출 합계 — 홈 대시보드 주간 달력 스트립용 (key = 일(day))
+  Future<Map<int, int>> getDailyTotals({
+    required String userId,
+    required int year,
+    required int month,
+  }) async {
+    _requireCurrentUser(userId);
+
+    final DateTime monthStart = _getMonthStart(year: year, month: month);
+    final DateTime nextMonthStart = _getNextMonthStart(year: year, month: month);
+
+    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
+        .where('date', isLessThan: Timestamp.fromDate(nextMonthStart))
+        .get();
+
+    final Map<int, int> totals = {};
+    for (final doc in snapshot.docs) {
+      final Map<String, dynamic> data = doc.data();
+      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
+      final DateTime? date = (data['date'] as Timestamp?)?.toDate();
+      if (date == null || amount <= 0) continue;
+      totals[date.day] = (totals[date.day] ?? 0) + amount;
+    }
+    return totals;
+  }
+
+  /// 최근 지출 N건 (최신순) — 홈 대시보드 "최근 지출" 목록용
+  Future<List<RecentExpenseEntry>> getRecentExpenses({
+    required String userId,
+    int limit = 5,
+  }) async {
+    _requireCurrentUser(userId);
+
+    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
+        .orderBy('date', descending: true)
+        .limit(limit)
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final Map<String, dynamic> data = doc.data();
+      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
+      final String categoryId = data['categoryId'] as String? ?? 'etc';
+      final DateTime date = (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
+      return RecentExpenseEntry(
+        categoryKey: categoryId,
+        categoryName: categoryNames[categoryId] ?? '기타',
+        amount: amount,
+        date: date,
+      );
+    }).toList();
+  }
 }

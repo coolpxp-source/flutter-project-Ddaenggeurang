@@ -4,12 +4,17 @@ import 'package:shimmer/shimmer.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
+import '../../models/category_summary_model.dart';
+import '../../models/budget_model.dart';
+import '../../services/ai_service.dart';
 import '../../services/auth_service.dart';
+import '../../services/budget_service.dart';
+import '../../services/category_summary_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
+import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import '../../widgets/common/Placeholder_screen.dart';
 import '../expense/expense_input_screen.dart';
@@ -45,7 +50,6 @@ class _C {
   static const mintSoft = Color(0xFFDBF7F3);
 
   static const expense = Color(0xFFF04438);
-  static const income = Color(0xFF12B76A);
 
   /// 카드 공통 그림자 — 테두리 대신 그림자로만 입체감을 준다.
   static List<BoxShadow> cardShadow = [
@@ -228,51 +232,35 @@ class _DashboardSkeleton extends StatelessWidget {
   );
 }
 
+/// 개별 섹션이 자체 데이터를 불러오는 동안 보여주는 단일 시머 블록.
+class _ShimmerBlock extends StatelessWidget {
+  final double height;
+  final double radius;
+  const _ShimmerBlock({required this.height, required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: const Color(0xFFEFEDF3),
+      highlightColor: const Color(0xFFF8F7FB),
+      child: Container(
+        width: double.infinity,
+        height: height,
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(radius)),
+      ),
+    );
+  }
+}
+
 class _HomeDashboardState extends State<_HomeDashboard> {
   bool _isGroupMode = false;
   DateTime _month = DateTime.now();
   late DateTime _selectedDay = DateTime.now();
 
-  // ─── 더미 데이터 (백엔드 연동 전 임시) ───
-  static const _mockBudgetTotal = 2000000;
-  static const _mockBudgetSpent = 1240000;
-  static const _mockWeekSpent = 34600;
-  static const _mockTopCategory = ('식비', 0.42);
+  // TODO: 소비심리테스트 파트(이태화) 완성 후 실데이터로 교체
   static const _mockSpendingType = '스트레스형 소비러';
   static const _mockSpendingTip =
       '감정 태그 중 스트레스 지출 비율이 높아요. 이번 주는 배달·카페 소비를 조금 줄여보는 걸 추천해요.';
-  static final _mockDailySpend = <int, int>{
-    2: 0, 3: 0, 4: 6500, 5: 0, 6: 7040, 7: 0,
-  };
-  static const _mockRecent = <_MockExpense>[
-    _MockExpense(
-      place: '스타벅스', category: '카페', date: '10.08',
-      amount: -6500, icon: Icons.local_cafe_rounded, color: _C.mint,
-    ),
-    _MockExpense(
-      place: '지하철', category: '교통', date: '10.08',
-      amount: -1400, icon: Icons.directions_subway_rounded, color: _C.blue,
-    ),
-    _MockExpense(
-      place: '무신사', category: '쇼핑', date: '10.05',
-      amount: -45000, icon: Icons.shopping_bag_rounded, color: _C.pink,
-    ),
-    _MockExpense(
-      place: '월급', category: '수입', date: '10.01',
-      amount: 2800000, icon: Icons.payments_rounded, color: _C.mint,
-    ),
-  ];
-
-  // 카테고리별 지출 도넛 차트용 — 색은 카테고리 아이덴티티에 고정 배정
-  // (식비=앰버, 교통=블루, 쇼핑=핑크, 카페=민트, 생활=퍼플, 기타=중립 그레이)
-  static const _mockCategorySpend = <_CategorySlice>[
-    _CategorySlice('식비', 520800, _C.amber),
-    _CategorySlice('교통', 223200, _C.blue),
-    _CategorySlice('쇼핑', 186000, _C.pink),
-    _CategorySlice('카페', 148800, _C.mint),
-    _CategorySlice('생활', 99200, _C.purple),
-    _CategorySlice('기타', 62000, Color(0xFFC7C3D1)),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -283,10 +271,6 @@ class _HomeDashboardState extends State<_HomeDashboard> {
           return const _DashboardSkeleton();
         }
         final user = snapshot.data!;
-        final remaining = _mockBudgetTotal - _mockBudgetSpent;
-        final progress = _mockBudgetTotal == 0
-            ? 0.0
-            : (_mockBudgetSpent / _mockBudgetTotal).clamp(0.0, 1.0);
 
         return RefreshIndicator(
           color: _C.amber,
@@ -304,25 +288,8 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                 ),
                 const SizedBox(height: 14),
 
-                _BudgetHero(remaining: remaining, total: _mockBudgetTotal, progress: progress)
-                    .animate()
-                    .fadeIn(duration: 380.ms, curve: Curves.easeOut)
-                    .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
-
-                // 히어로 카드 아래로 살짝 겹치는 레이어드 통계 카드
-                Transform.translate(
-                  offset: const Offset(0, -22),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: _FloatingStatsRow(
-                      weekSpent: _mockWeekSpent,
-                      topCategory: _mockTopCategory,
-                    )
-                        .animate(delay: 120.ms)
-                        .fadeIn(duration: 380.ms, curve: Curves.easeOut)
-                        .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
-                  ),
-                ),
+                _LiveBudgetSection(
+                    uid: widget.uid, month: _month, weekAnchor: _selectedDay),
 
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
@@ -332,7 +299,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                       const _QuickActionsGrid(),
                       const SizedBox(height: 24),
 
-                      const _CategorySpendingSection(slices: _mockCategorySpend),
+                      _CategorySpendingSection(uid: widget.uid, month: _month),
                       const SizedBox(height: 28),
 
                       _MonthHeader(
@@ -349,17 +316,18 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                       ),
                       const SizedBox(height: 16),
 
-                      _WeekCalendarStrip(
+                      _LiveWeekCalendarStrip(
+                        uid: widget.uid,
+                        month: _month,
                         selectedDay: _selectedDay,
-                        dailySpend: _mockDailySpend,
                         onSelect: (d) => setState(() => _selectedDay = d),
                       ),
                       const SizedBox(height: 20),
 
-                      _CoachBubble(tone: user.coachTone),
+                      _CoachBubble(uid: widget.uid, tone: user.coachTone),
                       const SizedBox(height: 24),
 
-                      _RecentExpensesSection(items: _mockRecent),
+                      _RecentExpensesSection(uid: widget.uid),
                       const SizedBox(height: 20),
 
                       _WalletTeaserCard(nickname: user.nickname, spendingType: _mockSpendingType),
@@ -394,7 +362,7 @@ class _GreetingRow extends StatelessWidget {
         CircleAvatar(
           radius: 18,
           backgroundColor: _C.amberSoft,
-          child: Text(user.coachTone.emoji, style: const TextStyle(fontSize: 17)),
+          backgroundImage: AssetImage(user.coachTone.imagePath),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -418,7 +386,121 @@ class _GreetingRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────── 예산 히어로 (앰버 → 코럴 그라데이션) ───────────────────────
+// ─────────────────────── 예산 히어로 + 통계 카드 (실데이터 로더) ───────────────────────
+
+class _BudgetStats {
+  final int total;
+  final int spent;
+  final int weekSpent;
+  final (String, double) topCategory;
+  const _BudgetStats({
+    required this.total,
+    required this.spent,
+    required this.weekSpent,
+    required this.topCategory,
+  });
+}
+
+/// 예산(BudgetService) + 이번 달/이번 주 지출(CategorySummaryService)을 함께 불러와
+/// _BudgetHero와 _FloatingStatsRow를 겹친 레이아웃 그대로 렌더링한다.
+class _LiveBudgetSection extends StatefulWidget {
+  final String uid;
+  final DateTime month;
+  final DateTime weekAnchor;
+  const _LiveBudgetSection({required this.uid, required this.month, required this.weekAnchor});
+
+  @override
+  State<_LiveBudgetSection> createState() => _LiveBudgetSectionState();
+}
+
+class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
+  late Future<_BudgetStats> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveBudgetSection old) {
+    super.didUpdateWidget(old);
+    if (old.month != widget.month || old.weekAnchor != widget.weekAnchor || old.uid != widget.uid) {
+      setState(() => _future = _load());
+    }
+  }
+
+  Future<_BudgetStats> _load() async {
+    final monthStr =
+        '${widget.month.year}-${widget.month.month.toString().padLeft(2, '0')}';
+    final weekStart =
+        widget.weekAnchor.subtract(Duration(days: widget.weekAnchor.weekday % 7));
+
+    final results = await Future.wait([
+      BudgetService().getBudget(userId: widget.uid, month: monthStr),
+      CategorySummaryService()
+          .getCategorySummary(userId: widget.uid, year: widget.month.year, month: widget.month.month),
+      CategorySummaryService().getWeeklyTotalExpense(userId: widget.uid, weekStart: weekStart),
+    ]);
+
+    final budget = results[0] as BudgetModel?;
+    final summaries = results[1] as List<CategorySummaryModel>;
+    final weekSpent = results[2] as int;
+
+    final spent = summaries.fold<int>(0, (sum, s) => sum + s.totalAmount);
+    final topCategory = summaries.isEmpty
+        ? ('지출 없음', 0.0)
+        : (summaries.first.categoryName, summaries.first.percentage / 100);
+
+    return _BudgetStats(
+      total: budget?.totalBudget ?? 0,
+      spent: spent,
+      weekSpent: weekSpent,
+      topCategory: topCategory,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_BudgetStats>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20),
+            child: _ShimmerBlock(height: 190, radius: 26),
+          );
+        }
+        final stats = snap.data ??
+            const _BudgetStats(total: 0, spent: 0, weekSpent: 0, topCategory: ('지출 없음', 0.0));
+        final remaining = stats.total - stats.spent;
+        final progress =
+            stats.total == 0 ? 0.0 : (stats.spent / stats.total).clamp(0.0, 1.0);
+
+        return Column(
+          children: [
+            _BudgetHero(remaining: remaining, total: stats.total, progress: progress)
+                .animate()
+                .fadeIn(duration: 380.ms, curve: Curves.easeOut)
+                .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
+
+            // 히어로 카드 아래로 살짝 겹치는 레이어드 통계 카드
+            Transform.translate(
+              offset: const Offset(0, -22),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: _FloatingStatsRow(weekSpent: stats.weekSpent, topCategory: stats.topCategory)
+                    .animate(delay: 120.ms)
+                    .fadeIn(duration: 380.ms, curve: Curves.easeOut)
+                    .slideY(begin: 0.1, end: 0, curve: Curves.easeOutCubic),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 
 class _BudgetHero extends StatelessWidget {
   final int remaining;
@@ -792,9 +874,65 @@ class _ModeToggle extends StatelessWidget {
 
 // ─────────────────────── 주간 달력 스트립 ───────────────────────
 
+/// 이번 달 일자별 지출(CategorySummaryService.getDailyTotals)을 불러와
+/// _WeekCalendarStrip에 실데이터로 꽂아 넣는다.
+class _LiveWeekCalendarStrip extends StatefulWidget {
+  final String uid;
+  final DateTime month;
+  final DateTime selectedDay;
+  final ValueChanged<DateTime> onSelect;
+  const _LiveWeekCalendarStrip({
+    required this.uid,
+    required this.month,
+    required this.selectedDay,
+    required this.onSelect,
+  });
+
+  @override
+  State<_LiveWeekCalendarStrip> createState() => _LiveWeekCalendarStripState();
+}
+
+class _LiveWeekCalendarStripState extends State<_LiveWeekCalendarStrip> {
+  late Future<Map<int, int>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveWeekCalendarStrip old) {
+    super.didUpdateWidget(old);
+    if (old.month != widget.month || old.uid != widget.uid) {
+      setState(() => _future = _load());
+    }
+  }
+
+  Future<Map<int, int>> _load() => CategorySummaryService()
+      .getDailyTotals(userId: widget.uid, year: widget.month.year, month: widget.month.month);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<int, int>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _ShimmerBlock(height: 88, radius: 18);
+        }
+        return _WeekCalendarStrip(
+          selectedDay: widget.selectedDay,
+          dailySpend: snap.data ?? const {},
+          onSelect: widget.onSelect,
+        );
+      },
+    );
+  }
+}
+
 class _WeekCalendarStrip extends StatelessWidget {
   final DateTime selectedDay;
-  final Map<int, int> dailySpend; // day → 지출액(더미)
+  final Map<int, int> dailySpend; // day → 지출액
   final ValueChanged<DateTime> onSelect;
 
   const _WeekCalendarStrip({
@@ -876,9 +1014,66 @@ class _WeekCalendarStrip extends StatelessWidget {
 
 // ─────────────────────── 코치 말풍선 ───────────────────────
 
-class _CoachBubble extends StatelessWidget {
+class _CoachBubble extends StatefulWidget {
+  final String uid;
   final CoachTone tone;
-  const _CoachBubble({required this.tone});
+  const _CoachBubble({required this.uid, required this.tone});
+
+  @override
+  State<_CoachBubble> createState() => _CoachBubbleState();
+}
+
+class _CoachBubbleState extends State<_CoachBubble> {
+  late Future<String> _messageFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageFuture = _buildMessage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CoachBubble old) {
+    super.didUpdateWidget(old);
+    if (old.uid != widget.uid || old.tone != widget.tone) {
+      _messageFuture = _buildMessage();
+    }
+  }
+
+  /// 이번 달 카테고리별 실제 지출(CategorySummaryService)을 요약해서
+  /// 땡코치 AI(은동 PC 로컬 Ollama)에게 잔소리 문구를 생성시킨다.
+  /// AI 서버가 꺼져 있어도 실제 집계 숫자로 만든 문구는 그대로 보여준다.
+  Future<String> _buildMessage() async {
+    final now = DateTime.now();
+    final summaries = await CategorySummaryService().getCategorySummary(
+      userId: widget.uid,
+      year: now.year,
+      month: now.month,
+    );
+
+    if (summaries.isEmpty) {
+      return '이번 달 지출 기록이 아직 없어요. 첫 기록을 남겨서 저와 함께 시작해볼까요?';
+    }
+
+    final top = summaries.first;
+    final dataSummary =
+        '이번 달 최다 지출 카테고리: ${top.categoryName} ${_won(top.totalAmount)} '
+        '(전체 지출의 ${top.percentage.round()}%)';
+
+    try {
+      return await AiService().generateNagging(widget.tone, dataSummary);
+    } on AiServerException {
+      return '$dataSummary. (AI 코치가 잠깐 자리를 비웠어요 — 은동 PC 연결을 확인해주세요)';
+    } catch (_) {
+      return dataSummary;
+    }
+  }
+
+  static String _won(int n) {
+    final s = n.toString().replaceAllMapped(
+        RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+    return '$s원';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -908,24 +1103,55 @@ class _CoachBubble extends StatelessWidget {
               border: Border.all(color: Colors.white.withOpacity(0.4)),
             ),
             alignment: Alignment.center,
-            child: Text(tone.emoji, style: const TextStyle(fontSize: 18)),
+            child: CoachAvatar(imagePath: widget.tone.imagePath, size: 30),
           ),
           const SizedBox(width: 12),
-          // TODO: 카페 지출 등 실데이터 기반 코멘트로 교체 (지출 파트 완성 후)
           Expanded(
-            child: Text(
-              '이번 달 카페값만 벌써 120,000원! 대박 절약은 힘들지만, 이번 주 조금만 절약 해볼까요?',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                height: 1.45,
-              ),
+            child: FutureBuilder<String>(
+              future: _messageFuture,
+              builder: (context, snap) {
+                if (snap.connectionState != ConnectionState.done) {
+                  return const _CoachBubbleLoading();
+                }
+                return Text(
+                  snap.data ?? '오늘도 현명한 소비 하고 계신가요?',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    height: 1.45,
+                  ),
+                );
+              },
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+/// 코치 문구를 AI로부터 받아오는 동안 보여주는 스켈레톤 라인.
+class _CoachBubbleLoading extends StatelessWidget {
+  const _CoachBubbleLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double width) => Container(
+          width: width,
+          height: 11,
+          margin: const EdgeInsets.only(bottom: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(6),
+          ),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [bar(double.infinity), bar(140)],
+    )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .fadeIn(duration: 700.ms, curve: Curves.easeInOut);
   }
 }
 
@@ -938,13 +1164,103 @@ class _CategorySlice {
   const _CategorySlice(this.label, this.amount, this.color);
 }
 
-class _CategorySpendingSection extends StatelessWidget {
+/// 카테고리 키(food/transport/shopping/culture/housing/etc) → 브랜드 색상.
+/// CategorySummaryService.categoryNames와 1:1로 맞춰 아이덴티티를 고정 배정.
+const _categoryColors = <String, Color>{
+  'food': _C.amber,
+  'transport': _C.blue,
+  'shopping': _C.pink,
+  'culture': _C.mint,
+  'housing': _C.purple,
+  'etc': Color(0xFFC7C3D1),
+};
+
+const _categoryIcons = <String, IconData>{
+  'food': Icons.restaurant_rounded,
+  'transport': Icons.directions_subway_rounded,
+  'shopping': Icons.shopping_bag_rounded,
+  'culture': Icons.movie_outlined,
+  'housing': Icons.home_outlined,
+  'etc': Icons.category_outlined,
+};
+
+class _CategorySpendingSection extends StatefulWidget {
+  final String uid;
+  final DateTime month;
+  const _CategorySpendingSection({required this.uid, required this.month});
+
+  @override
+  State<_CategorySpendingSection> createState() => _CategorySpendingSectionState();
+}
+
+class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
+  late Future<List<CategorySummaryModel>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CategorySpendingSection old) {
+    super.didUpdateWidget(old);
+    if (old.month != widget.month || old.uid != widget.uid) {
+      setState(() => _future = _load());
+    }
+  }
+
+  Future<List<CategorySummaryModel>> _load() => CategorySummaryService().getCategorySummary(
+      userId: widget.uid, year: widget.month.year, month: widget.month.month);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<CategorySummaryModel>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _ShimmerBlock(height: 190, radius: 20);
+        }
+        final summaries = snap.data ?? const [];
+        final slices = summaries
+            .map((s) => _CategorySlice(
+                s.categoryName, s.totalAmount, _categoryColors[s.categoryKey] ?? const Color(0xFFC7C3D1)))
+            .toList();
+        return _CategorySpendingCard(slices: slices);
+      },
+    );
+  }
+}
+
+class _CategorySpendingCard extends StatelessWidget {
   final List<_CategorySlice> slices;
-  const _CategorySpendingSection({required this.slices});
+  const _CategorySpendingCard({required this.slices});
 
   @override
   Widget build(BuildContext context) {
     final total = slices.fold<int>(0, (sum, s) => sum + s.amount);
+
+    if (slices.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: _C.cardShadow,
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('카테고리별 지출',
+                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+            SizedBox(height: 4),
+            Text('이번 달 지출 기록이 아직 없어요',
+                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
+          ],
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -960,7 +1276,6 @@ class _CategorySpendingSection extends StatelessWidget {
           const Text('카테고리별 지출',
               style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
           const SizedBox(height: 4),
-          // TODO: 지출 파트(임예림) 완성 후 실제 카테고리 집계로 교체
           const Text('이번 달 지출을 카테고리로 나눠봤어요',
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
           const SizedBox(height: 18),
@@ -1047,27 +1362,19 @@ class _CategorySpendingSection extends StatelessWidget {
 
 // ─────────────────────── 최근 지출 ───────────────────────
 
-class _MockExpense {
-  final String place;
-  final String category;
-  final String date;
-  final int amount; // 음수 = 지출, 양수 = 수입
-  final IconData icon;
-  final Color color;
+/// 최근 지출 N건(CategorySummaryService.getRecentExpenses)을 불러와 보여준다.
+/// 이 서브컬렉션 스키마엔 가맹점명이 없어 카테고리명을 대표 라벨로 쓴다.
+class _RecentExpensesSection extends StatefulWidget {
+  final String uid;
+  const _RecentExpensesSection({required this.uid});
 
-  const _MockExpense({
-    required this.place,
-    required this.category,
-    required this.date,
-    required this.amount,
-    required this.icon,
-    required this.color,
-  });
+  @override
+  State<_RecentExpensesSection> createState() => _RecentExpensesSectionState();
 }
 
-class _RecentExpensesSection extends StatelessWidget {
-  final List<_MockExpense> items;
-  const _RecentExpensesSection({required this.items});
+class _RecentExpensesSectionState extends State<_RecentExpensesSection> {
+  late final Future<List<RecentExpenseEntry>> _future =
+      CategorySummaryService().getRecentExpenses(userId: widget.uid);
 
   @override
   Widget build(BuildContext context) {
@@ -1089,20 +1396,45 @@ class _RecentExpensesSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: _C.card,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: _C.cardShadow,
-          ),
-          child: Column(
-            children: [
-              for (final (i, e) in items.indexed) ...[
-                if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF0EDF5)),
-                _ExpenseRow(item: e),
-              ],
-            ],
-          ),
+        FutureBuilder<List<RecentExpenseEntry>>(
+          future: _future,
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const _ShimmerBlock(height: 160, radius: 18);
+            }
+            final items = snap.data ?? const [];
+            if (items.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                decoration: BoxDecoration(
+                  color: _C.card,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: _C.cardShadow,
+                ),
+                child: const Center(
+                  child: Text('아직 지출 기록이 없어요',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                ),
+              );
+            }
+            return Container(
+              decoration: BoxDecoration(
+                color: _C.card,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: _C.cardShadow,
+              ),
+              child: Column(
+                children: [
+                  for (final (i, e) in items.indexed) ...[
+                    if (i > 0)
+                      const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF0EDF5)),
+                    _ExpenseRow(item: e),
+                  ],
+                ],
+              ),
+            );
+          },
         ),
       ],
     );
@@ -1110,12 +1442,14 @@ class _RecentExpensesSection extends StatelessWidget {
 }
 
 class _ExpenseRow extends StatelessWidget {
-  final _MockExpense item;
+  final RecentExpenseEntry item;
   const _ExpenseRow({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final isIncome = item.amount > 0;
+    final color = _categoryColors[item.categoryKey] ?? const Color(0xFFC7C3D1);
+    final icon = _categoryIcons[item.categoryKey] ?? Icons.category_outlined;
+    final date = '${item.date.month.toString().padLeft(2, '0')}.${item.date.day.toString().padLeft(2, '0')}';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
@@ -1123,31 +1457,31 @@ class _ExpenseRow extends StatelessWidget {
           Container(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(color: item.color.withOpacity(0.14), shape: BoxShape.circle),
+            decoration: BoxDecoration(color: color.withOpacity(0.14), shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: Icon(item.icon, size: 18, color: item.color),
+            child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item.place,
+                Text(item.categoryName,
                     style:
                     const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
                 const SizedBox(height: 2),
-                Text('${item.category} · ${item.date}',
+                Text(date,
                     style: const TextStyle(
                         fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
               ],
             ),
           ),
           Text(
-            '${isIncome ? '+' : '-'}${comma(item.amount.abs())}원',
-            style: TextStyle(
+            '-${comma(item.amount)}원',
+            style: const TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: isIncome ? _C.income : _C.expense,
+              color: _C.expense,
             ),
           ),
         ],

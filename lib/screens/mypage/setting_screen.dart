@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import 'change_password_screen.dart';
+import 'contact_screen.dart';
+import 'legal_doc_screen.dart';
 
 const _accent = Color(0xFFF5A623);
 const _accentSoft = Color(0xFFFFF0A6);
@@ -22,15 +25,10 @@ class _SettingScreenState extends State<SettingScreen> {
   final _auth = AuthService();
   bool _busy = false;
 
-  void _comingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature 화면은 준비 중이에요'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: _ink,
-      ),
-    );
-  }
+  /// 이메일/비밀번호로 가입한 계정만 비밀번호를 갖고 있다.
+  /// 소셜 로그인(카카오/네이버/구글/애플) 계정은 변경할 비밀번호가 없으므로 숨긴다.
+  bool get _hasPasswordProvider =>
+      _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ?? false;
 
   Future<void> _logout() async {
     final ok = await DdaengModal.confirm(
@@ -89,15 +87,24 @@ class _SettingScreenState extends State<SettingScreen> {
               _Row(
                   icon: Icons.description_outlined,
                   title: '이용약관',
-                  onTap: () => _comingSoon('이용약관')),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => LegalDocScreen(
+                          title: '이용약관',
+                          updatedAt: kLegalUpdatedAt,
+                          sections: kTermsOfService)))),
               _Row(
                   icon: Icons.privacy_tip_outlined,
                   title: '개인정보 처리방침',
-                  onTap: () => _comingSoon('개인정보 처리방침')),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => LegalDocScreen(
+                          title: '개인정보 처리방침',
+                          updatedAt: kLegalUpdatedAt,
+                          sections: kPrivacyPolicy)))),
               _Row(
                   icon: Icons.mail_outline_rounded,
                   title: '문의하기',
-                  onTap: () => _comingSoon('문의하기'),
+                  onTap: () => Navigator.of(context)
+                      .push(MaterialPageRoute(builder: (_) => const ContactScreen())),
                   showDivider: false),
             ]),
             const SizedBox(height: 22),
@@ -116,6 +123,17 @@ class _SettingScreenState extends State<SettingScreen> {
 
             const _SectionLabel('계정'),
             const SizedBox(height: 10),
+            if (_hasPasswordProvider) ...[
+              _Group(children: [
+                _Row(
+                    icon: Icons.password_rounded,
+                    title: '비밀번호 변경',
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
+                    showDivider: false),
+              ]),
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
               height: 52,
