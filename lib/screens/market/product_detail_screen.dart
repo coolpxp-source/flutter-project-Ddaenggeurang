@@ -16,8 +16,8 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-  static const _green = Color(0xFF3B8B5E);
-  static const _greenLight = Color(0xFFE6F4EB);
+  static const _green = Color(0xFFFF9166);
+  static const _greenLight = Color(0xFFFFF0E8);
 
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
   static const _myName = '나';

@@ -18,8 +18,8 @@ class MarketHomeScreen extends StatefulWidget {
 class _MarketHomeScreenState extends State<MarketHomeScreen> {
   final _service = MarketService();
   int _tabIndex = 0;
-  static const _green = Color(0xFF3B8B5E);
-  static const _greenLight = Color(0xFFE6F4EB);
+  static const _green = Color(0xFFFF9166);
+  static const _greenLight = Color(0xFFFFF0E8);
 
   // TODO: 로그인 연결되면 교체
   final String _myId = FirebaseAuth.instance.currentUser!.uid;

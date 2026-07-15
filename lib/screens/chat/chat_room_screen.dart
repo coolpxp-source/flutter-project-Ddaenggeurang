@@ -16,7 +16,7 @@ class ChatRoomScreen extends StatefulWidget {
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _chatService = ChatService();
   final _messageController = TextEditingController();
-  static const _green = Color(0xFF3B8B5E);
+  static const _green = Color(0xFFFF9166);
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   ChatParticipant? _otherParticipant;

@@ -14,7 +14,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
   final _contentController = TextEditingController();
   String _category = '자유';
   bool _saving = false;
-  static const _green = Color(0xFF3B8B5E);
+  static const _green = Color(0xFFFF9166);
 
   // TODO: 로그인 연결되면 교체
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
