@@ -49,7 +49,11 @@ class _MissionListScreenState extends State<MissionListScreen> {
       final results = await Future.wait([
         _missionService.getMissions(),
         _missionService.getMissionProgress(),
+        _missionService.isTodayAttendanceCompleted(),
       ]);
+      final isTodayAttendanceCompleted =
+      results[2] as bool;
+
 
       final missions =
       results[0] as List<MissionDefinition>;
@@ -66,8 +70,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
         _missionProgress = missionProgress;
 
         _isAttendanceCompleted =
-            _missionProgress['attendance']?['status'] ==
-                'completed';
+            isTodayAttendanceCompleted;
 
         _isLoading = false;
       });
