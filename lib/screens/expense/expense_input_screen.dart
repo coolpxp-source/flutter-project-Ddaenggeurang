@@ -23,7 +23,7 @@ class ExpenseInputScreen extends StatefulWidget {
 
 class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _expenseService = ExpenseService();
-  final _categoryService = CategoryService();
+  final _categoryService = categoryService();
   final _amountController = TextEditingController(text: '0');
   final _placeController = TextEditingController();
   final _memoController = TextEditingController();
