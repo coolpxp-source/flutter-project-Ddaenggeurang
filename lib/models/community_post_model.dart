@@ -11,6 +11,7 @@ class CommunityPost {
   final DateTime createdAt;
   final DateTime? updatedAt;
   final List<String> imageUrls;
+  final List<String> hashtags;
 
   CommunityPost({
     required this.postId,
@@ -23,6 +24,7 @@ class CommunityPost {
     required this.createdAt,
     this.updatedAt,
     required this.imageUrls,
+    this.hashtags = const [],
   });
 
   factory CommunityPost.fromFirestore(DocumentSnapshot doc) {
@@ -38,6 +40,7 @@ class CommunityPost {
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
       imageUrls: List<String>.from(map['imageUrls'] ?? []),
+      hashtags: List<String>.from(map['hashtags'] ?? []),
     );
   }
 }

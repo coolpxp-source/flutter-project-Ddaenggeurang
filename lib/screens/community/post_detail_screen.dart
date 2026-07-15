@@ -1,8 +1,10 @@
+import 'post_edit_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../models/community_post_model.dart';
 import '../../models/post_comment_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -19,7 +21,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   static const _greenLight = Color(0xFFFFF0E8);
 
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
-  final String _myName = FirebaseAuth.instance.currentUser?.displayName ?? '나';
+
+  Future<String> _getAuthorName() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
+      final nickname = doc.data()?['nickname'] as String?;
+      if (nickname != null && nickname.trim().isNotEmpty) return nickname;
+    } catch (_) {}
+    return FirebaseAuth.instance.currentUser?.displayName ?? '나';
+  }
 
   bool _isLiked = false;
 
@@ -35,12 +45,47 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     _service.toggleLike(widget.post.postId, _myId, !_isLiked);
   }
 
-  void _submitComment() {
+  Color _categoryColor(String cat) {
+    switch (cat) {
+      case '전체':
+        return _green;
+      case '절약팁':
+        return const Color(0xFF4CAF87);
+      case '소비고민':
+        return const Color(0xFF9B7EDE);
+      case '자유':
+        return const Color(0xFF5B9BD5);
+      case '거지방':
+        return const Color(0xFFE5735A);
+      default:
+        return _green;
+    }
+  }
+
+  Color _categoryColorLight(String cat) {
+    switch (cat) {
+      case '전체':
+        return _greenLight;
+      case '절약팁':
+        return const Color(0xFFE6F5EF);
+      case '소비고민':
+        return const Color(0xFFF1ECFA);
+      case '자유':
+        return const Color(0xFFEAF2FA);
+      case '거지방':
+        return const Color(0xFFFBECE9);
+      default:
+        return _greenLight;
+    }
+  }
+
+  void _submitComment() async {
     if (_commentController.text.trim().isEmpty) return;
+    final authorName = await _getAuthorName();
     _service.addComment(
       postId: widget.post.postId,
       authorId: _myId,
-      authorName: _myName,
+      authorName: authorName,
       content: _commentController.text.trim(),
     );
     _commentController.clear();
@@ -238,7 +283,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               if (post.authorId == _myId) ...[
                 IconButton(
                   icon: const Icon(Icons.edit_outlined, color: Colors.grey),
-                  onPressed: () => _editPost(context, post),
+                  onPressed: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => PostEditScreen(post: post)),
+                    );
+                  },
                 ),
                 IconButton(
                   icon: const Icon(Icons.delete_outline, color: Colors.grey),
@@ -282,19 +332,63 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       const SizedBox(height: 4),
                       Text('(수정됨)', style: TextStyle(fontSize: 11, color: Colors.grey[400])),
                     ],
+
+                    if (post.imageUrls.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        height: 220,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: post.imageUrls.length,
+                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          itemBuilder: (context, index) {
+                            final url = post.imageUrls[index];
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.network(
+                                url,
+                                width: 220,
+                                height: 220,
+                                fit: BoxFit.cover,
+                                loadingBuilder: (context, child, progress) {
+                                  if (progress == null) return child;
+                                  return const SizedBox(
+                                    width: 220,
+                                    height: 220,
+                                    child: Center(child: CircularProgressIndicator(color: _green)),
+                                  );
+                                },
+                                errorBuilder: (context, error, stackTrace) => Container(
+                                  width: 220,
+                                  height: 220,
+                                  color: Colors.grey[200],
+                                  child: const Icon(Icons.broken_image, color: Colors.grey),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+
+
                     const SizedBox(height: 12),
 
                     Wrap(
                       spacing: 6,
-                      children: [post.category, '땡그랑'].map((tag) {
+                      runSpacing: 6,
+                      children: [post.category, ...post.hashtags].map((tag) {
                         return Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: _greenLight,
+                            color: _categoryColorLight(post.category),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Text('#$tag',
-                              style: const TextStyle(fontSize: 11, color: _green, fontWeight: FontWeight.w500)),
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: _categoryColor(post.category),
+                                  fontWeight: FontWeight.w500)),
                         );
                       }).toList(),
                     ),

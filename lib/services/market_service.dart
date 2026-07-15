@@ -27,12 +27,6 @@ class MarketService {
     return MarketProduct.fromFirestore(doc);
   }
 
-  // 상품 등록
-  Future<String> addProduct(MarketProduct product) async {
-    final docRef = await _db.collection('marketProducts').add(product.toMap());
-    return docRef.id;
-  }
-
   // 상품 정보 수정
   Future<void> updateProduct(String productId, Map<String, dynamic> updates) async {
     updates['updatedAt'] = Timestamp.now();
@@ -80,5 +74,30 @@ class MarketService {
         .collection('favorites')
         .snapshots()
         .map((snap) => snap.docs.map((d) => d.id).toSet());
+  }
+
+  // 플리마켓 상품 등록
+  Future<void> addProduct({
+    required String sellerId,
+    required String sellerName,
+    required String title,
+    required num price,
+    required String description,
+    required List<String> images,
+    required String category,
+  }) async {
+    await _db.collection('marketProducts').add({
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'title': title,
+      'price': price,
+      'description': description,
+      'images': images,
+      'status': 'selling',
+      'category': category,
+      'priceComparisons': [],
+      'locationGeo': null,
+      'createdAt': Timestamp.now(),
+    });
   }
 }
