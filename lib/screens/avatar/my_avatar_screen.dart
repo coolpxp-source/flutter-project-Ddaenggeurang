@@ -23,8 +23,8 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
 
-  int _points = 1250;
-  int _level = 7;
+  int _points = 0;
+  final int _level = 1;
 
   String _selectedSlot = 'hat';
 
@@ -177,8 +177,10 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     );
   }
   Future<void> _reloadAvatarData() async {
-    final items = await _avatarService.getItems();
+    await _avatarService.initializeDefaultAvatar();
     final points = await _avatarService.getPoints();
+    final items = await _avatarService.getItems();
+
 
     if (!mounted) {
       return;
