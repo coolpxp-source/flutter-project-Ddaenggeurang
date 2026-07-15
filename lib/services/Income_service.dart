@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../models/Income_model.dart';
+import '../models/income_model.dart';
 
 class IncomeService {
   final _db = FirebaseFirestore.instance;
