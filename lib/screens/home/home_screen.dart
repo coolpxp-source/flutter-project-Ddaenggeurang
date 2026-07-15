@@ -16,7 +16,7 @@ import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
-import '../../widgets/common/Placeholder_screen.dart';
+import '../../widgets/common/placeholder_screen.dart';
 import '../expense/expense_input_screen.dart';
 import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
