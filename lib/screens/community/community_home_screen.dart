@@ -19,8 +19,8 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   static const _categories = ['전체', '절약팁', '소비고민', '자유', '거지방'];
 
   // 메인 컬러: 초록 계열
-  static const _green = Color(0xFF3B8B5E);
-  static const _greenLight = Color(0xFFE6F4EB);
+  static const _green = Color(0xFFFF9166);
+  static const _greenLight = Color(0xFFFFF0E8);
 
   @override
   Widget build(BuildContext context) {
@@ -233,8 +233,8 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                               height: isFirst ? 110 : 90,
                               decoration: BoxDecoration(
                                 color: isFirst
-                                    ? const Color(0xFF3B8B5E)
-                                    : const Color(0xFF3B8B5E).withOpacity(0.4),
+                                    ? const Color(0xFFFF9166)
+                                    : const Color(0xFFFF9166).withOpacity(0.4),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               alignment: Alignment.center,

@@ -3,7 +3,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-import 'screens/market/market_home_screen.dart';
+import 'screens/market/market_home_screen.dart'; // 마켓
+import 'screens/community/community_home_screen.dart'; // 커뮤니티
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +56,7 @@ void main() async {
   });
 
   runApp(const MaterialApp(
-    home: MarketHomeScreen(),
+    // home: MarketHomeScreen(), // 마켓
+    home: CommunityHomeScreen(), // 커뮤니티
   ));
 }

@@ -9,6 +9,7 @@ class CommunityPost {
   final int likeCount;
   final int commentCount;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   CommunityPost({
     required this.postId,
@@ -19,6 +20,7 @@ class CommunityPost {
     required this.likeCount,
     required this.commentCount,
     required this.createdAt,
+    this.updatedAt,
   });
 
   factory CommunityPost.fromFirestore(DocumentSnapshot doc) {
@@ -32,6 +34,7 @@ class CommunityPost {
       likeCount: map['likeCount'] ?? 0,
       commentCount: map['commentCount'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
 }

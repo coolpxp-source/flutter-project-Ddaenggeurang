@@ -7,6 +7,7 @@ class PostComment {
   final String content;
   final int likeCount;
   final DateTime createdAt;
+  final DateTime? updatedAt;
 
   PostComment({
     required this.commentId,
@@ -15,6 +16,7 @@ class PostComment {
     required this.content,
     required this.likeCount,
     required this.createdAt,
+    this.updatedAt,
   });
 
   factory PostComment.fromFirestore(DocumentSnapshot doc) {
@@ -26,6 +28,7 @@ class PostComment {
       content: map['content'] ?? '',
       likeCount: map['likeCount'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
   }
 }

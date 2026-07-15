@@ -5,8 +5,8 @@ class PriceComparisonScreen extends StatelessWidget {
   final MarketProduct product;
   const PriceComparisonScreen({super.key, required this.product});
 
-  static const _green = Color(0xFF3B8B5E);
-  static const _greenLight = Color(0xFFE6F4EB);
+  static const _green = Color(0xFFFF9166);
+  static const _greenLight = Color(0xFFFFF0E8);
 
   @override
   Widget build(BuildContext context) {
