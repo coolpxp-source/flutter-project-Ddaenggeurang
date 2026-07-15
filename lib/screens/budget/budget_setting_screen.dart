@@ -130,8 +130,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
         // 저장된 예산이 있으면 화면에 자동 반영
         if (budget != null) {
           _totalBudgetController.text =
-              budget.totalBudget.toString();
-
+              _formatAmount(budget.totalBudget);
           _startDay = budget.startDay;
 
           _fixedExpenseTotal =
