@@ -1,41 +1,55 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/mission_definition_model.dart';
 
 class MissionService {
-  Future<List<MissionDefinition>> getMissions() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+  final FirebaseFirestore _firestore =
+      FirebaseFirestore.instance;
 
-    return const [
-      MissionDefinition(
-        id: 'attendance_daily',
-        title: '오늘 출석하기',
-        type: 'attendance',
-        points: 10,
-        frequency: 'daily',
-        requiresApproval: false,
-        isActive: true,
-      ),
-      MissionDefinition(
-        id: 'expense_record_daily',
-        title: '오늘 지출 기록하기',
-        type: 'writing',
-        points: 20,
-        frequency: 'daily',
-        requiresApproval: false,
-        isActive: true,
-      ),
-      MissionDefinition(
-        id: 'saving_photo',
-        title: '절약 인증 사진 올리기',
-        type: 'photo_proof',
-        points: 30,
-        frequency: 'once',
-        requiresApproval: true,
-        isActive: true,
-      ),
-    ];
+  String get _currentUserId {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      throw StateError('로그인된 사용자가 없습니다.');
+    }
+
+    return user.uid;
   }
+
+  Future<List<MissionDefinition>> getMissions() async {
+    final snapshot = await _firestore
+        .collection('missionDefinitions')
+        .where('isActive', isEqualTo: true)
+        .get();
+
+    return snapshot.docs.map((doc) {
+      return MissionDefinition.fromMap(
+        doc.id,
+        doc.data(),
+      );
+    }).toList();
+  }
+
+  Future<Map<String, Map<String, dynamic>>> getMissionProgress() async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(_currentUserId)
+        .collection('missionProgress')
+        .get();
+
+    return {
+      for (final doc in snapshot.docs)
+        doc.id: doc.data(),
+    };
+  }
+
   Future<bool> checkAttendance() async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(
+      const Duration(milliseconds: 500),
+    );
+
     return true;
   }
+
+
 }

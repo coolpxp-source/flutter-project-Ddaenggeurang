@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../models/mission_definition_model.dart';
+import '../../services/mission_service.dart';
 import 'attendance_check_screen.dart';
 import 'mission_proof_upload_screen.dart';
 
@@ -14,61 +16,12 @@ class _MissionListScreenState extends State<MissionListScreen> {
   String _selectedTab = 'monthly';
   bool _isAttendanceCompleted = false;
 
-  final List<Map<String, dynamic>> _monthlyMissions = [
-    {
-      'id': 'attendance',
-      'title': '매일 출석하기',
-      'description': '이번 달 12일 출석했어요',
-      'progress': 12,
-      'target': 20,
-      'points': 100,
-      'icon': Icons.calendar_month,
-      'color': const Color(0xFFFF6CAE),
-    },
-    {
-      'id': 'budget',
-      'title': '주간 예산 지키기',
-      'description': '이번 주 예산의 82%를 사용했어요',
-      'progress': 82,
-      'target': 100,
-      'points': 150,
-      'icon': Icons.savings_outlined,
-      'color': const Color(0xFF8566FF),
-    },
-    {
-      'id': 'expense_record',
-      'title': '지출 10회 기록하기',
-      'description': '현재 7회 기록했어요',
-      'progress': 7,
-      'target': 10,
-      'points': 80,
-      'icon': Icons.edit_note,
-      'color': const Color(0xFFFFA94D),
-    },
-  ];
+  final MissionService _missionService = MissionService();
 
-  final List<Map<String, dynamic>> _challengeMissions = [
-    {
-      'id': 'no_delivery',
-      'title': '배달 없이 3일 보내기',
-      'description': '현재 1일 성공했어요',
-      'progress': 1,
-      'target': 3,
-      'points': 200,
-      'icon': Icons.no_food_outlined,
-      'color': const Color(0xFF36BFA0),
-    },
-    {
-      'id': 'photo_proof',
-      'title': '절약 인증 사진 올리기',
-      'description': '사진 인증 후 관리자 승인이 필요해요',
-      'progress': 0,
-      'target': 1,
-      'points': 100,
-      'icon': Icons.camera_alt_outlined,
-      'color': const Color(0xFF5B8DEF),
-    },
-  ];
+  bool _isLoading = true;
+  List<MissionDefinition> _missions = [];
+
+  Map<String, Map<String, dynamic>> _missionProgress = {};
 
   final Set<int> _completedDays = {
     1,
@@ -84,6 +37,122 @@ class _MissionListScreenState extends State<MissionListScreen> {
     14,
     15,
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMissions();
+  }
+
+  Future<void> _loadMissions() async {
+    try {
+      final results = await Future.wait([
+        _missionService.getMissions(),
+        _missionService.getMissionProgress(),
+      ]);
+
+      final missions =
+      results[0] as List<MissionDefinition>;
+
+      final missionProgress =
+      results[1] as Map<String, Map<String, dynamic>>;
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _missions = missions;
+        _missionProgress = missionProgress;
+
+        _isAttendanceCompleted =
+            _missionProgress['attendance']?['status'] ==
+                'completed';
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '미션 정보를 불러오지 못했습니다: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  Map<String, dynamic> _toMissionUiData(
+      MissionDefinition mission,
+      ) {
+    final progressData =
+    _missionProgress[mission.id];
+
+    final isCompleted =
+        progressData?['status'] == 'completed';
+
+    switch (mission.type) {
+      case 'attendance':
+        return {
+          'id': mission.id,
+          'title': mission.title,
+          'description': '오늘 출석하고 포인트를 받아보세요',
+          'progress': _isAttendanceCompleted ? 1 : 0,
+          'target': 1,
+          'points': mission.points,
+          'icon': Icons.calendar_month,
+          'color': const Color(0xFFFF6CAE),
+          'requiresApproval': mission.requiresApproval,
+        };
+
+      case 'budget_success':
+        return {
+          'id': mission.id,
+          'title': mission.title,
+          'description': '설정한 예산 안에서 소비해보세요',
+          'progress': isCompleted ? 1 : 0,
+          'target': 1,
+          'points': mission.points,
+          'icon': Icons.savings_outlined,
+          'color': const Color(0xFF8566FF),
+          'requiresApproval': mission.requiresApproval,
+        };
+
+      case 'photo_proof':
+        return {
+          'id': mission.id,
+          'title': mission.title,
+          'description': '사진 인증 후 관리자 승인이 필요해요',
+          'progress': isCompleted ? 1 : 0,
+          'target': 1,
+          'points': mission.points,
+          'icon': Icons.camera_alt_outlined,
+          'color': const Color(0xFF5B8DEF),
+          'requiresApproval': mission.requiresApproval,
+        };
+
+      default:
+        return {
+          'id': mission.id,
+          'title': mission.title,
+          'description': '미션에 도전해보세요',
+          'progress': isCompleted ? 1 : 0,
+          'target': 1,
+          'points': mission.points,
+          'icon': Icons.flag_outlined,
+          'color': const Color(0xFF36BFA0),
+          'requiresApproval': mission.requiresApproval,
+        };
+    }
+  }
 
   Future<void> _openMission(Map<String, dynamic> mission) async {
     if (mission['id'] == 'attendance') {
@@ -131,9 +200,28 @@ class _MissionListScreenState extends State<MissionListScreen> {
     const pinkColor = Color(0xFFFF68AE);
     const purpleColor = Color(0xFF8566FF);
 
+    final monthlyMissions = _missions
+        .where((mission) => !mission.requiresApproval)
+        .map(_toMissionUiData)
+        .toList();
+
+    final challengeMissions = _missions
+        .where((mission) => mission.requiresApproval)
+        .map(_toMissionUiData)
+        .toList();
+
     final missions = _selectedTab == 'monthly'
-        ? _monthlyMissions
-        : _challengeMissions;
+        ? monthlyMissions
+        : challengeMissions;
+
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F5F8),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -417,10 +505,12 @@ class _MissionListScreenState extends State<MissionListScreen> {
   }) {
     final progress = mission['progress'] as int;
     final target = mission['target'] as int;
-    final progressRate = target == 0 ? 0.0 : progress / target;
 
-    final isAttendanceMission = mission['id'] == 'attendance';
-    final isCompleted = isAttendanceMission && _isAttendanceCompleted;
+    final isCompleted =
+        target > 0 && progress >= target;
+
+    final progressRate =
+    target == 0 ? 0.0 : progress / target;
 
     return InkWell(
       onTap: () => _openMission(mission),
