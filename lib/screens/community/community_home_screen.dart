@@ -6,6 +6,7 @@ import 'ranking_screen.dart';
 import 'post_detail_screen.dart';
 import 'post_write_screen.dart';
 import 'package:circular_menu/circular_menu.dart';
+import '../market/market_home_screen.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
@@ -27,11 +28,23 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   static const _gradientStart = Color(0xFFFFA351);
   static const _gradientEnd = Color(0xFFFF6B1A);
 
+  bool _showMarketHint = true;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _showMarketHint = false);
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -40,10 +53,64 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
         elevation: 0,
         title: const Text('커뮤니티', style: TextStyle(color: Colors.black)),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(child: Text('땡그랑', style: TextStyle(color: Colors.grey[500]))),
+          if (_showMarketHint)
+            GestureDetector(
+              onTap: () {
+                setState(() => _showMarketHint = false);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _green,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _green.withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('마켓 바로가기!',
+                            style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => _showMarketHint = false),
+                          child: const Icon(Icons.close, size: 12, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 말풍선 꼬리 (오른쪽 방향)
+                  ClipPath(
+                    clipper: _RightTailClipper(),
+                    child: Container(width: 6, height: 12, color: _green),
+                  ),
+                ],
+              ),
+            ),
+          IconButton(
+            icon: Icon(Icons.storefront_outlined, color: Colors.grey[700]),
+            tooltip: '마켓',
+            onPressed: () {
+              setState(() => _showMarketHint = false);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
+              );
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
 
@@ -169,7 +236,6 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
             const SizedBox(height: 12),
 
             // 검색바
-            // 검색바
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
@@ -218,7 +284,6 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
             _buildRankingBanner(),
             const SizedBox(height: 16),
 
-            // 피드
             // 피드
             StreamBuilder<List<CommunityPost>>(
               stream: _service.getPosts(category: _selectedCategory),
@@ -607,4 +672,18 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
       ),
     );
   }
+}
+class _RightTailClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+    path.moveTo(0, 0);
+    path.lineTo(size.width, size.height / 2);
+    path.lineTo(0, size.height);
+    path.close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) => false;
 }
