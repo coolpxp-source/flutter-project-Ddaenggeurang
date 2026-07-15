@@ -1,22 +1,19 @@
 import 'package:ddaenggeurang/screens/avatar/my_avatar_screen.dart';
 import 'package:flutter/material.dart';
-import 'screens/mission/mission_list_screen.dart';
-import 'screens/mission/mission_admin_approval_screen.dart';
-import 'screens/psychology/psychology_test_start_screen.dart';
-import 'screens/group/group_create_join_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
-  runApp(const TaehwaTestApp());
-}
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-class TaehwaTestApp extends StatelessWidget {
-  const TaehwaTestApp({super.key});
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
-  @override
-  Widget build(BuildContext context) {
-    return const MaterialApp(
+  runApp(
+    const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: MissionListScreen(),
-    );
-  }
+      home: MyAvatarScreen(),
+    ),
+  );
 }

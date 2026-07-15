@@ -22,7 +22,7 @@ class _PointShopScreenState extends State<PointShopScreen> {
   ];
 
   int _points = 0;
-  int _userLevel = 2;
+  final int _userLevel = 1;
   String _selectedSlot = 'hat';
   bool _isLoading = true;
 
@@ -380,7 +380,6 @@ class _PointShopScreenState extends State<PointShopScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF20A67A);
     const backgroundColor = Color(0xFFF7F8F7);
 
     final filteredItems = _items
