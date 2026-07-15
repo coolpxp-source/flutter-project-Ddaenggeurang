@@ -85,6 +85,7 @@ class CommunityService {
     required String category,
     required String content,
     List<String> imageUrls = const [],
+    List<String> hashtags = const [],
   }) async {
     await _db.collection('communityPosts').add({
       'authorId': authorId,
@@ -92,6 +93,7 @@ class CommunityService {
       'category': category,
       'content': content,
       'imageUrls': imageUrls,
+      'hashtags': hashtags,
       'likeCount': 0,
       'commentCount': 0,
       'createdAt': Timestamp.now(),
@@ -166,11 +168,18 @@ class CommunityService {
   }
 
   // 게시글 수정
-  Future<void> updatePost(String postId, String newContent) async {
-    await _db.collection('communityPosts').doc(postId).update({
-      'content': newContent,
+  Future<void> updatePost(String postId, String content, {List<String>? imageUrls, List<String>? hashtags}) async {
+    final data = <String, dynamic>{
+      'content': content,
       'updatedAt': Timestamp.now(),
-    });
+    };
+    if (imageUrls != null) {
+      data['imageUrls'] = imageUrls;
+    }
+    if (hashtags != null) {
+      data['hashtags'] = hashtags;
+    }
+    await _db.collection('communityPosts').doc(postId).update(data);
   }
 
 // 댓글 수정
