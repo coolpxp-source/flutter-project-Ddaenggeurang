@@ -12,8 +12,8 @@ class BottomNavBar extends StatelessWidget {
     required this.onTabSelected,
   });
 
-  static const Color activeColor = Color(0xFFEE5586);
-  static const Color inactiveColor = Colors.grey;
+  static const Color activeColor = Color(0xFFF5A623);
+  static const Color inactiveColor = Color(0xFFACA49E);
 
   @override
   Widget build(BuildContext context) {
@@ -66,11 +66,14 @@ class BottomNavBar extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
-            // 활성 탭 밑 인디케이터 바 (디자인의 검정 바)
+            // 활성 탭 밑 인디케이터 바
             Container(
               width: 24,
-              height: 2,
-              color: isActive ? Colors.black : Colors.transparent,
+              height: 2.5,
+              decoration: BoxDecoration(
+                color: isActive ? activeColor : Colors.transparent,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ],
         ),

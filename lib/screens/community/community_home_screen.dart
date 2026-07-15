@@ -151,7 +151,12 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
       ),
       bottomNavigationBar: BottomNavBar(
         currentTab: NavTab.community,
-        onTabSelected: (tab) {},
+        // 이 화면은 홈에서 push로 열린 별도 화면이라, 다른 탭을 누르면
+        // 이 화면을 닫고 그걸 열었던 화면(대부분 홈)으로 돌아간다.
+        onTabSelected: (tab) {
+          if (tab == NavTab.community) return;
+          Navigator.of(context).pop();
+        },
       ),
     );
   }
