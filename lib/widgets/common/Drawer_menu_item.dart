@@ -6,19 +6,35 @@ class DrawerMenuItem extends StatelessWidget {
   final IconData icon;
   final String title;
   final Widget destinationScreen;
+  final Color iconColor;
+  final Color iconBg;
 
   const DrawerMenuItem({
     super.key,
     required this.icon,
     required this.title,
     required this.destinationScreen,
+    this.iconColor = _accent,
+    this.iconBg = _accentSoft,
   });
+
+  static const _accent = Color(0xFFF5A623);
+  static const _accentSoft = Color(0xFFFFF0A6);
+  static const _ink = Color(0xFF221A16);
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      leading: Icon(icon),
-      title: Text(title),
+      visualDensity: VisualDensity.compact,
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Icon(icon, size: 18, color: iconColor),
+      ),
+      title: Text(title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _ink)),
       onTap: () {
         Navigator.pop(context); // 사이드바 먼저 닫기
         Navigator.push(
@@ -39,13 +55,13 @@ class DrawerSectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      padding: const EdgeInsets.fromLTRB(20, 18, 16, 6),
       child: Text(
         label,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey[600],
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF8A7E77),
         ),
       ),
     );

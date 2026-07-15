@@ -5,9 +5,21 @@ import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../widgets/common/coach_avatar.dart';
 import '../onboarding/onboarding_screen.dart'; // OnboardingData, DdaengColors
 import '../../utils/formatters.dart';
 import '../home/home_screen.dart';
+
+/// 온보딩에서 입력받은 데이터를 이메일 인증 화면까지 임시로 들고 가기 위한 홀더.
+/// main.dart의 AppGate는 Firebase 인증 상태만 보고 라우팅하기 때문에,
+/// 회원가입 직전 로컬 위젯에만 있던 OnboardingData를 AppGate가
+/// SignupExtraScreen을 만들 때 넘겨줄 방법이 없어서 이 정적 홀더를 거쳐간다.
+/// (이메일 인증 게이트를 통과해 SignupExtraScreen에 도달하면 다 쓴 것이므로
+///  값을 계속 들고 있어도 무방 — 다음 로그인 때는 온보딩을 다시 안 거치므로
+///  null로 남아 전체 입력 폼이 뜬다)
+class PendingOnboarding {
+  static OnboardingData? data;
+}
 
 class DBCoach {
   final String id;
@@ -63,8 +75,9 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
   String _ageGroup = ''; // 선택 전 빈 문자열
   String? _job = '개발자';
   String _selectedCoachId = 'ddaengjwi';
-  String _selectedCoachEmoji = '🐭';
   String _selectedCoachName = '땡쥐';
+
+  String get _selectedCoachImagePath => CoachTone.fromCode(_selectedCoachId).imagePath;
 
   bool _saving = false;
   bool _forceFullForm = false;
@@ -101,7 +114,6 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
       _ageGroup = d.ageGroup;
       _job = d.job;
       _selectedCoachId = d.tone.name;
-      _selectedCoachEmoji = d.tone.emoji;
       _selectedCoachName = d.tone.label;
     }
 
@@ -312,8 +324,8 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
                                     shape: BoxShape.circle,
                                   ),
                                   alignment: Alignment.center,
-                                  child: Text(_selectedCoachEmoji,
-                                      style: const TextStyle(fontSize: 40)),
+                                  child: CoachAvatar(
+                                      imagePath: _selectedCoachImagePath, size: 64),
                                 ),
                                 const SizedBox(height: 20),
                                 const Text(
@@ -379,8 +391,8 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
                                         width: 1.5),
                                   ),
                                   alignment: Alignment.center,
-                                  child: Text(_selectedCoachEmoji,
-                                      style: const TextStyle(fontSize: 38)),
+                                  child: CoachAvatar(
+                                      imagePath: _selectedCoachImagePath, size: 60),
                                 ),
                                 const SizedBox(height: 14),
                                 Text('$_selectedCoachName 코치',
@@ -794,7 +806,6 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
                               selected: _selectedCoachId == c.id,
                               onTap: () => setState(() {
                                 _selectedCoachId = c.id;
-                                _selectedCoachEmoji = c.emoji;
                                 _selectedCoachName = c.name;
                               }),
                             )),
@@ -1133,7 +1144,8 @@ class _CoachCard extends StatelessWidget {
                   color: selected ? Colors.white : const Color(0xFFF2F4F6),
                   shape: BoxShape.circle),
               alignment: Alignment.center,
-              child: Text(coach.emoji, style: const TextStyle(fontSize: 26)),
+              child: CoachAvatar(
+                  imagePath: CoachTone.fromCode(coach.id).imagePath, size: 40),
             ),
             const SizedBox(width: 14),
             Expanded(

@@ -13,11 +13,13 @@ dependencies:
   lottie: ^3.0.0
   url_launcher: ^6.3.0
   firebase_storage: ^13.4.3
+  circular_menu: ^4.0.0
 
   # Firebase
   firebase_core: ^4.11.0
   firebase_auth:
   cloud_firestore:
+  cloud_functions:
   google_sign_in: ^6.2.1
 
   # AI 통신
@@ -40,12 +42,22 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   intl: ^0.20.3
+  google_fonts: ^8.1.0
+  flutter_animate: ^4.5.2
+  shimmer: ^3.0.0
+  percent_indicator: ^4.2.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: "^0.14.1"
   flutter_lints: ^6.0.0
+
+# path_provider_android 2.3.x는 jni_flutter를 통해 Android SDK platform 35를
+# 요구하는데 이 개발 환경엔 없어서 빌드가 깨진다. JNI를 쓰지 않는 이전
+# 버전으로 고정해서 우회.
+dependency_overrides:
+  path_provider_android: 2.2.15
 
 flutter:
   uses-material-design: true
@@ -56,6 +68,6 @@ flutter:
 
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: true
-  image_path: "assets/images/Icon.png" # assets 폴더에 아이콘 파일이 있어야 합니다
+  ios: false # ios/ 플랫폼 스캐폴드가 없어서(Android 전용 프로젝트) 비활성화
+  image_path: "assets/images/ddaeng_logo_transparent.png"
   min_sdk_android: 21

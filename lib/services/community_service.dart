@@ -79,24 +79,21 @@ class CommunityService {
     await postRef.update({'commentCount': FieldValue.increment(1)});
   }
 
-// 게시글 좋아요
-  Future<void> togglePostLike(String postId, bool isLiking) async {
-    await _db.collection('communityPosts').doc(postId).update({
-      'likeCount': FieldValue.increment(isLiking ? 1 : -1),
-    });
-  }
-
   Future<void> createPost({
     required String authorId,
     required String authorName,
     required String category,
     required String content,
+    List<String> imageUrls = const [],
+    List<String> hashtags = const [],
   }) async {
     await _db.collection('communityPosts').add({
       'authorId': authorId,
       'authorName': authorName,
       'category': category,
       'content': content,
+      'imageUrls': imageUrls,
+      'hashtags': hashtags,
       'likeCount': 0,
       'commentCount': 0,
       'createdAt': Timestamp.now(),
@@ -113,5 +110,89 @@ class CommunityService {
         .map((s) => s.docs.map((d) => CommunityStat.fromFirestore(d)).toList());
   }
 
+  // 좋아요 여부 확인
+  Stream<bool> isPostLiked(String postId, String userId) {
+    return _db
+        .collection('communityPosts')
+        .doc(postId)
+        .collection('likedBy')
+        .doc(userId)
+        .snapshots()
+        .map((doc) => doc.exists);
+  }
+
+// 좋아요 토글
+  Future<void> toggleLike(String postId, String userId, bool isLiking) async {
+    final ref = _db
+        .collection('communityPosts')
+        .doc(postId)
+        .collection('likedBy')
+        .doc(userId);
+
+    if (isLiking) {
+      await ref.set({'createdAt': Timestamp.now()});
+    } else {
+      await ref.delete();
+    }
+
+    await _db.collection('communityPosts').doc(postId).update({
+      'likeCount': FieldValue.increment(isLiking ? 1 : -1),
+    });
+  }
+
+  // 게시글 단건 실시간 구독
+  Stream<CommunityPost> getPostStream(String postId) {
+    return _db
+        .collection('communityPosts')
+        .doc(postId)
+        .snapshots()
+        .map((doc) => CommunityPost.fromFirestore(doc));
+  }
+
+  // 게시글 삭제
+  Future<void> deletePost(String postId) async {
+    await _db.collection('communityPosts').doc(postId).delete();
+  }
+
+// 댓글 삭제
+  Future<void> deleteComment(String postId, String commentId) async {
+    await _db
+        .collection('communityPosts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId)
+        .delete();
+    await _db.collection('communityPosts').doc(postId).update({
+      'commentCount': FieldValue.increment(-1),
+    });
+  }
+
+  // 게시글 수정
+  Future<void> updatePost(String postId, String content, {List<String>? imageUrls, List<String>? hashtags}) async {
+    final data = <String, dynamic>{
+      'content': content,
+      'updatedAt': Timestamp.now(),
+    };
+    if (imageUrls != null) {
+      data['imageUrls'] = imageUrls;
+    }
+    if (hashtags != null) {
+      data['hashtags'] = hashtags;
+    }
+    await _db.collection('communityPosts').doc(postId).update(data);
+  }
+
+// 댓글 수정
+  Future<void> updateComment(String postId, String commentId, String newContent) async {
+    await _db
+        .collection('communityPosts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId)
+        .update({
+      'content': newContent,
+      'updatedAt': Timestamp.now(),
+    });
+  }
 
 }

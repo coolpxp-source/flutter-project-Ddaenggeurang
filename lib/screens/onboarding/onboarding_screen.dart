@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/coach_tone.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/common/coach_avatar.dart';
 import '../auth/login_screen.dart';
 // 기존 import 문들 아래에 추가
 import '../auth/email_signup_screen.dart'; // EmailSignUpScreen 파일 경로에 맞게 수정 필요
@@ -1069,7 +1070,7 @@ class _ConfirmPage extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       alignment: Alignment.center,
-                      child: Text(t.emoji, style: const TextStyle(fontSize: 26)),
+                      child: CoachAvatar(imagePath: t.imagePath, size: 40),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
