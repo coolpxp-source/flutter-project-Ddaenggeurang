@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'Drawer_menu_item.dart';
 import 'Placeholder_screen.dart';
 import '../../screens/expense/expense_input_screen.dart';
+import '../../screens/record/record_type_select_screen.dart';
 
 /// 앱 전체에서 공용으로 쓰는 사이드바.
 /// 사용법: 각 화면 Scaffold에 drawer: const AppDrawer() 한 줄만 추가.
@@ -74,7 +75,7 @@ class AppDrawer extends StatelessWidget {
           DrawerMenuItem(
             icon: Icons.edit_note,
             title: '수입/지출/저축 기록하기',
-            destinationScreen: const ExpenseInputScreen(),
+            destinationScreen: const RecordTypeSelectScreen(),
             iconColor: _amberDeep,
             iconBg: _amberSoft,
           ),
