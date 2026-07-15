@@ -16,6 +16,37 @@ class _AttendanceCheckScreenState
 
   bool _isAttended = false;
   bool _isLoading = false;
+  bool _isInitialLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAttendanceStatus();
+  }
+
+  Future<void> _loadAttendanceStatus() async {
+    try {
+      final isCompleted =
+      await _missionService.isTodayAttendanceCompleted();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isAttended = isCompleted;
+        _isInitialLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isInitialLoading = false;
+      });
+    }
+  }
 
   Future<void> _checkAttendance() async {
     if (_isAttended || _isLoading) return;
@@ -53,6 +84,14 @@ class _AttendanceCheckScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitialLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('출석 체크'),

@@ -1,4 +1,6 @@
 import 'package:ddaenggeurang/screens/avatar/my_avatar_screen.dart';
+import 'package:ddaenggeurang/screens/mission/mission_admin_approval_screen.dart';
+import 'package:ddaenggeurang/screens/mission/mission_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -13,7 +15,7 @@ Future<void> main() async {
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: MyAvatarScreen(),
+      home: MissionAdminApprovalScreen(),
     ),
   );
 }
