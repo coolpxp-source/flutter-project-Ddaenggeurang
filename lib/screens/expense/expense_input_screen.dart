@@ -11,6 +11,7 @@ import '../../widgets/expense/category_quick_chip.dart';
 /// TODO: 카테고리 "+ 추가"는 category/category_management_screen.dart로 이동
 /// TODO: 퀵카테고리 categoryId는 임시 슬러그값 — category_service로 실제 Firestore
 ///       categories 컬렉션에서 nature별로 조회하도록 교체 필요
+///       구상중 ...
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({super.key});
 

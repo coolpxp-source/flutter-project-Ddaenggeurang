@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'models/user_model.dart';
 import 'firebase_options.dart';
 import 'services/user_service.dart';
-import 'screens/onboarding/onboarding_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_extra_screen.dart';
+import 'screens/auth/email_verification_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/splash_screen.dart'; // 방금 만든 스플래시 파일 import
 
@@ -38,6 +38,11 @@ class _DdaengAppState extends State<DdaengApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2F6BFF)),
         scaffoldBackgroundColor: Colors.white,
         useMaterial3: true,
+        // 앱 전체 기본 폰트를 Gothic A1(구글 폰트, 한글 지원)로 통일.
+        // 기존 화면들의 TextStyle(fontWeight/fontSize/color)은 fontFamily를
+        // 지정 안 했으므로 이 테마의 폰트를 그대로 물려받는다 — 다른 파트
+        // 화면도 별도 수정 없이 자동으로 폰트만 좋아짐.
+        textTheme: GoogleFonts.gothicA1TextTheme(),
       ),
       // 스플래시 상태에 따라 분기
       home: _showSplash
@@ -68,6 +73,14 @@ class AppGate extends StatelessWidget {
           return const LoginScreen();
         }
 
+        // ── 이메일 미인증 ──
+        // 구글 로그인 계정은 Firebase가 emailVerified를 자동으로 true로
+        // 채워주므로 이 단계를 그냥 통과한다. 이메일/비밀번호 가입 계정만
+        // 인증 전이면 여기서 막힌다.
+        if (!user.emailVerified) {
+          return const EmailVerificationScreen();
+        }
+
         // ── 로그인 상태 ──
         return StreamBuilder<UserModel?>(
           stream: UserService().watchUser(user.uid),
@@ -79,17 +92,15 @@ class AppGate extends StatelessWidget {
               return _ErrorView(message: '${snap.error}');
             }
             return snap.data == null
-                ? SignupExtraScreen(uid: user.uid, email: user.email ?? '')
+                ? SignupExtraScreen(
+                uid: user.uid,
+                email: user.email ?? '',
+                onboardingData: PendingOnboarding.data)
                 : const HomeScreen();
           },
         );
       },
     );
-  }
-
-  Future<bool> _seenOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('seenOnboarding') ?? false;
   }
 }
 

@@ -8,51 +8,96 @@ import '../../screens/expense/expense_input_screen.dart';
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
 
+  // 홈 대시보드와 동일한 팔레트 — 섹션별로 색을 다르게 줘서 화면 간 톤을 통일한다.
+  static const _amberDeep = Color(0xFF8A5200);
+  static const _amberSoft = Color(0xFFFFF3DE);
+  static const _blue = Color(0xFF4F7DF3);
+  static const _blueSoft = Color(0xFFE8EFFE);
+  static const _pink = Color(0xFFFF6F91);
+  static const _pinkSoft = Color(0xFFFFE3EC);
+  static const _purple = Color(0xFF6C5CE7);
+  static const _purpleSoft = Color(0xFFEDE9FE);
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
+      backgroundColor: Colors.white,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          const DrawerHeader(
-            decoration: BoxDecoration(color: Colors.blueAccent),
-            child: Align(
-              alignment: Alignment.bottomLeft,
-              child: Text(
-                '메뉴',
-                style: TextStyle(color: Colors.white, fontSize: 24),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 56, 20, 20),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFFB648), Color(0xFFFF7A45)],
               ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(6),
+                  child: Image.asset('assets/images/Icon.png'),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('땡그랑',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800)),
+                      SizedBox(height: 2),
+                      Text('가계부는 똑똑하게, 소비는 똑바르게!',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
-          const DrawerSectionLabel(label: '내역 입력 및 조회'),
+          const DrawerSectionLabel(label: '수입 / 지출 / 저축'),
           DrawerMenuItem(
             icon: Icons.edit_note,
-            title: '수입/지출 기록하기',
+            title: '수입/지출/저축 기록하기',
             destinationScreen: const ExpenseInputScreen(),
+            iconColor: _amberDeep,
+            iconBg: _amberSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.camera_alt_outlined,
             title: '영수증 촬영 업로드',
             destinationScreen: PlaceholderScreen(title: '영수증 촬영 업로드'),
+            iconColor: _amberDeep,
+            iconBg: _amberSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.sms_outlined,
             title: '문자내역 붙여넣기',
             destinationScreen: PlaceholderScreen(title: '문자내역 붙여넣기'),
+            iconColor: _amberDeep,
+            iconBg: _amberSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.list_alt,
             title: '내역 목록',
             destinationScreen: PlaceholderScreen(title: '내역 목록'),
-          ),
-
-          const Divider(),
-          const DrawerSectionLabel(label: '저축 / 투자'),
-          const DrawerMenuItem(
-            icon: Icons.savings_outlined,
-            title: '저축/투자 기록',
-            destinationScreen: PlaceholderScreen(title: '저축/투자 기록'),
+            iconColor: _amberDeep,
+            iconBg: _amberSoft,
           ),
 
           const Divider(),
@@ -61,16 +106,22 @@ class AppDrawer extends StatelessWidget {
             icon: Icons.credit_card,
             title: '할부 관리',
             destinationScreen: PlaceholderScreen(title: '할부 관리'),
+            iconColor: _blue,
+            iconBg: _blueSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.autorenew,
             title: '구독/정기결제 관리',
             destinationScreen: PlaceholderScreen(title: '구독/정기결제 관리'),
+            iconColor: _blue,
+            iconBg: _blueSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.flight_takeoff,
             title: '여행 관리',
             destinationScreen: PlaceholderScreen(title: '여행 관리'),
+            iconColor: _blue,
+            iconBg: _blueSoft,
           ),
 
           const Divider(),
@@ -79,11 +130,15 @@ class AppDrawer extends StatelessWidget {
             icon: Icons.card_giftcard,
             title: '카드포인트',
             destinationScreen: PlaceholderScreen(title: '카드포인트'),
+            iconColor: _pink,
+            iconBg: _pinkSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.calculate_outlined,
             title: '연말정산 시뮬레이션',
             destinationScreen: PlaceholderScreen(title: '연말정산 시뮬레이션'),
+            iconColor: _pink,
+            iconBg: _pinkSoft,
           ),
 
           const Divider(),
@@ -92,11 +147,15 @@ class AppDrawer extends StatelessWidget {
             icon: Icons.category_outlined,
             title: '카테고리 관리',
             destinationScreen: PlaceholderScreen(title: '카테고리 관리'),
+            iconColor: _purple,
+            iconBg: _purpleSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.emoji_emotions_outlined,
             title: '감정태그',
             destinationScreen: PlaceholderScreen(title: '감정태그'),
+            iconColor: _purple,
+            iconBg: _purpleSoft,
           ),
         ],
       ),

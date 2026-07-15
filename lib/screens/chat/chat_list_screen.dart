@@ -7,7 +7,7 @@ import 'chat_room_screen.dart';
 class ChatListScreen extends StatelessWidget {
   ChatListScreen({super.key});
 
-  static const _green = Color(0xFF3B8B5E);
+  static const _green = Color(0xFFFF9166);
 
   // TODO: 로그인 연결되면 교체
   final String _myId = FirebaseAuth.instance.currentUser!.uid;

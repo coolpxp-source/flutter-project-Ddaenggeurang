@@ -36,12 +36,22 @@ dependencies:
   image_picker: ^1.2.3
 
   cupertino_icons: ^1.0.8
+  google_fonts: ^8.1.0
+  flutter_animate: ^4.5.2
+  shimmer: ^3.0.0
+  percent_indicator: ^4.2.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_launcher_icons: "^0.14.1"
   flutter_lints: ^6.0.0
+
+# path_provider_android 2.3.x는 jni_flutter를 통해 Android SDK platform 35를
+# 요구하는데 이 개발 환경엔 없어서 빌드가 깨진다. JNI를 쓰지 않는 이전
+# 버전으로 고정해서 우회.
+dependency_overrides:
+  path_provider_android: 2.2.15
 
 flutter:
   uses-material-design: true
