@@ -138,12 +138,12 @@ class DdaengLoading extends StatelessWidget {
             children: [
               Image.asset(
                 'assets/images/ddaeng_logo_transparent_trimmed.png',
-                width: 96,
+                width: 168,
               )
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .scaleXY(
                       begin: 0.95, end: 1.05, duration: 1100.ms, curve: Curves.easeInOut),
-              const SizedBox(height: 20),
+              const SizedBox(height: 28),
               const BrandLoadingDots(),
             ],
           ),

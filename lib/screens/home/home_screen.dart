@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shimmer/shimmer.dart';
@@ -8,7 +9,6 @@ import '../../models/user_model.dart';
 import '../../models/category_summary_model.dart';
 import '../../models/budget_model.dart';
 import '../../services/ai_service.dart';
-import '../../services/auth_service.dart';
 import '../../services/budget_service.dart';
 import '../../services/category_summary_service.dart';
 import '../../services/user_service.dart';
@@ -22,6 +22,7 @@ import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
 import '../mypage/mypage_home_screen.dart';
 import '../avatar/my_avatar_screen.dart';
+import '../psychology/psychology_test_start_screen.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -53,7 +54,7 @@ class _C {
 
   /// 카드 공통 그림자 — 테두리 대신 그림자로만 입체감을 준다.
   static List<BoxShadow> cardShadow = [
-    BoxShadow(color: ink.withOpacity(0.05), blurRadius: 18, offset: const Offset(0, 8)),
+    BoxShadow(color: ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8)),
   ];
 }
 
@@ -90,9 +91,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout_rounded, color: _C.inkSub),
-            onPressed: () => AuthService().signOut(),
+            icon: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: _C.amberSoft, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: const Icon(Icons.notifications_none_rounded, size: 18, color: _C.amberDeep),
+            ),
+            tooltip: '알림',
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '알림'))),
           ),
+          const SizedBox(width: 4),
         ],
         // leading은 지정 안 해도 됨 — drawer가 있으면 Scaffold가
         // 햄버거 버튼을 자동으로 왼쪽에 넣어줌
@@ -158,6 +168,25 @@ class _TabPlaceholder extends StatelessWidget {
 // 지금은 더미 데이터로 틀만 잡아둔 상태. 각 위젯에 남긴 TODO 지점만
 // 실제 스트림/서비스로 바꿔 끼우면 됨.
 // ══════════════════════════════════════════════════════════
+
+/// 대시보드 배경에 은은하게 떠다니는 장식 블롭.
+class _HomeBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _HomeBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
+      ),
+    );
+  }
+}
 
 class _HomeDashboard extends StatefulWidget {
   final String uid;
@@ -272,24 +301,34 @@ class _HomeDashboardState extends State<_HomeDashboard> {
         }
         final user = snapshot.data!;
 
-        return RefreshIndicator(
-          color: _C.amber,
-          onRefresh: () async {},
-          child: SingleChildScrollView(
-            physics:
-            const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-            padding: EdgeInsets.zero,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: _GreetingRow(user: user),
-                ),
-                const SizedBox(height: 14),
-
+        return Stack(
+          children: [
+            Positioned(
+              top: 420,
+              left: -60,
+              child: _HomeBlob(color: _C.mintSoft, size: 150)
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .moveY(begin: 0, end: -16, duration: 3200.ms, curve: Curves.easeInOut),
+            ),
+            Positioned(
+              top: 700,
+              right: -40,
+              child: _HomeBlob(color: _C.pinkSoft, size: 130)
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .moveY(begin: 0, end: 14, duration: 3800.ms, curve: Curves.easeInOut),
+            ),
+            RefreshIndicator(
+              color: _C.amber,
+              onRefresh: () async {},
+              child: SingleChildScrollView(
+                physics:
+                const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                 _LiveBudgetSection(
-                    uid: widget.uid, month: _month, weekAnchor: _selectedDay),
+                    uid: widget.uid, month: _month, weekAnchor: _selectedDay, user: user),
 
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
@@ -340,9 +379,11 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                         .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         );
       },
     );
@@ -350,41 +391,6 @@ class _HomeDashboardState extends State<_HomeDashboard> {
 }
 
 // ─────────────────────── 인사말 ───────────────────────
-
-class _GreetingRow extends StatelessWidget {
-  final UserModel user;
-  const _GreetingRow({required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 18,
-          backgroundColor: _C.amberSoft,
-          backgroundImage: AssetImage(user.coachTone.imagePath),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text('${user.nickname}님, 오늘도 파이팅!',
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 16.5, fontWeight: FontWeight.w800, color: _C.ink)),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: _C.pinkSoft,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text('Lv.${user.level} · ${user.points}P',
-              style: const TextStyle(
-                  fontSize: 11.5, fontWeight: FontWeight.w800, color: _C.pink)),
-        ),
-      ],
-    );
-  }
-}
 
 // ─────────────────────── 예산 히어로 + 통계 카드 (실데이터 로더) ───────────────────────
 
@@ -407,7 +413,13 @@ class _LiveBudgetSection extends StatefulWidget {
   final String uid;
   final DateTime month;
   final DateTime weekAnchor;
-  const _LiveBudgetSection({required this.uid, required this.month, required this.weekAnchor});
+  final UserModel user;
+  const _LiveBudgetSection({
+    required this.uid,
+    required this.month,
+    required this.weekAnchor,
+    required this.user,
+  });
 
   @override
   State<_LiveBudgetSection> createState() => _LiveBudgetSectionState();
@@ -466,10 +478,7 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
       future: _future,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: _ShimmerBlock(height: 190, radius: 26),
-          );
+          return const _ShimmerBlock(height: 220, radius: 0);
         }
         final stats = snap.data ??
             const _BudgetStats(total: 0, spent: 0, weekSpent: 0, topCategory: ('지출 없음', 0.0));
@@ -479,7 +488,8 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
 
         return Column(
           children: [
-            _BudgetHero(remaining: remaining, total: stats.total, progress: progress)
+            _BudgetHero(
+                    user: widget.user, remaining: remaining, total: stats.total, progress: progress)
                 .animate()
                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                 .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
@@ -503,92 +513,190 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
 }
 
 class _BudgetHero extends StatelessWidget {
+  final UserModel user;
   final int remaining;
   final int total;
   final double progress;
 
-  const _BudgetHero({required this.remaining, required this.total, required this.progress});
+  const _BudgetHero({
+    required this.user,
+    required this.remaining,
+    required this.total,
+    required this.progress,
+  });
 
   @override
   Widget build(BuildContext context) {
+    const heroRadius = BorderRadius.only(
+      bottomLeft: Radius.circular(36),
+      bottomRight: Radius.circular(36),
+    );
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      padding: const EdgeInsets.fromLTRB(22, 22, 22, 40),
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 44),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFB648), Color(0xFFFF7A45)],
+          colors: [Color(0xFFFFC168), Color(0xFFFF7A45), Color(0xFFFF5C7A)],
+          stops: [0.0, 0.55, 1.0],
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: heroRadius,
         boxShadow: [
           BoxShadow(
-              color: const Color(0xFFFF8A45).withOpacity(0.35),
-              blurRadius: 26,
-              offset: const Offset(0, 14)),
+              color: const Color(0xFFFF6A66).withValues(alpha: 0.4),
+              blurRadius: 30,
+              offset: const Offset(0, 16)),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
+      child: ClipRRect(
+        borderRadius: heroRadius,
+        child: Stack(
+          children: [
+            Positioned(
+              top: -60,
+              right: -40,
+              child: Container(
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.22), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -70,
+              left: -50,
+              child: Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.12), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: -30,
+              left: -60,
+              child: Transform.rotate(
+                angle: -0.4,
+                child: Container(
+                  width: 240,
+                  height: 70,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('이번 달 남은 예산',
-                    style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white.withOpacity(0.92))),
-                const SizedBox(height: 10),
                 Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(comma(remaining),
-                        style: const TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            height: 1,
-                            letterSpacing: -0.6)),
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 4),
-                      child: Text('원',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                    Container(
+                      padding: const EdgeInsets.all(2.5),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.6),
+                      ),
+                      child: CircleAvatar(
+                        radius: 19,
+                        backgroundColor: Colors.white,
+                        backgroundImage: AssetImage(user.coachTone.imagePath),
+                      ),
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(begin: 1.0, end: 1.05, duration: 1900.ms, curve: Curves.easeInOut),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('${user.nickname}님, 오늘도 파이팅!',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.24),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('Lv.${user.level} · ${user.points}P',
+                          style: const TextStyle(
+                              fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                Text('전체 ${comma(total)}원 중 여유',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withOpacity(0.85))),
+                const SizedBox(height: 22),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('이번 달 남은 예산',
+                              style: TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white.withValues(alpha: 0.92))),
+                          const SizedBox(height: 10),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(comma(remaining),
+                                  style: const TextStyle(
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      height: 1,
+                                      letterSpacing: -0.8)),
+                              const Padding(
+                                padding: EdgeInsets.only(left: 4, bottom: 4),
+                                child: Text('원',
+                                    style: TextStyle(
+                                        fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text('전체 ${comma(total)}원 중 여유',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withValues(alpha: 0.85))),
+                        ],
+                      ),
+                    ),
+                    CircularPercentIndicator(
+                      radius: 42,
+                      lineWidth: 9,
+                      percent: progress,
+                      animation: true,
+                      animationDuration: 700,
+                      circularStrokeCap: CircularStrokeCap.round,
+                      backgroundColor: Colors.white.withValues(alpha: 0.28),
+                      progressColor: Colors.white,
+                      center: Text('${(progress * 100).round()}%',
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ],
+                ),
               ],
             ),
-          ),
-          CircularPercentIndicator(
-            radius: 42,
-            lineWidth: 9,
-            percent: progress,
-            animation: true,
-            animationDuration: 700,
-            circularStrokeCap: CircularStrokeCap.round,
-            backgroundColor: Colors.white.withOpacity(0.28),
-            progressColor: Colors.white,
-            center: Text('${(progress * 100).round()}%',
-                style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// ─────────────────────── 히어로 위에 뜨는 레이어드 카드 ───────────────────────
+// ─────────────────────── 히어로 위에 뜨는 글래스모피즘 통계 카드 ───────────────────────
 
 class _FloatingStatsRow extends StatelessWidget {
   final int weekSpent;
@@ -603,7 +711,6 @@ class _FloatingStatsRow extends StatelessWidget {
         Expanded(
           child: _StatCard(
             icon: Icons.calendar_view_week_rounded,
-            iconBg: _C.mintSoft,
             iconColor: _C.mint,
             label: '이번 주 지출',
             value: '${comma(weekSpent)}원',
@@ -613,7 +720,6 @@ class _FloatingStatsRow extends StatelessWidget {
         Expanded(
           child: _StatCard(
             icon: Icons.local_fire_department_rounded,
-            iconBg: _C.pinkSoft,
             iconColor: _C.pink,
             label: '최다 지출 카테고리',
             value: '${topCategory.$1} · ${(topCategory.$2 * 100).round()}%',
@@ -624,16 +730,15 @@ class _FloatingStatsRow extends StatelessWidget {
   }
 }
 
+/// 히어로 그라데이션 위에 겹치는 반투명 유리질감(glassmorphism) 카드.
 class _StatCard extends StatelessWidget {
   final IconData icon;
-  final Color iconBg;
   final Color iconColor;
   final String label;
   final String value;
 
   const _StatCard({
     required this.icon,
-    required this.iconBg,
     required this.iconColor,
     required this.label,
     required this.value,
@@ -641,35 +746,50 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(color: iconColor.withOpacity(0.12), blurRadius: 14, offset: const Offset(0, 7)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 16, color: iconColor),
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.2),
+            boxShadow: [
+              BoxShadow(
+                  color: iconColor.withValues(alpha: 0.14), blurRadius: 16, offset: const Offset(0, 8)),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-          const SizedBox(height: 2),
-          Text(value,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: iconColor,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                        color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3)),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 16, color: Colors.white),
+              ),
+              const SizedBox(height: 10),
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+              const SizedBox(height: 2),
+              Text(value,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -732,7 +852,7 @@ class _QuickActionsGrid extends StatelessWidget {
   }
 }
 
-class _QuickActionButton extends StatelessWidget {
+class _QuickActionButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final Color bg;
@@ -747,30 +867,49 @@ class _QuickActionButton extends StatelessWidget {
   });
 
   @override
+  State<_QuickActionButton> createState() => _QuickActionButtonState();
+}
+
+class _QuickActionButtonState extends State<_QuickActionButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap == null ? null : () => onTap!(context),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: bg,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: fg.withOpacity(0.14), blurRadius: 10, offset: const Offset(0, 5)),
-              ],
+    return GestureDetector(
+      onTapDown: widget.onTap == null ? null : (_) => setState(() => _pressed = true),
+      onTapUp: widget.onTap == null ? null : (_) => setState(() => _pressed = false),
+      onTapCancel: widget.onTap == null ? null : () => setState(() => _pressed = false),
+      onTap: widget.onTap == null ? null : () => widget.onTap!(context),
+      child: AnimatedScale(
+        scale: _pressed ? 0.9 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [widget.bg, Color.lerp(widget.bg, Colors.white, 0.15)!],
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: widget.fg.withValues(alpha: 0.16), blurRadius: 10, offset: const Offset(0, 5)),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Icon(widget.icon, size: 21, color: widget.fg),
             ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 21, color: fg),
-          ),
-          const SizedBox(height: 8),
-          Text(label,
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _C.ink)),
-        ],
+            const SizedBox(height: 8),
+            Text(widget.label,
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _C.ink)),
+          ],
+        ),
       ),
     );
   }
@@ -854,7 +993,7 @@ class _ModeToggle extends StatelessWidget {
           boxShadow: selected
               ? [
             BoxShadow(
-                color: const Color(0xFFFF8A45).withOpacity(0.3),
+                color: const Color(0xFFFF8A45).withValues(alpha: 0.3),
                 blurRadius: 8,
                 offset: const Offset(0, 3)),
           ]
@@ -952,7 +1091,7 @@ class _WeekCalendarStrip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
       decoration: BoxDecoration(
         color: _C.card,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: _C.cardShadow,
       ),
       child: Row(
@@ -1086,46 +1225,69 @@ class _CoachBubbleState extends State<_CoachBubble> {
           end: Alignment.bottomRight,
           colors: [Color(0xFFFF9EB5), Color(0xFFFF5C8A)],
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
-          BoxShadow(color: _C.pink.withOpacity(0.28), blurRadius: 18, offset: const Offset(0, 8)),
+          BoxShadow(color: _C.pink.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 8)),
         ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.24),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.4)),
-            ),
-            alignment: Alignment.center,
-            child: CoachAvatar(imagePath: widget.tone.imagePath, size: 30),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FutureBuilder<String>(
-              future: _messageFuture,
-              builder: (context, snap) {
-                if (snap.connectionState != ConnectionState.done) {
-                  return const _CoachBubbleLoading();
-                }
-                return Text(
-                  snap.data ?? '오늘도 현명한 소비 하고 계신가요?',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    height: 1.45,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -34,
+              right: -18,
+              child: Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.18), Colors.white.withValues(alpha: 0.0)],
                   ),
-                );
-              },
+                ),
+              ),
             ),
-          ),
-        ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.24),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+                  ),
+                  alignment: Alignment.center,
+                  child: CoachAvatar(imagePath: widget.tone.imagePath, size: 30),
+                )
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .scaleXY(begin: 1.0, end: 1.05, duration: 1800.ms, curve: Curves.easeInOut),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FutureBuilder<String>(
+                    future: _messageFuture,
+                    builder: (context, snap) {
+                      if (snap.connectionState != ConnectionState.done) {
+                        return const _CoachBubbleLoading();
+                      }
+                      return Text(
+                        snap.data ?? '오늘도 현명한 소비 하고 계신가요?',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          height: 1.45,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1142,7 +1304,7 @@ class _CoachBubbleLoading extends StatelessWidget {
           height: 11,
           margin: const EdgeInsets.only(bottom: 6),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.35),
+            color: Colors.white.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(6),
           ),
         );
@@ -1232,12 +1394,20 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
   }
 }
 
-class _CategorySpendingCard extends StatelessWidget {
+class _CategorySpendingCard extends StatefulWidget {
   final List<_CategorySlice> slices;
   const _CategorySpendingCard({required this.slices});
 
   @override
+  State<_CategorySpendingCard> createState() => _CategorySpendingCardState();
+}
+
+class _CategorySpendingCardState extends State<_CategorySpendingCard> {
+  int? _touchedIndex;
+
+  @override
   Widget build(BuildContext context) {
+    final slices = widget.slices;
     final total = slices.fold<int>(0, (sum, s) => sum + s.amount);
 
     if (slices.isEmpty) {
@@ -1246,7 +1416,7 @@ class _CategorySpendingCard extends StatelessWidget {
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(22),
           boxShadow: _C.cardShadow,
         ),
         child: const Column(
@@ -1262,12 +1432,14 @@ class _CategorySpendingCard extends StatelessWidget {
       );
     }
 
+    final touched = _touchedIndex != null ? slices[_touchedIndex!] : null;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: _C.cardShadow,
       ),
       child: Column(
@@ -1276,44 +1448,71 @@ class _CategorySpendingCard extends StatelessWidget {
           const Text('카테고리별 지출',
               style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
           const SizedBox(height: 4),
-          const Text('이번 달 지출을 카테고리로 나눠봤어요',
+          const Text('탭하면 카테고리별 비중을 볼 수 있어요',
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
           const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: 118,
-                height: 118,
+                width: 132,
+                height: 132,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     PieChart(
                       PieChartData(
+                        pieTouchData: PieTouchData(
+                          touchCallback: (event, response) {
+                            if (!event.isInterestedForInteractions ||
+                                response?.touchedSection == null) {
+                              setState(() => _touchedIndex = null);
+                              return;
+                            }
+                            setState(() => _touchedIndex =
+                                response!.touchedSection!.touchedSectionIndex);
+                          },
+                        ),
                         sections: [
-                          for (final s in slices)
+                          for (final (i, s) in slices.indexed)
                             PieChartSectionData(
                               value: s.amount.toDouble(),
                               color: s.color,
-                              radius: 20,
+                              radius: i == _touchedIndex ? 26 : 20,
                               showTitle: false,
                             ),
                         ],
-                        centerSpaceRadius: 39,
+                        centerSpaceRadius: 44,
                         sectionsSpace: 3,
                         startDegreeOffset: -90,
                       ),
+                      duration: const Duration(milliseconds: 220),
                     ),
                     Column(
                       mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(koreanAmount(total),
-                            style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800, color: _C.ink)),
-                        const Text('총 지출',
-                            style: TextStyle(
-                                fontSize: 9.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-                      ],
+                      children: touched != null
+                          ? [
+                              Text('${(touched.amount / total * 100).round()}%',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w900,
+                                      color: touched.color)),
+                              Text(touched.label,
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                            ]
+                          : [
+                              Text(koreanAmount(total),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                      fontSize: 15, fontWeight: FontWeight.w800, color: _C.ink)),
+                              const Text('총 지출',
+                                  style: TextStyle(
+                                      fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                            ],
                     ),
                   ],
                 ),
@@ -1322,31 +1521,50 @@ class _CategorySpendingCard extends StatelessWidget {
               Expanded(
                 child: Column(
                   children: [
-                    for (final s in slices)
+                    for (final (i, s) in slices.indexed)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(color: s.color, shape: BoxShape.circle),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => setState(
+                              () => _touchedIndex = _touchedIndex == i ? null : i),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: i == _touchedIndex
+                                  ? s.color.withValues(alpha: 0.1)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(s.label,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: _C.ink)),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration:
+                                      BoxDecoration(color: s.color, shape: BoxShape.circle),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(s.label,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: i == _touchedIndex
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: _C.ink)),
+                                ),
+                                Text('${(s.amount / total * 100).round()}%',
+                                    style: const TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: _C.inkSub)),
+                              ],
                             ),
-                            Text('${(s.amount / total * 100).round()}%',
-                                style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _C.inkSub)),
-                          ],
+                          ),
                         ),
                       ),
                   ],
@@ -1457,7 +1675,14 @@ class _ExpenseRow extends StatelessWidget {
           Container(
             width: 38,
             height: 38,
-            decoration: BoxDecoration(color: color.withOpacity(0.14), shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color.withValues(alpha: 0.14), color.withValues(alpha: 0.22)],
+              ),
+              shape: BoxShape.circle,
+            ),
             alignment: Alignment.center,
             child: Icon(icon, size: 18, color: color),
           ),
@@ -1504,7 +1729,7 @@ class _WalletTeaserCard extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: _C.cardShadow,
       ),
       child: Row(
@@ -1518,7 +1743,10 @@ class _WalletTeaserCard extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: [_C.purple, Color(0xFF9B8CFF)],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(color: _C.purple.withValues(alpha: 0.28), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
             ),
             alignment: Alignment.center,
             child: const Text('👛', style: TextStyle(fontSize: 24)),
@@ -1572,7 +1800,13 @@ class _SpendingTendencyCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: _C.pinkSoft, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: _C.pinkSoft,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(color: _C.pink.withValues(alpha: 0.1), blurRadius: 14, offset: const Offset(0, 6)),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1593,6 +1827,36 @@ class _SpendingTendencyCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF8A5164),
                   height: 1.5)),
+          const SizedBox(height: 14),
+          InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PsychologyTestStartScreen())),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                      color: _C.pink.withValues(alpha: 0.16), blurRadius: 10, offset: const Offset(0, 4)),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.psychology_alt_rounded, size: 16, color: _C.pink),
+                  const SizedBox(width: 6),
+                  const Text('소비심리 테스트하러가기',
+                      style: TextStyle(
+                          fontSize: 12.5, fontWeight: FontWeight.w800, color: _C.pink)),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.arrow_forward_rounded, size: 14, color: _C.pink),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

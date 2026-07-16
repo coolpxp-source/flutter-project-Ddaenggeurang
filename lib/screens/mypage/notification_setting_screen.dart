@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
@@ -8,7 +9,6 @@ const _accentSoft = Color(0xFFFFF0A6);
 const _ink = Color(0xFF221A16);
 const _inkSub = Color(0xFF8A7E77);
 const _bg = Color(0xFFFAF8F6);
-const _line = Color(0xFFF0E9E4);
 
 const _blue = Color(0xFF2F6BFF);
 const _blueSoft = Color(0xFFEEF4FF);
@@ -126,7 +126,10 @@ class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
                 value: settings.cardPointExpiryAlert,
                 onChanged: (v) => _toggle(settings, cardPointExpiryAlert: v),
               ),
-            ],
+            ]
+                .animate(interval: 60.ms)
+                .fadeIn(duration: 340.ms, curve: Curves.easeOut)
+                .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
           );
         },
       ),
@@ -151,36 +154,71 @@ class _MasterTile extends StatelessWidget {
           colors: [_accent, Color(0xFFFF8A50)],
         ),
         borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+              color: _accent.withValues(alpha: 0.28), blurRadius: 18, offset: const Offset(0, 8)),
+        ],
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -30,
+              right: -20,
+              child: Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.18), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Row(
               children: [
-                const Text('전체 알림',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
-                const SizedBox(height: 2),
-                Text(mixed ? '일부 알림이 꺼져 있어요' : (allOn ? '모두 켜져 있어요' : '모두 꺼져 있어요'),
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.8))),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22), shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.notifications_active_rounded,
+                      color: Colors.white, size: 20),
+                )
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .rotate(begin: -0.03, end: 0.03, duration: 1400.ms, curve: Curves.easeInOut),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('전체 알림',
+                          style: TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(mixed ? '일부 알림이 꺼져 있어요' : (allOn ? '모두 켜져 있어요' : '모두 꺼져 있어요'),
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.8))),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: allOn,
+                  onChanged: onChanged,
+                  activeThumbColor: Colors.white,
+                  activeTrackColor: Colors.white.withValues(alpha: 0.35),
+                  inactiveThumbColor: Colors.white,
+                  inactiveTrackColor: Colors.white.withValues(alpha: 0.25),
+                ),
               ],
             ),
-          ),
-          Switch(
-            value: allOn,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: Colors.white.withOpacity(0.35),
-            inactiveThumbColor: Colors.white,
-            inactiveTrackColor: Colors.white.withOpacity(0.25),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -212,14 +250,30 @@ class _SettingTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _line),
+        boxShadow: [
+          BoxShadow(
+              color: _ink.withValues(alpha: 0.045), blurRadius: 14, offset: const Offset(0, 5)),
+        ],
       ),
       child: Row(
         children: [
           Container(
             width: 40,
             height: 40,
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [iconBg, Color.lerp(iconBg, Colors.white, 0.15)!],
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: iconColor.withValues(alpha: 0.16),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3)),
+              ],
+            ),
             alignment: Alignment.center,
             child: Icon(icon, size: 19, color: iconColor),
           ),

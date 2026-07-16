@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/ai_service.dart' as ai;
+import '../../services/consultation_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/coach_avatar.dart';
+import 'consult_history_screen.dart';
 
 // 로컬 AI 코치(은동 PC의 Ollama 서버, lib/services/ai_service.dart)에
 // 실시간으로 물어보는 "살까 말까" 상담 채팅 화면.
@@ -99,6 +102,15 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
       );
       if (!mounted) return;
       setState(() => _messages.add(_ChatEntry.coach(result.comment, result.verdict)));
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        unawaited(ConsultationService().save(
+          uid: uid,
+          question: question,
+          answer: result.comment,
+          verdictCode: result.verdict?.name,
+        ));
+      }
     } on ai.RateLimitException catch (e) {
       if (!mounted) return;
       setState(() => _messages.add(_ChatEntry.error(e.message)));
@@ -133,7 +145,11 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
       color: _bg,
       child: Column(
         children: [
-          _RemainingBanner(remaining: _service.consultRemaining),
+          _RemainingBanner(
+            remaining: _service.consultRemaining,
+            onHistoryTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ConsultHistoryScreen())),
+          ),
           Expanded(
             child: _messages.isEmpty
                 ? _EmptyState(imagePath: imagePath)
@@ -156,16 +172,39 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
 
 class _RemainingBanner extends StatelessWidget {
   final int remaining;
-  const _RemainingBanner({required this.remaining});
+  final VoidCallback onHistoryTap;
+  const _RemainingBanner({required this.remaining, required this.onHistoryTap});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       color: _accentSoft,
-      child: Text('오늘 남은 상담 $remaining회',
-          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _accent)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text('오늘 남은 상담 $remaining회',
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _accent)),
+          ),
+          InkWell(
+            onTap: onHistoryTap,
+            borderRadius: BorderRadius.circular(20),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.history_rounded, size: 15, color: _accent),
+                  SizedBox(width: 3),
+                  Text('이력',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _accent)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
