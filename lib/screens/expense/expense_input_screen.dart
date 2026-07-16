@@ -1,19 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // TextInputFormatter 사용
+import '../../utils/currency_formatter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/expense_model.dart';
-import '../../models/emotion_tag_model.dart';
-import '../../models/category_model.dart';
 import '../../services/expense_service.dart';
-import '../../services/category_service.dart';
-import '../../widgets/expense/category_quick_chip.dart';
-import '../../widgets/expense/category_icon_map.dart';
 
-/// 10_내역입력_기본 - 지출 입력 화면
-///
-/// TODO: 사진 촬영/갤러리 버튼은 ML Kit OCR 연동 후 결과를 아래 폼에 자동 채우는 방식으로 연결
-/// TODO: "일시불" 태그 탭 시 할부 개월 선택 바텀시트 → InstallmentPlanService와 연결
-/// TODO: 카테고리 "+ 추가"는 category/category_management_screen.dart로 이동
-/// TODO: 지금은 기본 카테고리(isCustom=false)만 불러옴 — 사용자 커스텀 카테고리는
-///       CategoryService.getMyCustomCategories(userId, ...)와 합쳐서 보여줘야 함
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({super.key});
 
@@ -22,434 +14,392 @@ class ExpenseInputScreen extends StatefulWidget {
 }
 
 class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
-  final _expenseService = ExpenseService();
-  final _categoryService = CategoryService();
-  final _amountController = TextEditingController(text: '0');
-  final _placeController = TextEditingController();
-  final _memoController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _memoController = TextEditingController();
+  final ExpenseService _expenseService = ExpenseService();
 
   DateTime _selectedDate = DateTime.now();
-  String? _selectedCategoryId;
-  String? _selectedCategoryLabel;
 
-  // 지출 성격 3분류 — 카테고리의 nature 필드와 항상 일치해야 함
+  // DB 카테고리 로드 상태
+  bool _isLoadingCategories = true;
+  List<Map<String, dynamic>> _allCategories = [];
+
+  // 선택 상태 관리
   ExpenseNature _selectedNature = ExpenseNature.variable;
+  String? _selectedParentCategory;
+  String? _selectedCategoryId;
 
-  EmotionTag? _selectedEmotionTag;
-  bool _isInstallment = false; // "일시불" 태그 탭 시 true로 전환 (할부 개월 선택 필요)
+  // 감정 태그
+  final List<String> _emotionTags = ['충동적', '스트레스', '사회적', '계획적'];
+  String? _selectedEmotion;
 
-  late final Stream<List<CategoryModel>> _categoryStream;
+  // 🚀 부가 자동화 3종 상태 변수 (참조 필드용)
+  bool _isInstallment = false; // 할부 여부
+  int _installmentMonths = 3;  // 할부 개월 수 (기본 3개월)
+
+  bool _isRecurring = false; // 정기결제/구독 여부
+  bool _isTravel = false; // 여행 여부
 
   @override
   void initState() {
     super.initState();
-    // 화면 전체에서 한 번만 구독 — build마다 새 스트림 만들지 않도록 initState에서 생성
-    _categoryStream =
-        _categoryService.getDefaultCategories(transactionType: TransactionType.expense);
+    _loadCategoriesFromDB();
+  }
+
+  Future<void> _loadCategoriesFromDB() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance.collection('categories').get();
+      if (mounted) {
+        setState(() {
+          _allCategories = snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
+          _isLoadingCategories = false;
+        });
+      }
+    } catch (e) {
+      print('카테고리 로드 에러: $e');
+      setState(() => _isLoadingCategories = false);
+    }
+  }
+
+  void _onNatureChanged(ExpenseNature newNature) {
+    setState(() {
+      _selectedNature = newNature;
+      _selectedParentCategory = null;
+      _selectedCategoryId = null;
+
+      if (newNature != ExpenseNature.variable) {
+        _selectedEmotion = null;
+      }
+
+      // 명세서 규칙: nature=fixed일 때 여행 태깅 제외
+      if (newNature == ExpenseNature.fixed) {
+        _isTravel = false;
+      }
+    });
+  }
+
+  Future<void> _saveExpense() async {
+    // 1. 기본 필수값 검사
+    if (_amountController.text.isEmpty || _selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('금액과 소분류 카테고리를 모두 선택해주세요!')),
+      );
+      return;
+    }
+
+    // 2. 감정 태그 방어 로직 (변동비일 경우 필수)
+    if (_selectedNature == ExpenseNature.variable && _selectedEmotion == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('변동비 지출입니다. 감정 태그(🔥/😩/🤝/📝)를 반드시 선택해주세요!')),
+      );
+      return;
+    }
+
+    try {
+      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+      final int amount = int.parse(_amountController.text.replaceAll(',', ''));
+
+      // 💡 임시로 자동화 연결 ID 생성 (화면의 스위치 값에 따라 할당)
+      final String? tempInstallmentPlanId = _isInstallment ? 'temp_install_id' : null;
+      final String? tempRecurringPaymentId = _isRecurring ? 'temp_recur_id' : null;
+      final String? tempTravelId = _isTravel ? 'temp_travel_id' : null;
+
+      // ExpenseModel 생성 (모델에 정의된 정확한 파라미터명 사용)
+      final newExpense = ExpenseModel(
+        expenseId: '', // 파이어스토어에서 자동 생성되도록 비워둠
+        userId: userId,
+        amount: amount,
+        categoryId: _selectedCategoryId!,
+        date: _selectedDate,
+        memo: _memoController.text,
+        nature: _selectedNature,
+        emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+
+        // 👇 모델에 정의된 변수명으로 매핑!
+        installmentPlanId: tempInstallmentPlanId,
+        recurringPaymentId: tempRecurringPaymentId,
+        travelId: tempTravelId,
+      );
+
+      // _expenseService.dart 안에 있는 실제 저장 함수 이름에 맞춰서 주석을 풀고 사용하세요!
+      await _expenseService.addExpense(newExpense);
+
+      print('✅ 저장 시도 완료: 금액=$amount, 성격=${_selectedNature.label}');
+      print('🔗 연결 ID: 할부=$tempInstallmentPlanId, 구독=$tempRecurringPaymentId, 여행=$tempTravelId');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('지출 내역이 성공적으로 저장되었습니다!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      print('🔥 저장 에러: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+    }
   }
 
   @override
   void dispose() {
     _amountController.dispose();
-    _placeController.dispose();
     _memoController.dispose();
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() => _selectedDate = picked);
-    }
-  }
-
-  /// nature 탭을 바꾸면 이전 nature의 카테고리가 남아있으면 안 되니 초기화
-  void _selectNature(ExpenseNature nature) {
-    if (_selectedNature == nature) return;
-    setState(() {
-      _selectedNature = nature;
-      _selectedCategoryId = null;
-      _selectedCategoryLabel = null;
-      if (nature != ExpenseNature.variable) {
-        _selectedEmotionTag = null;
-      }
-    });
-  }
-
-  void _selectCategory(CategoryModel category) {
-    setState(() {
-      _selectedCategoryLabel = category.name;
-      _selectedCategoryId = category.categoryId;
-    });
-  }
-
-  void _onTapReceiptCapture() {
-    // TODO: image_picker(카메라) → ML Kit OCR → 파싱 결과로 폼 채우기
-  }
-
-  void _onTapGalleryPick() {
-    // TODO: image_picker(갤러리) → ML Kit OCR → 파싱 결과로 폼 채우기
-  }
-
-  void _onTapInstallmentTag() {
-    // TODO: 할부 개월 선택 바텀시트 표시, 선택 완료 시 _isInstallment = true로 전환
-    setState(() => _isInstallment = !_isInstallment);
-  }
-
-  Future<void> _save() async {
-    if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('카테고리를 선택해주세요')),
-      );
-      return;
-    }
-
-    final amount = int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
-    if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('금액을 입력해주세요')),
-      );
-      return;
-    }
-
-    // TODO: userId는 실제 로그인 유저 uid로 교체 (FirebaseAuth.instance.currentUser?.uid)
-    const userId = 'TODO_USER_ID';
-
-    final expense = ExpenseModel(
-      expenseId: '',
-      userId: userId,
-      amount: amount,
-      date: _selectedDate,
-      categoryId: _selectedCategoryId!,
-      nature: _selectedNature,
-      emotionTag:
-      _selectedNature == ExpenseNature.variable ? _selectedEmotionTag?.code : null,
-      memo: _memoController.text.isEmpty ? null : _memoController.text,
-    );
-
-    await _expenseService.addExpense(expense);
-
-    if (mounted) Navigator.pop(context);
-  }
-
   @override
   Widget build(BuildContext context) {
+    final natureFilteredCategories = _allCategories.where((c) {
+      final dbNature = (c['nature'] ?? '').toString().toLowerCase();
+      return dbNature.contains(_selectedNature.name.toLowerCase());
+    }).toList();
+
+    final List<String> parentCategories = natureFilteredCategories
+        .map((c) => (c['parentName'] ?? c['parent'] ?? '미분류') as String)
+        .toSet()
+        .toList();
+
+    final List<Map<String, dynamic>> childCategories = _selectedParentCategory == null
+        ? []
+        : natureFilteredCategories.where((c) {
+      final parent = c['parentName'] ?? c['parent'] ?? '미분류';
+      return parent == _selectedParentCategory;
+    }).toList();
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('지출 입력'),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(title: const Text('지출 기록')),
+      body: _isLoadingCategories
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildQuickPhotoBanner(),
-            const SizedBox(height: 20),
-            const Center(
-              child: Text('또는 직접 입력', style: TextStyle(color: Colors.grey, fontSize: 12)),
-            ),
-            const SizedBox(height: 16),
-
-            // 지출 성격 3분류 — 가장 먼저 선택, 이 선택에 따라 아래 카테고리 목록이 필터링됨
-            _buildNatureSegment(),
-            const SizedBox(height: 12),
-
-            _buildFormRow(
-              label: '일시',
-              child: InkWell(
-                onTap: _pickDate,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.calendar_today, size: 16),
-                    const SizedBox(width: 4),
-                    Text(_formatDate(_selectedDate)),
-                  ],
-                ),
-              ),
-            ),
-            _buildFormRow(
-              label: '카테고리',
-              labelColor: Colors.green,
-              child: Text(_selectedCategoryLabel ?? '선택'),
-            ),
-            _buildFormRow(
-              label: '금액',
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: _amountController,
-                      textAlign: TextAlign.right,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        suffixText: '원',
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ActionChip(
-                    label: Text(_isInstallment ? '할부' : '일시불'),
-                    onPressed: _onTapInstallmentTag,
-                  ),
-                ],
-              ),
-            ),
-            _buildFormRow(
-              label: '사용처',
-              child: SizedBox(
-                width: 160,
-                child: TextField(
-                  controller: _placeController,
-                  textAlign: TextAlign.right,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '입력 (선택)',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ),
-            _buildFormRow(
-              label: '메모',
-              child: SizedBox(
-                width: 160,
-                child: TextField(
-                  controller: _memoController,
-                  textAlign: TextAlign.right,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '선택 사항',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ),
-
-            // 변동비일 때만 감정태그 노출
-            if (_selectedNature == ExpenseNature.variable) ...[
-              const SizedBox(height: 8),
-              const Text('감정태그', style: TextStyle(fontSize: 13, color: Colors.grey)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: EmotionTag.values.map((tag) {
-                  final selected = _selectedEmotionTag == tag;
-                  return ChoiceChip(
-                    label: Text('${tag.emoji} ${tag.label}'),
-                    selected: selected,
-                    onSelected: (_) => setState(() => _selectedEmotionTag = tag),
-                  );
-                }).toList(),
-              ),
-            ],
-
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _save,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('저장', style: TextStyle(color: Colors.white, fontSize: 16)),
+            // 1. 금액 입력 (원화 표시 & 천 단위 콤마)
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyFormatter()], // 콤마 포매터 적용
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(
+                labelText: '결제 금액',
+                prefixText: '₩ ', // 원화 기호 추가
+                prefixStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 24),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // 2. 지출 성격 (Nature)
+            const Text('1. 지출 성격', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8.0,
               children: [
-                const Text('카테고리 선택', style: TextStyle(fontWeight: FontWeight.bold)),
-                TextButton.icon(
-                  onPressed: () {
-                    // TODO: category_management_screen.dart 로 이동
-                  },
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('추가'),
+                ChoiceChip(
+                  label: const Text('고정비'),
+                  selected: _selectedNature == ExpenseNature.fixed,
+                  onSelected: (val) => _onNatureChanged(ExpenseNature.fixed),
+                ),
+                ChoiceChip(
+                  label: const Text('변동비'),
+                  selected: _selectedNature == ExpenseNature.variable,
+                  onSelected: (val) => _onNatureChanged(ExpenseNature.variable),
+                ),
+                ChoiceChip(
+                  label: const Text('기타 (경조사 등)'),
+                  selected: _selectedNature == ExpenseNature.other,
+                  onSelected: (val) => _onNatureChanged(ExpenseNature.other),
                 ),
               ],
             ),
+            const SizedBox(height: 16),
+
+            // 3. 대분류 드롭다운
+            const Text('2. 대분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
             const SizedBox(height: 8),
-            _buildCategoryGrid(),
+            DropdownButtonFormField<String>(
+              value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
+              hint: const Text('대분류 선택'),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              items: parentCategories.isEmpty
+                  ? [const DropdownMenuItem(value: null, child: Text('해당 성격의 카테고리가 없습니다'))]
+                  : parentCategories.map((String parentName) {
+                return DropdownMenuItem<String>(
+                  value: parentName,
+                  child: Text(parentName),
+                );
+              }).toList(),
+              onChanged: parentCategories.isEmpty ? null : (String? newParent) {
+                setState(() {
+                  _selectedParentCategory = newParent;
+                  _selectedCategoryId = null;
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // 4. 소분류 드롭다운
+            const Text('3. 소분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: childCategories.any((c) => c['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
+              hint: const Text('소분류 선택'),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              items: _selectedParentCategory == null
+                  ? [const DropdownMenuItem(value: null, child: Text('먼저 대분류를 선택하세요'))]
+                  : childCategories.isEmpty
+                  ? [const DropdownMenuItem(value: null, child: Text('소분류가 없습니다'))]
+                  : childCategories.map((categoryData) {
+                return DropdownMenuItem<String>(
+                  value: categoryData['id'],
+                  child: Text(categoryData['name']),
+                );
+              }).toList(),
+              onChanged: _selectedParentCategory == null || childCategories.isEmpty
+                  ? null
+                  : (String? newId) {
+                setState(() {
+                  _selectedCategoryId = newId;
+                });
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // 5. 변동비 전용 감정 태그
+            if (_selectedNature == ExpenseNature.variable) ...[
+              const Text('감정 태그', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8.0,
+                children: _emotionTags.map((tag) {
+                  return ChoiceChip(
+                    label: Text(tag),
+                    selected: _selectedEmotion == tag,
+                    onSelected: (bool selected) {
+                      setState(() {
+                        _selectedEmotion = selected ? tag : null;
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // 6. 🚀 부가 자동화 3종 연결 (할부, 구독, 여행)
+            const Divider(thickness: 2),
+            const Text('부가 기능 연결 (옵션)', style: TextStyle(fontWeight: FontWeight.bold)),
+
+            // 6-1. 할부
+            SwitchListTile(
+              title: const Text('할부 결제인가요?'),
+              subtitle: const Text('무이자 균등금액으로 분할 기록됩니다.'),
+              value: _isInstallment,
+              onChanged: (bool value) {
+                setState(() {
+                  _isInstallment = value;
+                  if (value) _isRecurring = false; // 할부와 구독은 보통 겹치지 않음
+                });
+              },
+            ),
+            if (_isInstallment)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    const Text('할부 개월 수: '),
+                    const SizedBox(width: 16),
+                    DropdownButton<int>(
+                      value: _installmentMonths,
+                      items: [2, 3, 4, 5, 6, 10, 12, 24].map((int value) {
+                        return DropdownMenuItem<int>(
+                          value: value,
+                          child: Text('$value개월'),
+                        );
+                      }).toList(),
+                      onChanged: (int? newValue) {
+                        if (newValue != null) {
+                          setState(() => _installmentMonths = newValue);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+
+            // 6-2. 정기결제(구독)
+            SwitchListTile(
+              title: const Text('매월 반복되는 정기결제/구독인가요?'),
+              subtitle: const Text('다음 달부터 자동으로 내역이 생성됩니다.'),
+              value: _isRecurring,
+              onChanged: (bool value) {
+                setState(() {
+                  _isRecurring = value;
+                  if (value) _isInstallment = false;
+                });
+              },
+            ),
+
+            // 6-3. 여행 (고정비일 때는 비활성화)
+            SwitchListTile(
+              title: const Text('현재 진행 중인 여행 지출인가요?'),
+              subtitle: _selectedNature == ExpenseNature.fixed
+                  ? const Text('고정비는 여행 지출로 태깅할 수 없습니다.', style: TextStyle(color: Colors.red))
+                  : const Text('진행 중인 여행 예산에 포함됩니다.'),
+              value: _isTravel,
+              onChanged: _selectedNature == ExpenseNature.fixed
+                  ? null // 고정비면 클릭 불가
+                  : (bool value) {
+                setState(() => _isTravel = value);
+              },
+            ),
+            const Divider(thickness: 2),
+            const SizedBox(height: 16),
+
+            // 7. 날짜 및 메모
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('결제일: ${_selectedDate.toLocal().toString().split(' ')[0]}'),
+                OutlinedButton(
+                  onPressed: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                  child: const Text('날짜 변경'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _memoController,
+              decoration: const InputDecoration(
+                labelText: '메모 (선택)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            // 8. 저장 버튼
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.blueAccent,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _saveExpense,
+              child: const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
       ),
     );
-  }
-
-  /// nature에 맞는 카테고리를 실제 Firestore에서 불러와 대분류(parentName)별로 묶어서 표시
-  Widget _buildCategoryGrid() {
-    return StreamBuilder<List<CategoryModel>>(
-      stream: _categoryStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasError) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text('카테고리를 불러오지 못했어요: ${snapshot.error}',
-                style: const TextStyle(color: Colors.red, fontSize: 12)),
-          );
-        }
-
-        final all = snapshot.data ?? [];
-        final filtered = all.where((c) => c.nature == _selectedNature).toList();
-
-        if (filtered.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Text('등록된 카테고리가 없어요', style: TextStyle(color: Colors.grey)),
-          );
-        }
-
-        // 대분류(parentName)별로 그룹핑, 원본 순서 유지
-        final Map<String, List<CategoryModel>> grouped = {};
-        for (final c in filtered) {
-          grouped.putIfAbsent(c.parentName, () => []).add(c);
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: grouped.entries.map((entry) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(entry.key,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: entry.value.map((c) {
-                      return SizedBox(
-                        width: 76,
-                        child: CategoryQuickChip(
-                          icon: CategoryIconMap.iconFor(c.name),
-                          label: c.name,
-                          isSelected: _selectedCategoryId == c.categoryId,
-                          onTap: () => _selectCategory(c),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  /// 고정비 / 변동비 / 기타 3분류 세그먼트
-  /// 여기서 고른 값에 따라 아래 카테고리 목록 + 감정태그 노출 여부가 결정됨
-  Widget _buildNatureSegment() {
-    return Row(
-      children: ExpenseNature.values.map((nature) {
-        final selected = _selectedNature == nature;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: ChoiceChip(
-              label: Center(child: Text(nature.label)),
-              selected: selected,
-              onSelected: (_) => _selectNature(nature),
-              selectedColor: Colors.green.withOpacity(0.15),
-              labelStyle: TextStyle(
-                color: selected ? Colors.green[800] : Colors.black87,
-                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildQuickPhotoBanner() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('✨ 사진으로 빠르게 입력', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text(
-            '영수증이나 결제 알림 캡처를 올리면 AI가 알아서 채워드려요',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _onTapReceiptCapture,
-                  icon: const Icon(Icons.camera_alt_outlined),
-                  label: const Text('촬영하기'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _onTapGalleryPick,
-                  icon: const Icon(Icons.image_outlined),
-                  label: const Text('갤러리에서 선택'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFormRow({
-    required String label,
-    required Widget child,
-    Color? labelColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: labelColor ?? Colors.black87)),
-          child,
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final today = DateTime.now();
-    if (date.year == today.year && date.month == today.month && date.day == today.day) {
-      return '오늘';
-    }
-    return '${date.month}/${date.day}';
   }
 }
