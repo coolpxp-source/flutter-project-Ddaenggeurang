@@ -29,6 +29,9 @@ class ExpenseModel {
   /// EmotionTag는 컬렉션이 아니라 enum이라 Id 접미사를 붙이지 않음
   final String? emotionTag;
 
+  final String? installmentId; // 할부 문서 ID
+  final String? recurringId;   // 정기결제(구독) 문서 ID
+
   final String? memo;
 
   /// '퉁치기' 간편 입력 모드로 등록됐는지 여부
@@ -63,13 +66,15 @@ class ExpenseModel {
     required this.categoryId,
     required this.nature,
     this.emotionTag,
+    this.installmentId,
+    this.recurringId,
+    this.travelId,
     this.memo,
     this.isQuickInput = false,
     this.installmentPlanId,
     this.installmentInstallmentNo,
     this.recurringPaymentId,
     this.isAmountAdjusted = false,
-    this.travelId,
     this.isDeleted = false,
     this.deletedAt,
     this.createdAt,
