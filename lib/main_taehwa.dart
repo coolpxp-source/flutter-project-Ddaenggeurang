@@ -15,7 +15,7 @@ Future<void> main() async {
   runApp(
     const MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: MissionListScreen(),
+      home: MissionAdminApprovalScreen(),
     ),
   );
 }
