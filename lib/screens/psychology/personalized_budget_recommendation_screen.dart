@@ -303,6 +303,7 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
     );
   }
 
+  // 추천 예산 적용 안내 버튼
   Widget _buildApplyButton(
       BuildContext context,
       ) {
@@ -314,7 +315,7 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
-                '추천 예산 적용 기능은 로그인 및 예산 기능 연동 후 연결됩니다.',
+                '추천 예산 적용은 예산 기능의 저장 기준 확정 후 연결됩니다.',
               ),
             ),
           );
