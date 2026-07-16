@@ -50,6 +50,8 @@ class UserModel {
   final Map<String, String?> equippedItems;
   final CoachTone coachTone;   // nagCharacterStyle
   final NotificationSettings notificationSettings;
+  final String? lastLoginDate; // "yyyy-MM-dd" — 연속 접속 스트릭 계산용
+  final int loginStreak;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -68,6 +70,8 @@ class UserModel {
     },
     this.coachTone = CoachTone.ddaengjwi,
     this.notificationSettings = const NotificationSettings(),
+    this.lastLoginDate,
+    this.loginStreak = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -89,6 +93,8 @@ class UserModel {
       coachTone: CoachTone.fromCode(d['nagCharacterStyle']),
       notificationSettings:
       NotificationSettings.fromMap(d['notificationSettings']),
+      lastLoginDate: d['lastLoginDate'] as String?,
+      loginStreak: (d['loginStreak'] ?? 0).toInt(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate(),
     );

@@ -32,4 +32,16 @@ class ConsultationService {
   Future<void> delete({required String uid, required String consultationId}) {
     return _col(uid).doc(consultationId).delete();
   }
+
+  /// 회원탈퇴 시 호출 — users/{uid} 문서를 지워도 서브컬렉션은 자동으로
+  /// 안 지워지므로, 상담이력 전체를 직접 배치 삭제해서 고아 데이터를 막는다.
+  Future<void> deleteAll(String uid) async {
+    final docs = await _col(uid).get();
+    if (docs.docs.isEmpty) return;
+    final batch = _db.batch();
+    for (final doc in docs.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
 }

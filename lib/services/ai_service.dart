@@ -112,9 +112,10 @@ class AiService {
 
   // ── 상담 Rate Limit (하루 5회) ─────────────────────────────
   // MVP: 메모리 카운터. 본 프로젝트에서는 Firestore users/{uid}에 날짜별 저장으로 교체할 것.
+  // AiService()는 호출부마다 새 인스턴스라 static이어야 앱 전역에서 같은 카운트를 본다.
   static const int consultDailyLimit = 5;
-  int _consultCount = 0;
-  String _consultDate = '';
+  static int _consultCount = 0;
+  static String _consultDate = '';
 
   int get consultRemaining {
     _resetIfNewDay();
@@ -129,11 +130,29 @@ class AiService {
     }
   }
 
+  // ═══════════════ 캐시 (잔소리/주간/월간 — 기간당 1회 생성, 재사용) ═══════════════
+  // AiService()는 호출부마다 새로 생성되는 인스턴스라 캐시는 static으로 공유해야
+  // 실제로 효과가 있다. 키에 dataSummary 원문을 그대로 넣기 때문에, 집계 숫자가
+  // 바뀌면(=새 지출 발생) 자연히 캐시가 미스나며 재생성된다 — 별도 무효화 로직 불필요.
+  static final Map<String, String> _reportCache = {};
+
+  Future<String> _generateCached(String cacheKey, String prompt, String source) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final key = '$today|$cacheKey';
+    final cached = _reportCache[key];
+    if (cached != null) return cached;
+    final result = await _generateChecked(prompt, source);
+    _reportCache[key] = result;
+    return result;
+  }
+
   // ═══════════════ 1) 일간 잔소리 ═══════════════
   /// [dataSummary] 예: "배달비: 140,000원 (전월 대비 +40%), 스트레스 태그 비율: 70%"
   /// 집계/계산은 앱(Firestore + Dart)에서 끝내고, 완성된 숫자 문장만 넘길 것.
+  /// 같은 날 동일한 톤+데이터 조합이면 재호출 없이 캐시된 문장을 재사용한다.
   Future<String> generateNagging(CoachTone tone, String dataSummary) {
-    return _generateChecked('[톤: ${tone.label}] $dataSummary', dataSummary);
+    return _generateCached(
+        'nagging|${tone.name}|$dataSummary', '[톤: ${tone.label}] $dataSummary', dataSummary);
   }
 
   // ═══════════════ 2) 주간 리포트 ═══════════════
@@ -151,7 +170,7 @@ class AiService {
         : '$weekOverWeekPercent';
     final data = '이번 주 지출: ${_won(totalSpent)}, 주간 예산 잔여: $budgetRemainPercent%, '
         '최다 카테고리: $topCategory($topCategoryPercent%), 무지출: $noSpendDays일, 전주 대비: $wow%';
-    return _generateChecked('[리포트: 주간] [톤: ${tone.label}] $data', data);
+    return _generateCached('weekly|${tone.name}|$data', '[리포트: 주간] [톤: ${tone.label}] $data', data);
   }
 
   // ═══════════════ 3) 월간 리포트 ═══════════════
@@ -173,7 +192,8 @@ class AiService {
     final data = '이번 달 총지출: ${_won(totalSpent)} (전월 대비 $mom%), 수입: ${_won(income)}, '
         '저축률: $savingRate%, 최다 카테고리: $topCategory($topCategoryPercent%), '
         '스트레스 태그 비율: $stressTagPercent%, 예산 달성: $budgetAchieved/$budgetTotal 카테고리';
-    return _generateChecked('[리포트: 월간] [톤: ${tone.label}] $data', data);
+    return _generateCached(
+        'monthly|${tone.name}|$data', '[리포트: 월간] [톤: ${tone.label}] $data', data);
   }
 
   // ═══════════════ 4) 살까말까 상담 ═══════════════
