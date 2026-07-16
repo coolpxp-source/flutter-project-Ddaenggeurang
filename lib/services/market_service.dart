@@ -100,4 +100,18 @@ class MarketService {
       'createdAt': Timestamp.now(),
     });
   }
+
+  // [플리마켓 ] 좋아요한 상품 목록
+  Future<List<MarketProduct>> getFavoriteProducts(String userId) async {
+    final favIds = await getFavoriteIds(userId).first;
+    // 땡그랑마켓 더미 아이템(ddaeng_로 시작)은 실제 Firestore 문서가 없어서 제외
+    final realIds = favIds.where((id) => !id.startsWith('ddaeng_')).toList();
+    if (realIds.isEmpty) return [];
+
+    final snap = await _db
+        .collection('marketProducts')
+        .where(FieldPath.documentId, whereIn: realIds)
+        .get();
+    return snap.docs.map((d) => MarketProduct.fromFirestore(d)).toList();
+  }
 }
