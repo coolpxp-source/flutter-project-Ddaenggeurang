@@ -14,6 +14,7 @@ class SharedExpenseListScreen extends StatefulWidget {
 
   final GroupModel group;
 
+
   @override
   State<SharedExpenseListScreen> createState() =>
       _SharedExpenseListScreenState();
@@ -26,6 +27,7 @@ class _SharedExpenseListScreenState
 
   List<SharedExpenseModel> _expenses = [];
   int _totalAmount = 0;
+  bool _isLoadingExpenses = true;
 
   @override
   void initState() {
@@ -33,18 +35,42 @@ class _SharedExpenseListScreenState
     _loadExpenses();
   }
 
-  void _loadExpenses() {
-    setState(() {
-      _expenses =
-          _groupService.getSharedExpenses(
-            groupId: widget.group.id,
-          );
+  // 공동지출 목록 조회 메서드
+  Future<void> _loadExpenses() async {
+    try {
+      final expenses = await _groupService.getSharedExpenses(
+        groupId: widget.group.id,
+      );
 
-      _totalAmount =
-          _groupService.getSharedExpenseTotal(
-            groupId: widget.group.id,
-          );
-    });
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _expenses = expenses;
+        _totalAmount = expenses.fold<int>(
+          0,
+              (sum, expense) => sum + expense.amount,
+        );
+        _isLoadingExpenses = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingExpenses = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '공동지출 목록을 불러오지 못했습니다: $e',
+          ),
+        ),
+      );
+    }
   }
 
   String _formatAmount(int amount) {
@@ -286,19 +312,21 @@ class _SharedExpenseListScreenState
           ],
         ),
         const SizedBox(height: 14),
-        if (_expenses.isEmpty)
+        // 공동지출 목록 상태별 표시
+        if (_isLoadingExpenses)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_expenses.isEmpty)
           _buildEmptyState()
         else
           ..._expenses.map(
                 (expense) => Padding(
-              padding:
-              const EdgeInsets.only(
-                bottom: 12,
-              ),
-              child:
-              _buildExpenseCard(
-                expense,
-              ),
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildExpenseCard(expense),
             ),
           ),
       ],
@@ -881,27 +909,49 @@ class _SharedExpenseListScreenState
       return;
     }
 
-    _groupService.deleteSharedExpense(
-      expenseId: expense.id,
-    );
+    try {
+      // 공동지출 Firestore 삭제
+      await _groupService.deleteSharedExpense(
+        groupId: expense.groupId,
+        expenseId: expense.id,
+      );
 
-    if (!mounted) {
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    Navigator.pop(
-      bottomSheetContext,
-    );
+      Navigator.pop(
+        bottomSheetContext,
+      );
 
-    _loadExpenses();
+      await _loadExpenses();
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      const SnackBar(
-        content: Text(
-          '공동 지출이 삭제되었습니다.',
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '공동 지출이 삭제되었습니다.',
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst(
+              'Exception: ',
+              '',
+            ),
+          ),
+        ),
+      );
+    }
   }
 }

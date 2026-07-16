@@ -148,37 +148,43 @@ class _SharedExpenseEditScreenState
       _isSaving = true;
     });
 
-    final updatedExpense =
-    SharedExpenseModel(
-      id: widget.expense.id,
-      groupId:
-      widget.expense.groupId,
-      title: title,
-      amount: amount,
-      paidByUserId:
-      widget.expense
-          .paidByUserId,
-      paidByNickname: payer,
-      category:
-      _selectedCategory,
-      date: _selectedDate,
-      createdAt:
-      widget.expense.createdAt,
-      memo: memo,
-    );
+    try {
+      // 공동지출 Firestore 수정
+      await _groupService.updateSharedExpense(
+        groupId: widget.expense.groupId,
+        expenseId: widget.expense.id,
+        title: title,
+        amount: amount,
+        paidByNickname: payer,
+        category: _selectedCategory,
+        date: _selectedDate,
+        memo: memo,
+      );
 
-    _groupService.updateSharedExpense(
-      updatedExpense,
-    );
+      if (!mounted) {
+        return;
+      }
 
-    if (!mounted) {
-      return;
+      Navigator.pop(
+        context,
+        true,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSaving = false;
+      });
+
+      _showMessage(
+        e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+      );
     }
-
-    Navigator.pop(
-      context,
-      true,
-    );
   }
 
   void _showMessage(

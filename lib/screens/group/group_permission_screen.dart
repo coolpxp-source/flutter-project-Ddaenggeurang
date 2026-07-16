@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'shared_expense_list_screen.dart';
 import '../../models/group_model.dart';
+import '../../services/group_service.dart';
 
 class GroupPermissionScreen extends StatefulWidget {
   const GroupPermissionScreen({
@@ -17,46 +18,107 @@ class GroupPermissionScreen extends StatefulWidget {
 
 class _GroupPermissionScreenState
     extends State<GroupPermissionScreen> {
-  final List<Map<String, dynamic>> _members = [
-    {
-      'userId': 'mock_user_001',
-      'nickname': '이태화',
-      'role': 'owner',
-    },
-    {
-      'userId': 'mock_user_002',
-      'nickname': '절약왕김땡',
-      'role': 'editor',
-    },
-    {
-      'userId': 'mock_user_003',
-      'nickname': '통장지킴이',
-      'role': 'viewer',
-    },
-  ];
 
-  void _changeRole(
+  final GroupService _groupService =
+      GroupService.instance;
+
+  List<Map<String, dynamic>> _members = [];
+
+  bool _isLoadingMembers = true;
+  bool _isChangingRole = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  // 그룹 멤버 권한 목록 조회 메서드
+  Future<void> _loadMembers() async {
+    try {
+      final members = await _groupService.getGroupMembers(
+        groupId: widget.group.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _members = members;
+        _isLoadingMembers = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingMembers = false;
+      });
+
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  // 그룹 멤버 권한 변경 메서드
+  Future<void> _changeRole(
       Map<String, dynamic> member,
       String newRole,
-      ) {
+      ) async {
     if (member['role'] == 'owner') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('그룹장은 권한을 변경할 수 없습니다.'),
-        ),
-      );
+      _showMessage('그룹장은 권한을 변경할 수 없습니다.');
+      return;
+    }
+
+    if (_isChangingRole) {
       return;
     }
 
     setState(() {
-      member['role'] = newRole;
+      _isChangingRole = true;
     });
 
+    try {
+      await _groupService.updateMemberRole(
+        groupId: widget.group.id,
+        memberId: member['userId'] as String,
+        newRole: newRole,
+      );
+
+      await _loadMembers();
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '${member['nickname']}님의 권한을 변경했습니다.',
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isChangingRole = false;
+        });
+      }
+    }
+  }
+
+  // 안내 메시지 표시 메서드
+  void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(
-          '${member['nickname']}님의 권한을 변경했습니다.',
-        ),
+        content: Text(message),
       ),
     );
   }
@@ -242,14 +304,27 @@ class _GroupPermissionScreenState
             ),
           ),
           const SizedBox(height: 16),
-          ..._members.map(
-                (member) => Padding(
-              padding: const EdgeInsets.only(
-                bottom: 14,
+          if (_isLoadingMembers)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 30),
+                child: CircularProgressIndicator(),
               ),
-              child: _buildMemberCard(member),
+            )
+          else if (_members.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text('그룹 멤버가 없습니다.'),
+              ),
+            )
+          else
+            ..._members.map(
+                  (member) => Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _buildMemberCard(member),
+              ),
             ),
-          ),
         ],
       ),
     );
