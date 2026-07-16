@@ -83,16 +83,23 @@ class UserService {
     return snap.docs.any((d) => d.id != exceptUid);
   }
 
+  /// 포인트 100당 레벨 1 — 아바타 상점의 AvatarItemModel.unlockLevel(레벨 기반
+  /// 잠금)이 이미 있는데 레벨을 올려주는 로직이 어디에도 없어서, 포인트가 쌓여도
+  /// Lv.2 이상 요구 아이템은 영원히 잠긴 채였다. 여기서 포인트와 함께 계산해서 저장한다.
+  int _levelForPoints(int points) => 1 + (points ~/ 100);
+
   /// 포인트 지급(미션 보상 등) — 현재 값을 읽어서 더하는 트랜잭션이라
-  /// 동시에 여러 보상이 들어와도 유실되지 않는다.
+  /// 동시에 여러 보상이 들어와도 유실되지 않는다. 레벨도 함께 갱신한다.
   Future<void> addPoints(String uid, int amount) async {
     if (amount == 0) return;
     final ref = _users.doc(uid);
     await FirebaseFirestore.instance.runTransaction((transaction) async {
       final snap = await transaction.get(ref);
-      final current = (snap.data()?['points'] as num?)?.toInt() ?? 0;
+      final currentPoints = (snap.data()?['points'] as num?)?.toInt() ?? 0;
+      final newPoints = currentPoints + amount;
       transaction.update(ref, {
-        'points': current + amount,
+        'points': newPoints,
+        'level': _levelForPoints(newPoints),
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });

@@ -420,11 +420,12 @@ class MissionService {
             ),
           );
 
+          final newPoints = currentPoints + rewardPoints;
           transaction.update(
             userRef,
             {
-              'points':
-              currentPoints + rewardPoints,
+              'points': newPoints,
+              'level': 1 + (newPoints ~/ 100),
               'updatedAt':
               FieldValue.serverTimestamp(),
             },
@@ -766,12 +767,12 @@ class MissionService {
             ),
           );
 
+          final newPoints = currentPoints + rewardPoints;
           transaction.update(
             userRef,
             {
-              'points':
-              currentPoints +
-                  rewardPoints,
+              'points': newPoints,
+              'level': 1 + (newPoints ~/ 100),
               'updatedAt':
               FieldValue.serverTimestamp(),
             },
