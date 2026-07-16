@@ -18,6 +18,14 @@ class ExpenseInputScreen extends StatefulWidget {
   }
 }
 
+<<<<<<< HEAD
+class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
+  final _expenseService = ExpenseService();
+  final _categoryService = categoryService();
+  final _amountController = TextEditingController(text: '0');
+  final _placeController = TextEditingController();
+  final _memoController = TextEditingController();
+=======
 class _ExpenseInputScreenState
     extends State<ExpenseInputScreen> {
   final TextEditingController _amountController =
@@ -28,6 +36,7 @@ class _ExpenseInputScreenState
 
   final ExpenseService _expenseService =
   ExpenseService();
+>>>>>>> e6e0e506bf55ff6b93c41c4a8468799914287a69
 
   DateTime _selectedDate = DateTime.now();
 
