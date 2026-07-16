@@ -689,8 +689,13 @@ class _MissionListScreenState extends State<MissionListScreen> {
   Widget _buildCalendarSection({
     required Color pinkColor,
   }) {
-    const daysInMonth = 31;
-    const firstWeekday = 3;
+    final now = DateTime.now();
+
+    final daysInMonth =
+        DateTime(now.year, now.month + 1, 0).day;
+
+    final firstWeekday =
+        DateTime(now.year, now.month, 1).weekday % 7;
 
     return Container(
       padding: const EdgeInsets.all(18),
