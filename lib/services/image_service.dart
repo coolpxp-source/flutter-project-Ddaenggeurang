@@ -11,6 +11,8 @@ class ImageService {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      maxWidth: 1080,
+      maxHeight: 1080,
     );
     if (picked == null) return null;
     return File(picked.path);

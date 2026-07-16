@@ -4,6 +4,8 @@ import '../../services/chat_service.dart';
 import '../../models/message_model.dart';
 import '../../models/chat_model.dart';
 import '../../utils/stickers.dart';
+import 'package:intl/intl.dart';
+import '../../services/image_service.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatId;
@@ -15,11 +17,13 @@ class ChatRoomScreen extends StatefulWidget {
 
 class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final _chatService = ChatService();
+  final _imageService = ImageService();
   final _messageController = TextEditingController();
   static const _green = Color(0xFFFF9166);
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   ChatParticipant? _otherParticipant;
+  String _otherUserId = '';
   bool _showStickers = false;
 
   @override
@@ -34,9 +38,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (chat != null && mounted) {
       setState(() {
         _otherParticipant = chat.getOtherParticipant(_myId);
+        _otherUserId = chat.participantIds.firstWhere(
+              (id) => id != _myId,
+          orElse: () => '',
+        );
       });
     }
   }
+
 
   void _send() {
     final text = _messageController.text.trim();
@@ -53,9 +62,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _chatService.sendMessage(
       chatId: widget.chatId,
       message: message,
-      otherUserId: _otherParticipant != null
-          ? _findOtherId()
-          : '',
+      otherUserId: _otherUserId,
     );
 
     _messageController.clear();
@@ -73,15 +80,39 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     _chatService.sendMessage(
       chatId: widget.chatId,
       message: message,
-      otherUserId: _otherParticipant != null ? _findOtherId() : '',
+      otherUserId: _otherUserId,
     );
 
     setState(() => _showStickers = false);
   }
 
-  String _findOtherId() {
-    // TODO: chat.participantIds에서 본인 제외한 ID 정확히 가져오도록 개선 필요
-    return '';
+  Future<void> _sendImage() async {
+    final file = await _imageService.pickImage();
+    if (file == null) return;
+
+    try {
+      final url = await _imageService.uploadImage(file, 'chatImages/${widget.chatId}');
+
+      final message = Message(
+        messageId: '',
+        senderId: _myId,
+        type: MessageType.image,
+        imageUrl: url,
+        sentAt: DateTime.now(),
+      );
+
+      _chatService.sendMessage(
+        chatId: widget.chatId,
+        message: message,
+        otherUserId: _otherUserId,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('이미지 전송 실패: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -118,54 +149,170 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<Message>>(
-              stream: _chatService.getMessages(widget.chatId),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                final messages = snapshot.data!;
-                if (messages.isEmpty) {
-                  return const Center(child: Text('첫 메시지를 보내보세요'));
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    final isMine = msg.senderId == _myId;
+            child: StreamBuilder<Chat>(
+              stream: _chatService.getChatStream(widget.chatId),
+              builder: (context, chatSnapshot) {
+                final otherUnread = chatSnapshot.data?.getUnreadCountFor(_otherUserId) ?? 0;
 
-                    // 스티커 메시지는 다르게 렌더링
-                    if (msg.type == MessageType.sticker) {
-                      final path = stickerAssets[msg.stickerId] ?? '';
-                      return Align(
-                        alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: path.isNotEmpty
-                              ? Image.asset(path, width: 80, height: 80)
-                              : const SizedBox(),
-                        ),
-                      );
+                return StreamBuilder<List<Message>>(
+                  stream: _chatService.getMessages(widget.chatId),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    final messages = snapshot.data!;
+                    if (messages.isEmpty) {
+                      return const Center(child: Text('첫 메시지를 보내보세요'));
                     }
 
-                    return Align(
-                      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.of(context).size.width * 0.7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isMine ? _green : Colors.grey[200],
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          msg.previewText,
-                          style: TextStyle(color: isMine ? Colors.white : Colors.black87),
-                        ),
-                      ),
+                    // 내가 보낸 메시지 중 가장 마지막 것의 인덱스 (읽음 표시는 여기에만)
+                    int lastMineIndex = -1;
+                    for (int i = 0; i < messages.length; i++) {
+                      if (messages[i].senderId == _myId) lastMineIndex = i;
+                    }
+
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        final isMine = msg.senderId == _myId;
+                        final timeText = DateFormat('HH:mm').format(msg.sentAt.toUtc().add(const Duration(hours: 9)));
+                        final showRead = isMine && index == lastMineIndex && otherUnread == 0;
+
+                        // 이미지 메시지
+                        if (msg.type == MessageType.image) {
+                          return Align(
+                            alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Padding(
+                              padding: EdgeInsets.only(right: isMine ? 4 : 0),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  if (isMine && index == lastMineIndex) ...[
+                                    _buildReadIcon(showRead),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Column(
+                                    crossAxisAlignment:
+                                    isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.network(
+                                          msg.imageUrl ?? '',
+                                          width: 160,
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (context, child, progress) {
+                                            if (progress == null) return child;
+                                            return Container(
+                                              width: 160,
+                                              height: 160,
+                                              color: Colors.grey[200],
+                                              child: const Center(child: CircularProgressIndicator()),
+                                            );
+                                          },
+                                          errorBuilder: (context, error, stackTrace) => Container(
+                                            width: 160,
+                                            height: 160,
+                                            color: Colors.grey[200],
+                                            child: const Icon(Icons.broken_image, color: Colors.grey),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2, bottom: 4),
+                                        child: Text(timeText, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+                        // 스티커 메시지
+                        if (msg.type == MessageType.sticker) {
+                          final path = stickerAssets[msg.stickerId] ?? '';
+                          return Align(
+                            alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+                            child: Padding(
+                              padding: EdgeInsets.only(right: isMine ? 4 : 0),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  if (isMine && index == lastMineIndex) ...[
+                                    _buildReadIcon(showRead),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  Column(
+                                    crossAxisAlignment:
+                                    isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      if (path.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 4),
+                                          child: Image.asset(path, width: 80, height: 80),
+                                        ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2, bottom: 4),
+                                        child: Text(timeText, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }
+
+                        // 일반 텍스트 메시지
+                        return Align(
+                          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(right: isMine ? 4 : 0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (isMine && index == lastMineIndex) ...[
+                                  _buildReadIcon(showRead),
+                                  const SizedBox(width: 6),
+                                ],
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                    isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      Container(
+                                        margin: const EdgeInsets.only(top: 4),
+                                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                        constraints: BoxConstraints(
+                                          maxWidth: MediaQuery.of(context).size.width * 0.7,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isMine ? _green : Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Text(
+                                          msg.previewText,
+                                          style: TextStyle(color: isMine ? Colors.white : Colors.black87),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2, bottom: 4),
+                                        child: Text(timeText, style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
                 );
@@ -207,6 +354,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                     ),
                     onPressed: () => setState(() => _showStickers = !_showStickers),
                   ),
+                  IconButton(
+                    icon: Icon(Icons.image_outlined, color: Colors.grey[600]),
+                    onPressed: _sendImage,
+                  ),
                   Expanded(
                     child: TextField(
                       controller: _messageController,
@@ -235,6 +386,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+  Widget _buildReadIcon(bool isRead) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isRead ? _green : Colors.white,
+        border: Border.all(color: _green, width: 1.5),
+      ),
+      child: Icon(
+        Icons.check,
+        size: 9,
+        color: isRead ? Colors.white : _green,
       ),
     );
   }

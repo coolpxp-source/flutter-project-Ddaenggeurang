@@ -85,6 +85,9 @@ class MarketService {
     required String description,
     required List<String> images,
     required String category,
+    bool isUrgent = false,
+    bool isNegotiable = false,
+    bool isDirectDeal = false,
   }) async {
     await _db.collection('marketProducts').add({
       'sellerId': sellerId,
@@ -97,6 +100,9 @@ class MarketService {
       'category': category,
       'priceComparisons': [],
       'locationGeo': null,
+      'isUrgent': isUrgent,
+      'isNegotiable': isNegotiable,
+      'isDirectDeal': isDirectDeal,
       'createdAt': Timestamp.now(),
     });
   }
