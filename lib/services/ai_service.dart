@@ -196,6 +196,13 @@ class AiService {
         'monthly|${tone.name}|$data', '[리포트: 월간] [톤: ${tone.label}] $data', data);
   }
 
+  // ═══════════════ 3.5) 소비 챌린지 ═══════════════
+  /// [dataSummary] 예: "카테고리: 배달, 목표: 80,000원 이하, 지난달: 100,000원"
+  Future<String> generateChallenge(CoachTone tone, String dataSummary) {
+    return _generateCached(
+        'challenge|${tone.name}|$dataSummary', '[리포트: 챌린지] [톤: ${tone.label}] $dataSummary', dataSummary);
+  }
+
   // ═══════════════ 4) 살까말까 상담 ═══════════════
   /// 출력 예:
   ///   판정: 보류
