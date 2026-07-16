@@ -104,4 +104,8 @@ class ChatService {
       return total;
     });
   }
+
+  Stream<Chat> getChatStream(String chatId) {
+    return _db.collection('chats').doc(chatId).snapshots().map((d) => Chat.fromFirestore(d));
+  }
 }

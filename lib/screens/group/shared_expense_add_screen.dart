@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-
-import '../../models/shared_expense_model.dart';
 import '../../services/group_service.dart';
 
 class SharedExpenseAddScreen extends StatefulWidget {
@@ -96,26 +94,36 @@ class _SharedExpenseAddScreenState extends State<SharedExpenseAddScreen> {
       _isSaving = true;
     });
 
-    final SharedExpenseModel expense = SharedExpenseModel(
-      id: 'shared_expense_${DateTime.now().millisecondsSinceEpoch}',
-      groupId: widget.groupId,
-      title: title,
-      amount: amount,
-      paidByUserId: 'mock_user_001',
-      paidByNickname: payer,
-      category: _selectedCategory,
-      date: _selectedDate,
-      createdAt: DateTime.now(),
-      memo: memo,
-    );
+    try {
+      // 공동지출 Firestore 저장
+      await _groupService.addSharedExpense(
+        groupId: widget.groupId,
+        title: title,
+        amount: amount,
+        paidByNickname: payer,
+        category: _selectedCategory,
+        date: _selectedDate,
+        memo: memo,
+      );
 
-    await _groupService.addSharedExpense(expense);
+      if (!mounted) {
+        return;
+      }
 
-    if (!mounted) {
-      return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSaving = false;
+      });
+
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
     }
-
-    Navigator.pop(context, true);
   }
 
   void _showMessage(String message) {

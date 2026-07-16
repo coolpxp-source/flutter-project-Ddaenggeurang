@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import '../../utils/currency_formatter.dart';
+import 'package:intl/intl.dart'; // 프리랜서 세전 금액(NumberFormat) 계산용
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/income_model.dart';
 import '../../services/income_service.dart';
 
-/// 수입 추가하기 - 사진업로드 없이 직접입력만 (수입은 명세서상 문자/영수증 파싱 대상 아님)
-///
-/// TODO: IncomeService가 아직 없다면 expense_service.dart 패턴 그대로
-///       income_service.dart에 addIncome(IncomeModel) 메서드 추가 필요
-/// TODO: "매달 자동 등록" 토글 켰을 때 RecurringIncomeTemplate 생성/조회 로직은
-///       아직 미연결 — 지금은 이번 한 건만 IncomeModel로 저장됨
 class IncomeInputScreen extends StatefulWidget {
   const IncomeInputScreen({super.key});
 
@@ -16,16 +15,30 @@ class IncomeInputScreen extends StatefulWidget {
 }
 
 class _IncomeInputScreenState extends State<IncomeInputScreen> {
-  final _incomeService = IncomeService();
-  final _amountController = TextEditingController(text: '0');
-  final _memoController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _memoController = TextEditingController();
+  final IncomeService _incomeService = IncomeService();
 
   DateTime _selectedDate = DateTime.now();
-  IncomeSource _selectedSource = IncomeSource.salary;
+  IncomeSource _selectedSource = IncomeSource.salary; // 기본값: 월급
 
-  // 월급일 때만 노출되는 반복등록 옵션
+  // 🚀 부가 자동화 상태 변수
   bool _isRecurring = false;
-  int _payDay = DateTime.now().day.clamp(1, 28);
+  int _payDay = 1;
+
+  int _currentAmount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // 금액 입력 시 실시간 세전 계산을 위한 리스너
+    _amountController.addListener(() {
+      final text = _amountController.text.replaceAll(',', '');
+      setState(() {
+        _currentAmount = int.tryParse(text) ?? 0;
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -34,209 +47,189 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     super.dispose();
   }
 
-  Future<void> _pickDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) setState(() => _selectedDate = picked);
-  }
-
-  void _selectSource(IncomeSource source) {
-    setState(() {
-      _selectedSource = source;
-      // 월급이 아니면 반복등록 옵션은 의미 없으니 초기화
-      if (source != IncomeSource.salary) _isRecurring = false;
-    });
-  }
-
-  int get _amount => int.tryParse(_amountController.text.replaceAll(',', '')) ?? 0;
-
-  Future<void> _save() async {
-    if (_amount <= 0) {
+  Future<void> _saveIncome() async {
+    if (_currentAmount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('실수령액을 입력해주세요')),
+        const SnackBar(content: Text('수입 금액을 입력해주세요!')),
       );
       return;
     }
 
-    // TODO: userId는 실제 로그인 유저 uid로 교체 (FirebaseAuth.instance.currentUser?.uid)
-    const userId = 'TODO_USER_ID';
+    try {
+      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+      final String? recurringTemplateId = _isRecurring ? 'temp_recurring_income_id' : null;
 
-    final income = IncomeModel(
-      incomeId: '',
-      userId: userId,
-      amount: _amount,
-      incomeSource: _selectedSource,
-      date: _selectedDate,
-      memo: _memoController.text.isEmpty ? null : _memoController.text,
-    );
+      final newIncome = IncomeModel(
+        incomeId: '',
+        userId: userId,
+        amount: _currentAmount,
+        incomeSource: _selectedSource,
+        date: _selectedDate,
+        memo: _memoController.text,
+        recurringIncomeTemplateId: recurringTemplateId,
+      );
 
-    await _incomeService.addIncome(income);
+      await _incomeService.addIncome(newIncome);
 
-    // TODO: _isRecurring이 true면 여기서 RecurringIncomeTemplate도 생성/갱신해야 함
-    // (예: IncomeService().createOrUpdateRecurringTemplate(...))
+      debugPrint('✅ 수입 저장 시도: 금액=$_currentAmount, 출처=${_selectedSource.label}');
 
-    if (mounted) Navigator.pop(context);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('수입 내역이 저장되었습니다!')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      debugPrint('🔥 저장 에러: $e');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 명세서 규칙: 프리랜서 소득 3.3% 원천징수 기준 세전 금액 역산
+    final double estimatedGross = _currentAmount / 0.967;
+
     return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text('수입 입력'),
-        centerTitle: true,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('수입 기록')),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('출처', style: TextStyle(fontSize: 13, color: Colors.grey)),
+            // 1. 금액 입력 (지출 폼과 동일한 위치 배치)
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyFormatter()],
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              decoration: const InputDecoration(
+                labelText: '실수령액 (세후 금액)',
+                prefixText: '₩ ',
+                prefixStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            // 💡 프리랜서 전용: 금액 아래에 바로 세전 안내 문구 표시
+            if (_selectedSource == IncomeSource.freelanceIncome && _currentAmount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
+                child: Text(
+                  '약 ${NumberFormat('#,###').format(estimatedGross)}원 (세전 추정)',
+                  style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            const SizedBox(height: 24),
+
+            // 2. 수입 분류 (지출 성격 선택과 동일한 UI)
+            const Text('1. 수입 분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
             const SizedBox(height: 8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 8.0,
               children: IncomeSource.values.map((source) {
-                final selected = _selectedSource == source;
                 return ChoiceChip(
                   label: Text(source.label),
-                  selected: selected,
-                  onSelected: (_) => _selectSource(source),
+                  selected: _selectedSource == source,
+                  onSelected: (bool selected) {
+                    if (selected) {
+                      setState(() {
+                        _selectedSource = source;
+                        // 매달 들어오는 성격이 아니면 반복 스위치 초기화
+                        if (source != IncomeSource.salary && source != IncomeSource.allowance) {
+                          _isRecurring = false;
+                        }
+                      });
+                    }
+                  },
                 );
               }).toList(),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-            _buildFormRow(
-              label: '일시',
-              child: InkWell(
-                onTap: _pickDate,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.calendar_today, size: 16),
-                    const SizedBox(width: 4),
-                    Text(_formatDate(_selectedDate)),
-                  ],
-                ),
-              ),
-            ),
-            _buildFormRow(
-              label: '실수령액',
-              child: SizedBox(
-                width: 140,
-                child: TextField(
-                  controller: _amountController,
-                  textAlign: TextAlign.right,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    suffixText: '원',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ),
-
-            // 프리랜서 소득일 때만 세전 추정액 안내 (저장하지 않는 참고용 계산값)
-            if (_selectedSource == IncomeSource.freelanceIncome && _amount > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, bottom: 8),
-                child: Text(
-                  '세전 약 ${(_amount / 0.967).round()}원 (추정 · 3.3% 원천징수 기준)',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ),
-
-            _buildFormRow(
-              label: '메모',
-              child: SizedBox(
-                width: 160,
-                child: TextField(
-                  controller: _memoController,
-                  textAlign: TextAlign.right,
-                  decoration: const InputDecoration(
-                    border: InputBorder.none,
-                    hintText: '선택 사항',
-                    isDense: true,
-                  ),
-                ),
-              ),
-            ),
-
-            // 월급일 때만 반복등록 옵션 노출
-            if (_selectedSource == IncomeSource.salary) ...[
-              const Divider(height: 32),
-              _buildFormRow(
-                label: '매달 자동 등록',
-                child: Switch(
-                  value: _isRecurring,
-                  onChanged: (v) => setState(() => _isRecurring = v),
-                ),
+            // 3. 정기 수입 부가 기능 (지출의 할부/구독 기능과 동일한 배치)
+            if (_selectedSource == IncomeSource.salary || _selectedSource == IncomeSource.allowance) ...[
+              const Divider(thickness: 2),
+              const Text('부가 기능 연결 (옵션)', style: TextStyle(fontWeight: FontWeight.bold)),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('매달 자동으로 기록하기'),
+                subtitle: const Text('매월 설정한 날짜에 자동으로 내역이 생성됩니다.'),
+                value: _isRecurring,
+                onChanged: (bool value) {
+                  setState(() => _isRecurring = value);
+                },
               ),
               if (_isRecurring)
-                _buildFormRow(
-                  label: '매달 며칠',
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.remove_circle_outline, size: 20),
-                        onPressed: _payDay > 1
-                            ? () => setState(() => _payDay--)
-                            : null,
-                      ),
-                      Text('$_payDay일'),
-                      IconButton(
-                        icon: const Icon(Icons.add_circle_outline, size: 20),
-                        onPressed: _payDay < 28
-                            ? () => setState(() => _payDay++)
-                            : null,
-                      ),
-                    ],
-                  ),
+                Row(
+                  children: [
+                    const Text('매월 입금일: '),
+                    const SizedBox(width: 16),
+                    DropdownButton<int>(
+                      value: _payDay,
+                      items: List.generate(31, (index) => index + 1).map((int day) {
+                        return DropdownMenuItem<int>(
+                          value: day,
+                          child: Text('$day일'),
+                        );
+                      }).toList(),
+                      onChanged: (int? newDay) {
+                        if (newDay != null) {
+                          setState(() => _payDay = newDay);
+                        }
+                      },
+                    ),
+                  ],
                 ),
+              const Divider(thickness: 2),
+              const SizedBox(height: 16),
             ],
 
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _save,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                child: const Text('저장', style: TextStyle(color: Colors.white, fontSize: 16)),
+            // 4. 날짜 및 메모 (지출 폼과 완벽하게 동일)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('입금일: ${_selectedDate.toLocal().toString().split(' ')[0]}'),
+                OutlinedButton(
+                  onPressed: () async {
+                    final DateTime? picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime(2100),
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                    }
+                  },
+                  child: const Text('날짜 변경'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _memoController,
+              decoration: const InputDecoration(
+                labelText: '메모 (선택)',
+                border: OutlineInputBorder(),
               ),
+            ),
+            const SizedBox(height: 32),
+
+            // 저장 버튼
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: Colors.blueAccent, // 지출 폼과 동일한 테마 컬러로 통일
+                foregroundColor: Colors.white,
+              ),
+              onPressed: _saveIncome,
+              child: const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
       ),
     );
-  }
-
-  Widget _buildFormRow({required String label, required Widget child}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [Text(label), child],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final today = DateTime.now();
-    if (date.year == today.year && date.month == today.month && date.day == today.day) {
-      return '오늘';
-    }
-    return '${date.month}/${date.day}';
   }
 }

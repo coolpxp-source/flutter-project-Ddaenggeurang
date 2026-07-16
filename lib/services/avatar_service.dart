@@ -37,6 +37,35 @@ class AvatarService {
     return (data?['points'] as num?)?.toInt() ?? 0;
   }
 
+  // 현재 사용자 닉네임 조회 메서드
+  Future<String> getNickname() async {
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(_currentUserId)
+        .get();
+
+    final data = userDoc.data();
+    final nickname = data?['nickname'] as String?;
+
+    if (nickname == null || nickname.trim().isEmpty) {
+      return '사용자';
+    }
+
+    return nickname.trim();
+  }
+
+  // 현재 사용자 레벨 조회 메서드
+  Future<int> getLevel() async {
+    final userDoc = await _firestore
+        .collection('users')
+        .doc(_currentUserId)
+        .get();
+
+    final data = userDoc.data();
+
+    return (data?['level'] as num?)?.toInt() ?? 1;
+  }
+
   Future<List<AvatarItem>> getItems() async {
     try {
       final userId = _currentUserId;

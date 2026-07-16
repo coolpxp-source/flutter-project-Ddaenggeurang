@@ -21,11 +21,11 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
   ];
 
   bool _isLoading = true;
-  bool _isSaving = false;
 
   int _points = 0;
-  final int _level = 1;
+  int _level = 1;
 
+  String _nickname = '사용자';
   String _selectedSlot = 'hat';
 
   List<AvatarItem> _items = [];
@@ -46,15 +46,22 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     _loadAvatarData();
   }
 
+  // 아바타 화면 데이터 조회 메서드
   Future<void> _loadAvatarData() async {
-    final items = await _avatarService.getItems();
-    final points = await _avatarService.getPoints();
+    final results = await Future.wait([
+      _avatarService.getItems(),
+      _avatarService.getPoints(),
+      _avatarService.getLevel(),
+      _avatarService.getNickname(),
+    ]);
 
     if (!mounted) return;
 
     setState(() {
-      _items = items;
-      _points = points;
+      _items = results[0] as List<AvatarItem>;
+      _points = results[1] as int;
+      _level = results[2] as int;
+      _nickname = results[3] as String;
       _isLoading = false;
     });
   }
@@ -176,43 +183,26 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
       ),
     );
   }
+  // 아바타 화면 데이터 새로고침 메서드
   Future<void> _reloadAvatarData() async {
     await _avatarService.initializeDefaultAvatar();
-    final points = await _avatarService.getPoints();
-    final items = await _avatarService.getItems();
 
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _items = items;
-      _points = points;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveAvatar() async {
-    if (_isSaving) return;
-
-    setState(() {
-      _isSaving = true;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 500));
+    final results = await Future.wait([
+      _avatarService.getPoints(),
+      _avatarService.getLevel(),
+      _avatarService.getItems(),
+      _avatarService.getNickname(),
+    ]);
 
     if (!mounted) return;
 
     setState(() {
-      _isSaving = false;
+      _points = results[0] as int;
+      _level = results[1] as int;
+      _items = results[2] as List<AvatarItem>;
+      _nickname = results[3] as String;
+      _isLoading = false;
     });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('현재 아바타가 저장되었습니다.'),
-      ),
-    );
   }
 
   String _slotLabel(String slot) {
@@ -257,6 +247,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
         .toList();
 
     final ownedCount = _items.where((item) => item.isOwned).length;
+    final equippedCount = _items.where((item) => item.isEquipped).length;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -304,8 +295,10 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 30),
         children: [
           _buildAvatarHeader(
+            nickname: _nickname,
             level: _level,
             ownedCount: ownedCount,
+            equippedCount: equippedCount,
             pinkColor: pinkColor,
             purpleColor: purpleColor,
           ),
@@ -315,39 +308,17 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
             pinkColor: pinkColor,
             purpleColor: purpleColor,
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 54,
-            child: FilledButton(
-              onPressed: _isSaving ? null : _saveAvatar,
-              style: FilledButton.styleFrom(
-                backgroundColor: pinkColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: Text(
-                _isSaving ? '저장 중...' : '현재 아바타 저장하기',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _buildDailyMissionCard(
-            pinkColor: pinkColor,
-          ),
         ],
       ),
     );
   }
 
+  // 아바타 사용자 정보 영역
   Widget _buildAvatarHeader({
+    required String nickname,
     required int level,
     required int ownedCount,
+    required int equippedCount,
     required Color pinkColor,
     required Color purpleColor,
   }) {
@@ -374,9 +345,9 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '태화님의 절약 캐릭터',
-            style: TextStyle(
+          Text(
+            '$nickname님의 절약 캐릭터',
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 13,
             ),
@@ -440,8 +411,8 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: _buildStatBox(
-                  label: '접속 기록',
-                  value: '12일',
+                  label: '착용 아이템',
+                  value: '$equippedCount개',
                 ),
               ),
             ],
@@ -681,67 +652,6 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                 );
               },
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDailyMissionCard({
-    required Color pinkColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF7EE),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFFFFDDB9),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFE7C7),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(
-              Icons.emoji_events,
-              color: Color(0xFFE69A1F),
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '오늘의 아바타 미션',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  '오늘 지출 1건을 기록하면 포인트를 받을 수 있어요.',
-                  style: TextStyle(
-                    color: Color(0xFF8E8277),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          FilledButton(
-            onPressed: null,
-            style: FilledButton.styleFrom(
-              disabledBackgroundColor: const Color(0xFF202334),
-              disabledForegroundColor: Colors.white,
-            ),
-            child: const Text('도전'),
-          ),
         ],
       ),
     );

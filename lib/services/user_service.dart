@@ -57,6 +57,25 @@ class UserService {
     });
   }
 
+  /// 연속 접속 스트릭 갱신 — 오늘 이미 접속 처리됐으면 아무 것도 하지 않는다.
+  /// 어제 접속한 상태로 오늘 다시 열면 스트릭 +1, 하루 이상 건너뛰었으면 1로 리셋.
+  Future<void> touchLoginStreak(String uid, UserModel current) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (current.lastLoginDate == today) return;
+
+    final yesterday = DateTime.now()
+        .subtract(const Duration(days: 1))
+        .toIso8601String()
+        .substring(0, 10);
+    final newStreak =
+    current.lastLoginDate == yesterday ? current.loginStreak + 1 : 1;
+
+    await _users.doc(uid).update({
+      'lastLoginDate': today,
+      'loginStreak': newStreak,
+    });
+  }
+
   /// 닉네임 중복 검사
   Future<bool> isNicknameTaken(String nickname, {String? exceptUid}) async {
     final snap =

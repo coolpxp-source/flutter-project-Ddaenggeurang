@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'psychology_test_result_screen.dart';
+import '../../services/psychology_test_service.dart';
 class PsychologyTestProgressScreen extends StatefulWidget {
   const PsychologyTestProgressScreen({super.key});
 
@@ -13,6 +14,9 @@ class _PsychologyTestProgressScreenState
   int _currentQuestionIndex = 0;
   int? _selectedOptionIndex;
   final List<int> _answers = [];
+  final PsychologyTestService _psychologyTestService =
+  PsychologyTestService();
+  bool _isSavingResult = false;
 
   final List<Map<String, dynamic>> _questions = [
     {
@@ -274,7 +278,12 @@ class _PsychologyTestProgressScreenState
     _calculateResult();
   }
 
-  void _calculateResult() {
+  // 테스트 결과 계산 및 저장 메서드
+  Future<void> _calculateResult() async {
+    if (_isSavingResult) {
+      return;
+    }
+
     final totalScore = _answers.fold<int>(
       0,
           (sum, score) => sum + score,
@@ -292,15 +301,46 @@ class _PsychologyTestProgressScreenState
       resultType = 'planned_spender';
     }
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PsychologyTestResultScreen(
-          resultType: resultType,
-          totalScore: totalScore,
+    setState(() {
+      _isSavingResult = true;
+    });
+
+    try {
+      await _psychologyTestService.saveTestResult(
+        resultType: resultType,
+        totalScore: totalScore,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PsychologyTestResultScreen(
+            resultType: resultType,
+            totalScore: totalScore,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('테스트 결과 저장에 실패했습니다: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingResult = false;
+        });
+      }
+    }
   }
 
   @override
@@ -524,7 +564,9 @@ class _PsychologyTestProgressScreenState
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _goToNextQuestion,
+        onPressed: _isSavingResult
+            ? null
+            : _goToNextQuestion,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFE66A9F),
           foregroundColor: Colors.white,
@@ -533,7 +575,16 @@ class _PsychologyTestProgressScreenState
             borderRadius: BorderRadius.circular(18),
           ),
         ),
-        child: Text(
+        child: _isSavingResult
+            ? const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Colors.white,
+          ),
+        )
+            : Text(
           isLastQuestion
               ? '결과 확인하기'
               : '다음 질문',

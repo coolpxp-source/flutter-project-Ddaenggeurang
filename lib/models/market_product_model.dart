@@ -55,6 +55,9 @@ class MarketProduct {
   final List<PriceComparison> priceComparisons;
   final GeoPoint? locationGeo;
   final String? verifiedDong;
+  final bool isUrgent;
+  final bool isNegotiable;
+  final bool isDirectDeal;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -72,6 +75,9 @@ class MarketProduct {
     required this.priceComparisons,
     this.locationGeo,
     this.verifiedDong,
+    this.isUrgent = false,
+    this.isNegotiable = false,
+    this.isDirectDeal = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -93,6 +99,9 @@ class MarketProduct {
           .toList(),
       locationGeo: map['locationGeo'] as GeoPoint?,
       verifiedDong: map['verifiedDong'] as String?,
+      isUrgent: map['isUrgent'] ?? false,
+      isNegotiable: map['isNegotiable'] ?? false,
+      isDirectDeal: map['isDirectDeal'] ?? false,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -117,6 +126,9 @@ class MarketProduct {
       'priceComparisons': priceComparisons.map((e) => e.toMap()).toList(),
       'locationGeo': locationGeo,
       'verifiedDong': verifiedDong,
+      'isUrgent': isUrgent,
+      'isNegotiable': isNegotiable,
+      'isDirectDeal': isDirectDeal,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };

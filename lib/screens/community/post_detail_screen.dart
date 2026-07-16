@@ -33,6 +33,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   bool _isLiked = false;
 
+  String? _editingCommentId;
+  TextEditingController? _editCommentController;
+
   @override
   void initState() {
     super.initState();
@@ -206,6 +209,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     );
   }
 
+  void _startEditComment(PostComment c) {
+    setState(() {
+      _editingCommentId = c.commentId;
+      _editCommentController = TextEditingController(text: c.content);
+    });
+  }
+
+  void _cancelEditComment() {
+    setState(() => _editingCommentId = null);
+  }
+
+  Future<void> _saveEditComment(String postId, String commentId) async {
+    final content = _editCommentController?.text.trim() ?? '';
+    if (content.isEmpty) return;
+    await _service.updateComment(postId, commentId, content);
+    setState(() => _editingCommentId = null);
+  }
+
   void _editPost(BuildContext context, CommunityPost post) {
     final controller = TextEditingController(text: post.content);
     showDialog(
@@ -227,36 +248,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             onPressed: () async {
               if (controller.text.trim().isEmpty) return;
               await _service.updatePost(post.postId, controller.text.trim());
-              if (context.mounted) Navigator.pop(context);
-            },
-            child: const Text('저장'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _editComment(BuildContext context, String postId, PostComment comment) {
-    final controller = TextEditingController(text: comment.content);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('댓글 수정'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
-              await _service.updateComment(postId, comment.commentId, controller.text.trim());
               if (context.mounted) Navigator.pop(context);
             },
             child: const Text('저장'),
@@ -442,43 +433,80 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                             Text('댓글 ${comments.length}개',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                             const SizedBox(height: 12),
-                            ...comments.map((c) => Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  CircleAvatar(radius: 12, backgroundColor: Colors.grey[300]),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(c.authorName,
-                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                        const SizedBox(height: 2),
-                                        Text(c.content, style: const TextStyle(fontSize: 13)),
-                                        if (c.updatedAt != null) ...[
-                                          const SizedBox(height: 2),
-                                          Text('(수정됨)',
-                                              style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                            ...comments.map((c) {
+                              final isEditing = _editingCommentId == c.commentId;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    CircleAvatar(radius: 12, backgroundColor: Colors.grey[300]),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(c.authorName,
+                                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                          const SizedBox(height: 4),
+                                          if (isEditing) ...[
+                                            TextField(
+                                              controller: _editCommentController,
+                                              autofocus: true,
+                                              maxLines: null,
+                                              style: const TextStyle(fontSize: 13),
+                                              decoration: InputDecoration(
+                                                isDense: true,
+                                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                                filled: true,
+                                                fillColor: Colors.grey[100],
+                                                border: OutlineInputBorder(
+                                                  borderRadius: BorderRadius.circular(10),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Row(
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: _cancelEditComment,
+                                                  child: Text('취소', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                GestureDetector(
+                                                  onTap: () => _saveEditComment(post.postId, c.commentId),
+                                                  child: const Text('저장',
+                                                      style: TextStyle(fontSize: 12, color: _green, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ],
+                                            ),
+                                          ] else ...[
+                                            Text(c.content, style: const TextStyle(fontSize: 13)),
+                                            if (c.updatedAt != null) ...[
+                                              const SizedBox(height: 2),
+                                              Text('(수정됨)', style: TextStyle(fontSize: 10, color: Colors.grey[400])),
+                                            ],
+                                          ],
                                         ],
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                  if (c.authorId == _myId) ...[
-                                    GestureDetector(
-                                      onTap: () => _editComment(context, post.postId, c),
-                                      child: Icon(Icons.edit, size: 15, color: Colors.grey[400]),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    GestureDetector(
-                                      onTap: () => _confirmDeleteComment(context, post.postId, c.commentId),
-                                      child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
-                                    ),
+                                    if (!isEditing && c.authorId == _myId) ...[
+                                      GestureDetector(
+                                        onTap: () => _startEditComment(c),
+                                        child: Icon(Icons.edit, size: 15, color: Colors.grey[400]),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      GestureDetector(
+                                        onTap: () => _confirmDeleteComment(context, post.postId, c.commentId),
+                                        child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            )),
+                                ),
+                              );
+                            }),
                           ],
                         );
                       },

@@ -85,6 +85,9 @@ class MarketService {
     required String description,
     required List<String> images,
     required String category,
+    bool isUrgent = false,
+    bool isNegotiable = false,
+    bool isDirectDeal = false,
   }) async {
     await _db.collection('marketProducts').add({
       'sellerId': sellerId,
@@ -97,7 +100,24 @@ class MarketService {
       'category': category,
       'priceComparisons': [],
       'locationGeo': null,
+      'isUrgent': isUrgent,
+      'isNegotiable': isNegotiable,
+      'isDirectDeal': isDirectDeal,
       'createdAt': Timestamp.now(),
     });
+  }
+
+  // [플리마켓 ] 좋아요한 상품 목록
+  Future<List<MarketProduct>> getFavoriteProducts(String userId) async {
+    final favIds = await getFavoriteIds(userId).first;
+    // 땡그랑마켓 더미 아이템(ddaeng_로 시작)은 실제 Firestore 문서가 없어서 제외
+    final realIds = favIds.where((id) => !id.startsWith('ddaeng_')).toList();
+    if (realIds.isEmpty) return [];
+
+    final snap = await _db
+        .collection('marketProducts')
+        .where(FieldPath.documentId, whereIn: realIds)
+        .get();
+    return snap.docs.map((d) => MarketProduct.fromFirestore(d)).toList();
   }
 }

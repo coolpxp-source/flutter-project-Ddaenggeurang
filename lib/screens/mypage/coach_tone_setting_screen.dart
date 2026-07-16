@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
@@ -10,7 +11,6 @@ const _accentSoft = Color(0xFFFFF0A6);
 const _ink = Color(0xFF221A16);
 const _inkSub = Color(0xFF8A7E77);
 const _bg = Color(0xFFFAF8F6);
-const _line = Color(0xFFF0E9E4);
 
 class CoachToneSettingScreen extends StatefulWidget {
   const CoachToneSettingScreen({super.key});
@@ -73,7 +73,10 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
                   onTap: () => _select(tone),
                 ),
               )),
-            ],
+            ]
+                .animate(interval: 70.ms)
+                .fadeIn(duration: 360.ms, curve: Curves.easeOut)
+                .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
           );
         },
       ),
@@ -113,12 +116,29 @@ class _CoachCard extends StatelessWidget {
     return GestureDetector(
       onTap: disabled ? null : onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? _accentSoft : Colors.white,
+          gradient: selected
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [_accentSoft, Colors.white],
+                )
+              : null,
+          color: selected ? null : Colors.white,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? _accent : _line, width: selected ? 1.6 : 1),
+          border: selected ? Border.all(color: _accent, width: 1.6) : null,
+          boxShadow: [
+            BoxShadow(
+              color: selected
+                  ? _accent.withValues(alpha: 0.18)
+                  : _ink.withValues(alpha: 0.045),
+              blurRadius: selected ? 18 : 12,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,8 +149,23 @@ class _CoachCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                      color: selected ? Colors.white : const Color(0xFFFFF8E5),
-                      shape: BoxShape.circle),
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: selected
+                          ? [Colors.white, const Color(0xFFFFF4D6)]
+                          : [const Color(0xFFFFF8E5), const Color(0xFFFFEFC7)],
+                    ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                                color: _accent.withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3)),
+                          ]
+                        : null,
+                  ),
                   alignment: Alignment.center,
                   child: CoachAvatar(imagePath: tone.imagePath, size: 40),
                 ),
@@ -171,7 +206,7 @@ class _CoachCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: selected ? Colors.white.withOpacity(0.6) : _bg,
+                color: selected ? Colors.white.withValues(alpha: 0.6) : _bg,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

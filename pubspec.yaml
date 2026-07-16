@@ -12,14 +12,14 @@ dependencies:
 
   lottie: ^3.0.0
   url_launcher: ^6.3.0
-  firebase_storage: ^13.4.3
+  firebase_storage: ^13.4.5
   circular_menu: ^4.0.0
 
   # Firebase
-  firebase_core: ^4.11.0
-  firebase_auth:
-  cloud_firestore:
-  cloud_functions:
+  firebase_core: ^4.12.1
+  firebase_auth: ^6.5.6
+  cloud_firestore: ^6.7.1
+  cloud_functions: ^6.3.3
   google_sign_in: ^6.2.1
 
   # AI 통신
@@ -36,6 +36,7 @@ dependencies:
 
   # 알림
   flutter_local_notifications:
+  timezone: ^0.11.1
 
   # 이미지
   image_picker: ^1.2.3
@@ -46,6 +47,8 @@ dependencies:
   flutter_animate: ^4.5.2
   shimmer: ^3.0.0
   percent_indicator: ^4.2.5
+  table_calendar: ^3.2.0
+  flutter_staggered_animations: ^1.1.1
 
 dev_dependencies:
   flutter_test:

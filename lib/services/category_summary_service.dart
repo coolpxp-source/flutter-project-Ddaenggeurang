@@ -1,255 +1,525 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/category_summary_model.dart';
 
+/// expenses 컬렉션을 기준으로
+/// 월별/주별/일별/최근 지출 통계를 계산하는 서비스
 class CategorySummaryService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore;
 
-  /// Firestore 카테고리 키와 화면 표시 이름
-  static const Map<String, String> categoryNames = {
-    'food': '식비',
-    'transport': '교통',
-    'shopping': '쇼핑',
-    'culture': '문화',
-    'housing': '주거',
-    'etc': '기타',
-  };
+  CategorySummaryService({
+    FirebaseFirestore? firestore,
+  }) : _firestore =
+      firestore ?? FirebaseFirestore.instance;
 
-  /// 현재 로그인 사용자 확인
-  User _requireCurrentUser(String userId) {
-    final User? currentUser = _auth.currentUser;
-
-    if (currentUser == null) {
-      throw Exception('로그인된 사용자가 없습니다.');
-    }
-
-    if (currentUser.uid != userId) {
-      throw Exception('사용자 UID가 일치하지 않습니다.');
-    }
-
-    return currentUser;
+  /// 최상위 expenses 컬렉션
+  CollectionReference<Map<String, dynamic>>
+  get _expenseCollection {
+    return _firestore.collection('expenses');
   }
 
-  /// 사용자의 expenses 서브컬렉션
+  /// categories 컬렉션
+  CollectionReference<Map<String, dynamic>>
+  get _categoryCollection {
+    return _firestore.collection('categories');
+  }
+
+  // =========================================================
+  // 1. 월별 카테고리 집계
+  // =========================================================
+
+  /// 선택한 월의 지출을 categoryId별로 합산한다.
   ///
-  /// 경로:
-  /// users/{userId}/expenses/{expenseId}
-  CollectionReference<Map<String, dynamic>> _expenseCollection(
-      String userId,
-      ) {
-    return _firestore
-        .collection('users')
-        .doc(userId)
-        .collection('expenses');
-  }
-
-  /// 조회 월의 시작일
-  DateTime _getMonthStart({
-    required int year,
-    required int month,
-  }) {
-    return DateTime(year, month, 1);
-  }
-
-  /// 다음 달 시작일
-  DateTime _getNextMonthStart({
-    required int year,
-    required int month,
-  }) {
-    return DateTime(year, month + 1, 1);
-  }
-
-  /// 특정 월의 카테고리별 지출 집계
-  Future<List<CategorySummaryModel>> getCategorySummary({
+  /// 사용 예:
+  ///
+  /// getCategorySummary(
+  ///   userId: uid,
+  ///   year: 2026,
+  ///   month: 7,
+  /// );
+  Future<List<CategorySummaryModel>>
+  getCategorySummary({
     required String userId,
     required int year,
     required int month,
   }) async {
-    _requireCurrentUser(userId);
+    if (userId.trim().isEmpty) {
+      return <CategorySummaryModel>[];
+    }
 
-    final DateTime monthStart = _getMonthStart(
-      year: year,
-      month: month,
+    final DateTime startDate = DateTime(
+      year,
+      month,
+      1,
     );
 
-    final DateTime nextMonthStart = _getNextMonthStart(
-      year: year,
-      month: month,
+    final DateTime endDate = DateTime(
+      year,
+      month + 1,
+      1,
     );
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot =
-    await _expenseCollection(userId)
-        .where(
-      'date',
-      isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart),
-    )
-        .where(
-      'date',
-      isLessThan: Timestamp.fromDate(nextMonthStart),
-    )
-        .get();
+    final List<_ExpenseData> expenses =
+    await _loadUserExpenses(
+      userId: userId,
+    );
 
-    final Map<String, int> categoryTotals = {
-      for (final String key in categoryNames.keys) key: 0,
-    };
+    /// categoryId별 지출 합계
+    final Map<String, int> categoryTotals =
+    <String, int>{};
 
-    for (final QueryDocumentSnapshot<Map<String, dynamic>> document
-    in snapshot.docs) {
-      final Map<String, dynamic> data = document.data();
+    for (final _ExpenseData expense
+    in expenses) {
+      final bool isSelectedMonth =
+          !expense.date.isBefore(startDate) &&
+              expense.date.isBefore(endDate);
 
-      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
-
-      if (amount <= 0) {
+      if (!isSelectedMonth) {
         continue;
       }
 
-      // 설계 기준 필드명은 categoryId
-      final String categoryId =
-          data['categoryId'] as String? ?? 'etc';
-
-      final String normalizedCategory =
-      categoryNames.containsKey(categoryId)
-          ? categoryId
-          : 'etc';
-
-      categoryTotals[normalizedCategory] =
-          (categoryTotals[normalizedCategory] ?? 0) + amount;
+      categoryTotals[expense.categoryId] =
+          (categoryTotals[expense.categoryId] ??
+              0) +
+              expense.amount;
     }
 
-    final int totalExpense = categoryTotals.values.fold<int>(
-      0,
-          (int sum, int amount) => sum + amount,
-    );
-
-    final List<CategorySummaryModel> summaries =
-    categoryTotals.entries
-        .where(
-          (MapEntry<String, int> entry) => entry.value > 0,
-    )
-        .map(
-          (MapEntry<String, int> entry) {
-        final double percentage = totalExpense == 0
-            ? 0
-            : entry.value / totalExpense * 100;
-
-        return CategorySummaryModel(
-          categoryKey: entry.key,
-          categoryName:
-          categoryNames[entry.key] ?? '기타',
-          totalAmount: entry.value,
-          percentage: percentage,
-        );
-      },
-    )
-        .toList();
-
-    summaries.sort(
-          (
-          CategorySummaryModel a,
-          CategorySummaryModel b,
-          ) =>
-          b.totalAmount.compareTo(a.totalAmount),
-    );
-
-    return summaries;
-  }
-
-  /// 특정 월의 전체 지출 합계
-  Future<int> getMonthlyTotalExpense({
-    required String userId,
-    required int year,
-    required int month,
-  }) async {
-    final List<CategorySummaryModel> summaries =
-    await getCategorySummary(
-      userId: userId,
-      year: year,
-      month: month,
-    );
-
-    return summaries.fold<int>(
+    final int totalExpense =
+    categoryTotals.values.fold<int>(
       0,
           (
           int sum,
-          CategorySummaryModel item,
-          ) =>
-      sum + item.totalAmount,
+          int amount,
+          ) {
+        return sum + amount;
+      },
     );
+
+    if (totalExpense <= 0) {
+      return <CategorySummaryModel>[];
+    }
+
+    final Map<String, _CategoryInfo>
+    categoryInfoMap =
+    await _loadCategoryInfoMap();
+
+    final List<CategorySummaryModel> result =
+    categoryTotals.entries.map((entry) {
+      final _CategoryInfo? categoryInfo =
+      categoryInfoMap[entry.key];
+
+      final String categoryKey =
+          categoryInfo?.key ?? entry.key;
+
+      final String categoryName =
+          categoryInfo?.name ?? entry.key;
+
+      final double percentage =
+          entry.value / totalExpense * 100;
+
+      return CategorySummaryModel(
+        categoryKey: categoryKey,
+        categoryName: categoryName,
+        totalAmount: entry.value,
+        percentage: percentage,
+      );
+    }).toList();
+
+    /// 지출 금액이 큰 순서로 정렬
+    result.sort(
+          (
+          CategorySummaryModel first,
+          CategorySummaryModel second,
+          ) {
+        return second.totalAmount.compareTo(
+          first.totalAmount,
+        );
+      },
+    );
+
+    debugPrint(
+      '[카테고리 집계] '
+          'userId=$userId, '
+          'year=$year, '
+          'month=$month, '
+          'count=${result.length}, '
+          'total=$totalExpense',
+    );
+
+    return result;
   }
 
-  /// [weekStart] 00:00부터 7일간의 지출 합계 (홈 대시보드 "이번 주 지출" 카드용)
+  // =========================================================
+  // 2. 주간 총지출
+  // =========================================================
+
+  /// weekStart부터 7일 동안 지출 합계를 반환한다.
+  ///
+  /// 사용 예:
+  ///
+  /// getWeeklyTotalExpense(
+  ///   userId: uid,
+  ///   weekStart: weekStart,
+  /// );
   Future<int> getWeeklyTotalExpense({
     required String userId,
     required DateTime weekStart,
   }) async {
-    _requireCurrentUser(userId);
+    if (userId.trim().isEmpty) {
+      return 0;
+    }
 
-    final DateTime start = DateTime(weekStart.year, weekStart.month, weekStart.day);
-    final DateTime end = start.add(const Duration(days: 7));
+    final DateTime normalizedStart =
+    DateTime(
+      weekStart.year,
+      weekStart.month,
+      weekStart.day,
+    );
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('date', isLessThan: Timestamp.fromDate(end))
-        .get();
+    final DateTime weekEnd =
+    normalizedStart.add(
+      const Duration(days: 7),
+    );
 
-    return snapshot.docs.fold<int>(0, (int sum, doc) {
-      final int amount = (doc.data()['amount'] as num?)?.toInt() ?? 0;
-      return amount > 0 ? sum + amount : sum;
-    });
+    final List<_ExpenseData> expenses =
+    await _loadUserExpenses(
+      userId: userId,
+    );
+
+    int totalExpense = 0;
+
+    for (final _ExpenseData expense
+    in expenses) {
+      final bool isInWeek =
+          !expense.date.isBefore(
+            normalizedStart,
+          ) &&
+              expense.date.isBefore(
+                weekEnd,
+              );
+
+      if (!isInWeek) {
+        continue;
+      }
+
+      totalExpense += expense.amount;
+    }
+
+    return totalExpense;
   }
 
-  /// 특정 월의 일자별 지출 합계 — 홈 대시보드 주간 달력 스트립용 (key = 일(day))
+  // =========================================================
+  // 3. 월별 일자 지출 합계
+  // =========================================================
+
+  /// 선택한 월의 지출을 날짜 숫자별로 합산한다.
+  ///
+  /// 반환 예:
+  ///
+  /// {
+  ///   1: 10000,
+  ///   5: 32000,
+  ///   15: 9000,
+  /// }
   Future<Map<int, int>> getDailyTotals({
     required String userId,
     required int year,
     required int month,
   }) async {
-    _requireCurrentUser(userId);
-
-    final DateTime monthStart = _getMonthStart(year: year, month: month);
-    final DateTime nextMonthStart = _getNextMonthStart(year: year, month: month);
-
-    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(monthStart))
-        .where('date', isLessThan: Timestamp.fromDate(nextMonthStart))
-        .get();
-
-    final Map<int, int> totals = {};
-    for (final doc in snapshot.docs) {
-      final Map<String, dynamic> data = doc.data();
-      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
-      final DateTime? date = (data['date'] as Timestamp?)?.toDate();
-      if (date == null || amount <= 0) continue;
-      totals[date.day] = (totals[date.day] ?? 0) + amount;
+    if (userId.trim().isEmpty) {
+      return <int, int>{};
     }
-    return totals;
+
+    final DateTime startDate = DateTime(
+      year,
+      month,
+      1,
+    );
+
+    final DateTime endDate = DateTime(
+      year,
+      month + 1,
+      1,
+    );
+
+    final List<_ExpenseData> expenses =
+    await _loadUserExpenses(
+      userId: userId,
+    );
+
+    final Map<int, int> dailyTotals =
+    <int, int>{};
+
+    for (final _ExpenseData expense
+    in expenses) {
+      final bool isSelectedMonth =
+          !expense.date.isBefore(startDate) &&
+              expense.date.isBefore(endDate);
+
+      if (!isSelectedMonth) {
+        continue;
+      }
+
+      final int day = expense.date.day;
+
+      dailyTotals[day] =
+          (dailyTotals[day] ?? 0) +
+              expense.amount;
+    }
+
+    return dailyTotals;
   }
 
-  /// 최근 지출 N건 (최신순) — 홈 대시보드 "최근 지출" 목록용
-  Future<List<RecentExpenseEntry>> getRecentExpenses({
+  // =========================================================
+  // 4. 최근 지출
+  // =========================================================
+
+  /// 최근 지출을 최신순으로 반환한다.
+  ///
+  /// RecentExpenseEntry는
+  /// category_summary_model.dart에 정의된 것을 사용한다.
+  Future<List<RecentExpenseEntry>>
+  getRecentExpenses({
     required String userId,
     int limit = 5,
   }) async {
-    _requireCurrentUser(userId);
+    if (userId.trim().isEmpty ||
+        limit <= 0) {
+      return <RecentExpenseEntry>[];
+    }
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot = await _expenseCollection(userId)
-        .orderBy('date', descending: true)
-        .limit(limit)
+    final List<_ExpenseData> expenses =
+    await _loadUserExpenses(
+      userId: userId,
+    );
+
+    final Map<String, _CategoryInfo>
+    categoryInfoMap =
+    await _loadCategoryInfoMap();
+
+    /// 최신 날짜순 정렬
+    expenses.sort(
+          (
+          _ExpenseData first,
+          _ExpenseData second,
+          ) {
+        return second.date.compareTo(
+          first.date,
+        );
+      },
+    );
+
+    return expenses.take(limit).map(
+          (_ExpenseData expense) {
+        final _CategoryInfo? categoryInfo =
+        categoryInfoMap[
+        expense.categoryId];
+
+        return RecentExpenseEntry(
+          categoryKey:
+          categoryInfo?.key ??
+              expense.categoryId,
+          categoryName:
+          categoryInfo?.name ??
+              expense.categoryId,
+          amount: expense.amount,
+          date: expense.date,
+        );
+      },
+    ).toList();
+  }
+
+  // =========================================================
+  // 공통 내부 조회
+  // =========================================================
+
+  /// 현재 사용자의 삭제되지 않은 지출을 조회한다.
+  Future<List<_ExpenseData>>
+  _loadUserExpenses({
+    required String userId,
+  }) async {
+    final QuerySnapshot<Map<String, dynamic>>
+    snapshot =
+    await _expenseCollection
+        .where(
+      'userId',
+      isEqualTo: userId,
+    )
         .get();
 
-    return snapshot.docs.map((doc) {
-      final Map<String, dynamic> data = doc.data();
-      final int amount = (data['amount'] as num?)?.toInt() ?? 0;
-      final String categoryId = data['categoryId'] as String? ?? 'etc';
-      final DateTime date = (data['date'] as Timestamp?)?.toDate() ?? DateTime.now();
-      return RecentExpenseEntry(
-        categoryKey: categoryId,
-        categoryName: categoryNames[categoryId] ?? '기타',
-        amount: amount,
-        date: date,
+    final List<_ExpenseData> result =
+    <_ExpenseData>[];
+
+    for (final QueryDocumentSnapshot<
+        Map<String, dynamic>>
+    document in snapshot.docs) {
+      final Map<String, dynamic> data =
+      document.data();
+
+      /// 소프트 삭제 문서는 제외
+      if (data['isDeleted'] == true) {
+        continue;
+      }
+
+      final DateTime? date =
+      _toDateTime(
+        data['date'],
       );
-    }).toList();
+
+      if (date == null) {
+        continue;
+      }
+
+      final int amount =
+      _toInt(
+        data['amount'],
+      );
+
+      if (amount <= 0) {
+        continue;
+      }
+
+      final String categoryId =
+          data['categoryId']
+              ?.toString()
+              .trim() ??
+              '';
+
+      if (categoryId.isEmpty) {
+        continue;
+      }
+
+      result.add(
+        _ExpenseData(
+          categoryId: categoryId,
+          amount: amount,
+          date: date,
+        ),
+      );
+    }
+
+    return result;
   }
+
+  /// categories 컬렉션에서
+  /// 문서 ID별 이름과 카테고리 키를 조회한다.
+  Future<Map<String, _CategoryInfo>>
+  _loadCategoryInfoMap() async {
+    final QuerySnapshot<Map<String, dynamic>>
+    snapshot =
+    await _categoryCollection.get();
+
+    final Map<String, _CategoryInfo> result =
+    <String, _CategoryInfo>{};
+
+    for (final QueryDocumentSnapshot<
+        Map<String, dynamic>>
+    document in snapshot.docs) {
+      final Map<String, dynamic> data =
+      document.data();
+
+      final String categoryName =
+          _readFirstNonEmptyString(
+            data,
+            const <String>[
+              'name',
+              'categoryName',
+              'label',
+            ],
+          ) ??
+              document.id;
+
+      /// categoryKey가 있으면 사용하고,
+      /// 없으면 code 또는 문서 ID 사용
+      final String categoryKey =
+          _readFirstNonEmptyString(
+            data,
+            const <String>[
+              'categoryKey',
+              'key',
+              'code',
+            ],
+          ) ??
+              document.id;
+
+      result[document.id] =
+          _CategoryInfo(
+            key: categoryKey,
+            name: categoryName,
+          );
+    }
+
+    return result;
+  }
+
+  /// Map 안에서 첫 번째 빈 값이 아닌 문자열 찾기
+  String? _readFirstNonEmptyString(
+      Map<String, dynamic> data,
+      List<String> keys,
+      ) {
+    for (final String key in keys) {
+      final String value =
+          data[key]?.toString().trim() ?? '';
+
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  /// Firestore 숫자를 int로 변환
+  int _toInt(dynamic value) {
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(
+      value?.toString() ?? '',
+    ) ??
+        0;
+  }
+
+  /// Firestore 날짜 값을 DateTime으로 변환
+  DateTime? _toDateTime(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+
+    if (value is DateTime) {
+      return value;
+    }
+
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+
+    return null;
+  }
+}
+
+/// 서비스 내부에서만 사용하는 지출 데이터
+class _ExpenseData {
+  final String categoryId;
+  final int amount;
+  final DateTime date;
+
+  const _ExpenseData({
+    required this.categoryId,
+    required this.amount,
+    required this.date,
+  });
+}
+
+/// 서비스 내부에서만 사용하는 카테고리 정보
+class _CategoryInfo {
+  final String key;
+  final String name;
+
+  const _CategoryInfo({
+    required this.key,
+    required this.name,
+  });
 }
