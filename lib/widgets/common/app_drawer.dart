@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../screens/history/transaction_history_screen.dart';
 import 'drawer_menu_item.dart';
 import 'placeholder_screen.dart';
 import '../../screens/expense/expense_input_screen.dart';
@@ -96,7 +97,7 @@ class AppDrawer extends StatelessWidget {
           const DrawerMenuItem(
             icon: Icons.list_alt,
             title: '내역 목록',
-            destinationScreen: PlaceholderScreen(title: '내역 목록'),
+            destinationScreen: TransactionHistoryScreen(),
             iconColor: _amberDeep,
             iconBg: _amberSoft,
           ),
