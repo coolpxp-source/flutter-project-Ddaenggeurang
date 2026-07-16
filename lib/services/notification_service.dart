@@ -31,8 +31,10 @@ class NotificationService {
   }
 
   /// 오늘 남은 AI상담 횟수를 알려주는 즉시 알림.
-  Future<void> showConsultReminder(int remaining) async {
-    if (remaining <= 0) return;
+  /// 실제로 띄운 제목/본문을 반환한다(호출부가 알림함에 그대로 기록할 수 있도록 —
+  /// 문구를 main.dart 쪽에 중복 하드코딩하지 않기 위함). 안 띄웠으면 null.
+  Future<({String title, String body})?> showConsultReminder(int remaining) async {
+    if (remaining <= 0) return null;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -43,12 +45,10 @@ class NotificationService {
         priority: Priority.defaultPriority,
       ),
     );
-    await _plugin.show(
-      id: 0,
-      title: '땡쥐가 기다리고 있어요 🐭',
-      body: '오늘 상담 $remaining회 남았어요. 궁금한 소비가 있다면 물어보세요!',
-      notificationDetails: details,
-    );
+    const title = '땡쥐가 기다리고 있어요 🐭';
+    final body = '오늘 상담 $remaining회 남았어요. 궁금한 소비가 있다면 물어보세요!';
+    await _plugin.show(id: 0, title: title, body: body, notificationDetails: details);
+    return (title: title, body: body);
   }
 
   /// 오늘의 코치 잔소리(AiService.generateNagging 결과)를 알려주는 즉시 알림.

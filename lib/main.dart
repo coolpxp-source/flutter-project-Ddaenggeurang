@@ -9,6 +9,7 @@ import 'models/user_model.dart';
 import 'firebase_options.dart';
 import 'services/ai_service.dart';
 import 'services/category_summary_service.dart';
+import 'services/notification_history_service.dart';
 import 'services/notification_service.dart';
 import 'services/subscription_service.dart';
 import 'services/user_service.dart';
@@ -114,7 +115,7 @@ class AppGate extends StatelessWidget {
                   onboardingData: PendingOnboarding.data);
             }
             unawaited(UserService().touchLoginStreak(user.uid, profile));
-            unawaited(_maybeShowConsultReminder());
+            unawaited(_maybeShowConsultReminder(user.uid));
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
             unawaited(_maybeShowDailyNagging(user.uid, profile));
             return const HomeScreen();
@@ -127,12 +128,17 @@ class AppGate extends StatelessWidget {
 
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
 /// SharedPreferences에 오늘 날짜를 남겨서 같은 날 재실행/재빌드로 중복 발송되지 않게 한다.
-Future<void> _maybeShowConsultReminder() async {
+Future<void> _maybeShowConsultReminder(String uid) async {
   final today = DateTime.now().toIso8601String().substring(0, 10);
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getString('lastConsultReminderDate') == today) return;
   await prefs.setString('lastConsultReminderDate', today);
-  await NotificationService.instance.showConsultReminder(AiService().consultRemaining);
+
+  final shown = await NotificationService.instance
+      .showConsultReminder(AiService().consultRemaining);
+  if (shown == null) return;
+  await NotificationHistoryService()
+      .record(uid: uid, title: shown.title, body: shown.body, type: 'consult');
 }
 
 /// 하루 1번, 활성 구독 목록 기준으로 결제일 알림을 다시 걸어준다(설정 꺼져 있으면 취소).
@@ -170,11 +176,11 @@ Future<void> _maybeShowDailyNagging(String uid, UserModel profile) async {
 
   try {
     final text = await AiService().generateNagging(profile.coachTone, dataSummary);
+    final title = '${profile.coachTone.emoji} ${profile.coachTone.label}가 한마디';
     await prefs.setString('lastNaggingDate', today);
-    await NotificationService.instance.showDailyNagging(
-      text,
-      title: '${profile.coachTone.emoji} ${profile.coachTone.label}가 한마디',
-    );
+    await NotificationService.instance.showDailyNagging(text, title: title);
+    await NotificationHistoryService()
+        .record(uid: uid, title: title, body: text, type: 'nagging');
   } catch (_) {
     // AI 서버 연결 실패 — 알림 없이 조용히 넘어간다.
   }

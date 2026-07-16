@@ -11,6 +11,7 @@ import '../../models/budget_model.dart';
 import '../../services/ai_service.dart';
 import '../../services/budget_service.dart';
 import '../../services/category_summary_service.dart';
+import '../../services/notification_history_service.dart';
 import '../../services/user_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
@@ -24,6 +25,7 @@ import '../mypage/mypage_home_screen.dart';
 import '../avatar/my_avatar_screen.dart';
 import '../psychology/psychology_test_start_screen.dart';
 import '../group/group_create_join_screen.dart';
+import '../notification/notification_history_screen.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -92,16 +94,42 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
-            icon: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(color: _C.amberSoft, shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: const Icon(Icons.notifications_none_rounded, size: 18, color: _C.amberDeep),
+            icon: StreamBuilder<int>(
+              stream: NotificationHistoryService().watchUnreadCount(uid),
+              builder: (context, snap) {
+                final unread = snap.data ?? 0;
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: _C.amberSoft, shape: BoxShape.circle),
+                      alignment: Alignment.center,
+                      child:
+                          const Icon(Icons.notifications_none_rounded, size: 18, color: _C.amberDeep),
+                    ),
+                    if (unread > 0)
+                      Positioned(
+                        top: -2,
+                        right: -2,
+                        child: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: _C.pink,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
             tooltip: '알림',
-            onPressed: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '알림'))),
+            onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationHistoryScreen())),
           ),
           const SizedBox(width: 4),
         ],
@@ -947,7 +975,11 @@ class _MonthHeader extends StatelessWidget {
         const SizedBox(width: 4),
         _iconBtn(Icons.chevron_right_rounded, onNext),
         const Spacer(),
-        _iconBtn(Icons.notifications_none_rounded, () {}),
+        _iconBtn(
+          Icons.notifications_none_rounded,
+          () => Navigator.of(context)
+              .push(MaterialPageRoute(builder: (_) => const NotificationHistoryScreen())),
+        ),
       ],
     );
   }
