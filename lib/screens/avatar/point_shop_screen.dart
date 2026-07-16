@@ -22,7 +22,7 @@ class _PointShopScreenState extends State<PointShopScreen> {
   ];
 
   int _points = 0;
-  final int _userLevel = 1;
+  int _userLevel = 1;
   String _selectedSlot = 'hat';
   bool _isLoading = true;
 
@@ -160,15 +160,20 @@ class _PointShopScreenState extends State<PointShopScreen> {
     _loadShop();
   }
 
+  // 아바타 상점 데이터 조회 메서드
   Future<void> _loadShop() async {
-    final points = await _avatarService.getPoints();
-    final items = await _avatarService.getItems();
+    final results = await Future.wait([
+      _avatarService.getPoints(),
+      _avatarService.getLevel(),
+      _avatarService.getItems(),
+    ]);
 
     if (!mounted) return;
 
     setState(() {
-      _points = points;
-      _items = items;
+      _points = results[0] as int;
+      _userLevel = results[1] as int;
+      _items = results[2] as List<AvatarItem>;
       _isLoading = false;
     });
   }
