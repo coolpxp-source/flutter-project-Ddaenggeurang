@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../services/psychology_test_service.dart';
 
-class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
+class PersonalizedBudgetRecommendationScreen
+    extends StatefulWidget {
   const PersonalizedBudgetRecommendationScreen({
     super.key,
     required this.resultType,
@@ -9,8 +11,22 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
   final String resultType;
 
   @override
+  State<PersonalizedBudgetRecommendationScreen>
+  createState() =>
+      _PersonalizedBudgetRecommendationScreenState();
+}
+
+class _PersonalizedBudgetRecommendationScreenState
+    extends State<PersonalizedBudgetRecommendationScreen> {
+  final PsychologyTestService _psychologyTestService =
+  PsychologyTestService();
+
+  bool _isApplying = false;
+
+  @override
   Widget build(BuildContext context) {
-    final budgetData = _getBudgetData(resultType);
+    final budgetData =
+    _getBudgetData(widget.resultType);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F7FB),
@@ -43,6 +59,74 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  // 현재 월 예산에 추천 카테고리 예산을 적용하는 메서드
+  Future<void> _applyRecommendedBudget() async {
+    if (_isApplying) return;
+
+    setState(() {
+      _isApplying = true;
+    });
+
+    try {
+      final categoryBudgets =
+      await _psychologyTestService
+          .applyRecommendedBudget(
+        resultType: widget.resultType,
+      );
+
+      if (!mounted) return;
+
+      final totalApplied =
+      categoryBudgets.values.fold<int>(
+        0,
+            (sum, amount) => sum + amount,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '추천 예산이 적용되었습니다. '
+                '카테고리 예산 총 ${_formatAmount(totalApplied)}원',
+          ),
+        ),
+      );
+    } on StateError catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '추천 예산 적용에 실패했습니다: $error',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplying = false;
+        });
+      }
+    }
+  }
+
+// 금액에 천 단위 구분 기호를 적용하는 메서드
+  String _formatAmount(int amount) {
+    return amount
+        .toString()
+        .replaceAllMapped(
+      RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
     );
   }
 
@@ -304,6 +388,7 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
   }
 
   // 추천 예산 적용 안내 버튼
+  // 추천 예산 실제 적용 버튼
   Widget _buildApplyButton(
       BuildContext context,
       ) {
@@ -311,24 +396,32 @@ class PersonalizedBudgetRecommendationScreen extends StatelessWidget {
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '추천 예산 적용은 예산 기능의 저장 기준 확정 후 연결됩니다.',
-              ),
-            ),
-          );
-        },
+        onPressed:
+        _isApplying ? null : _applyRecommendedBudget,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE66A9F),
+          backgroundColor:
+          const Color(0xFFE66A9F),
           foregroundColor: Colors.white,
+          disabledBackgroundColor:
+          const Color(0xFFE8AFC7),
+          disabledForegroundColor:
+          Colors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius:
+            BorderRadius.circular(18),
           ),
         ),
-        child: const Text(
+        child: _isApplying
+            ? const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: Colors.white,
+          ),
+        )
+            : const Text(
           '추천 예산 적용하기',
           style: TextStyle(
             fontSize: 16,
