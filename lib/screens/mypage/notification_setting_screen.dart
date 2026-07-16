@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
+import '../../services/notification_service.dart';
+import '../../services/subscription_service.dart';
 import '../../services/user_service.dart';
 
 const _accent = Color(0xFFF5A623);
@@ -30,8 +32,8 @@ class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
     bool? fixedExpenseAlert,
     bool? subscriptionAlert,
     bool? cardPointExpiryAlert,
-  }) {
-    return _userService.updateNotificationSettings(
+  }) async {
+    await _userService.updateNotificationSettings(
       _uid,
       current.copyWith(
         fixedExpenseAlert: fixedExpenseAlert,
@@ -39,16 +41,27 @@ class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
         cardPointExpiryAlert: cardPointExpiryAlert,
       ),
     );
+    if (subscriptionAlert != null) await _syncSubscriptionReminders(subscriptionAlert);
   }
 
-  Future<void> _toggleAll(NotificationSettings current, bool value) {
-    return _userService.updateNotificationSettings(
+  Future<void> _toggleAll(NotificationSettings current, bool value) async {
+    await _userService.updateNotificationSettings(
       _uid,
       current.copyWith(
         fixedExpenseAlert: value,
         subscriptionAlert: value,
         cardPointExpiryAlert: value,
       ),
+    );
+    await _syncSubscriptionReminders(value);
+  }
+
+  /// 토글을 켜고 끌 때 다음 날까지 기다리지 않고 바로 알림 예약을 반영한다.
+  Future<void> _syncSubscriptionReminders(bool enabled) async {
+    final subs = await SubscriptionService().getSubscriptions(_uid).first;
+    await NotificationService.instance.syncSubscriptionReminders(
+      enabled: enabled,
+      activeSubscriptions: subs.where((s) => s.isActive).toList(),
     );
   }
 

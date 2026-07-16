@@ -21,6 +21,10 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
   String _category = '기타';
   bool _saving = false;
 
+  bool _isUrgent = false;
+  bool _isNegotiable = false;
+  bool _isDirectDeal = false;
+
   static const _green = Color(0xFFFF9166);
   static const _greenLight = Color(0xFFFFF0E8);
   static const _gradientStart = Color(0xFFFFA351);
@@ -46,6 +50,39 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
       default:
         return Icons.category_outlined;
     }
+  }
+
+  Widget _optionChip(String label, bool selected, ValueChanged<bool> onChanged) {
+    return GestureDetector(
+      onTap: () => onChanged(!selected),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        decoration: BoxDecoration(
+          color: selected ? _green : _greenLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? _green : _green.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.check_circle : Icons.circle_outlined,
+              size: 15,
+              color: selected ? Colors.white : _green,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                color: selected ? Colors.white : _green,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<String> _getSellerName() async {
@@ -174,6 +211,9 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
         description: desc,
         images: imageUrls,
         category: _category,
+        isUrgent: _isUrgent,
+        isNegotiable: _isNegotiable,
+        isDirectDeal: _isDirectDeal,
       );
 
       if (context.mounted) Navigator.pop(context);
@@ -381,6 +421,35 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
                     border: InputBorder.none,
                     isDense: true,
                   ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+// 거래 옵션
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('거래 옵션', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _optionChip('급처', _isUrgent, (v) => setState(() => _isUrgent = v)),
+                    _optionChip('네고 가능', _isNegotiable, (v) => setState(() => _isNegotiable = v)),
+                    _optionChip('직거래', _isDirectDeal, (v) => setState(() => _isDirectDeal = v)),
+                  ],
                 ),
               ],
             ),
