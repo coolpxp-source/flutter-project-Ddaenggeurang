@@ -2,12 +2,15 @@ import 'package:ddaenggeurang/services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:circular_menu/circular_menu.dart';
 import '../../services/market_service.dart';
 import '../../models/market_product_model.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import '../chat/chat_list_screen.dart';
 import 'product_detail_screen.dart';
 import 'product_register_screen.dart';
+import 'my_products_screen.dart';
+import 'my_favorites_screen.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -45,40 +48,108 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).pop(),
-                      child: const Padding(
-                        padding: EdgeInsets.only(right: 4),
-                        child: Icon(Icons.arrow_back, color: Colors.black87),
-                      ),
+      // 플리마켓 탭일 때만 원형 메뉴로 감싸고, 땡그랑마켓 탭이면 메뉴 없이 그대로 표시
+      body: _tabIndex == 1
+          ? CircularMenu(
+        alignment: Alignment.bottomRight,
+        radius: 80,
+        toggleButtonColor: _green,
+        toggleButtonIconColor: Colors.white,
+        toggleButtonSize: 30,
+        toggleButtonPadding: 18,
+        toggleButtonMargin: 20,
+        toggleButtonBoxShadow: [
+          BoxShadow(
+            color: _green.withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+        items: [
+          CircularMenuItem(
+            icon: Icons.add,
+            color: _green,
+            iconColor: Colors.white,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ProductRegisterScreen()),
+              );
+            },
+          ),
+          CircularMenuItem(
+            icon: Icons.inventory_2_outlined,
+            color: const Color(0xFF9B7EDE),
+            iconColor: Colors.white,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyProductsScreen()),
+              );
+            },
+          ),
+          CircularMenuItem(
+            icon: Icons.favorite_border,
+            color: const Color(0xFFE5735A),
+            iconColor: Colors.white,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MyFavoritesScreen()),
+              );
+            },
+          ),
+        ],
+        backgroundWidget: _buildContent(),
+      )
+          : _buildContent(),
+      bottomNavigationBar: BottomNavBar(
+        currentTab: NavTab.community,
+        onTabSelected: (tab) {
+          if (tab == NavTab.community) return;
+          Navigator.of(context).pop();
+        },
+      ),
+    );
+  }
+
+  // 땡그랑마켓/플리마켓 공통 콘텐츠 — 원형 메뉴 유무와 상관없이 동일하게 재사용
+  Widget _buildContent() {
+    return SafeArea(
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // 헤더 — 플리마켓 탭일 때만 우측에 채팅 아이콘(안읽음 뱃지) 노출
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Padding(
+                      padding: EdgeInsets.only(right: 4),
+                      child: Icon(Icons.arrow_back, color: Colors.black87),
                     ),
-                    const SizedBox(width: 4),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('땡그랑 마켓',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        SizedBox(height: 4),
-                        Text('가격 비교부터 알뜰한 상품 추천까지',
-                            style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('땡그랑 마켓',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 4),
+                      Text('가격 비교부터 알뜰한 상품 추천까지',
+                          style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ],
+              ),
+              if (_tabIndex == 1)
                 StreamBuilder<int>(
                   stream: ChatService().getTotalUnreadCount(_myId),
                   builder: (context, snapshot) {
                     final unreadCount = snapshot.data ?? 0;
-
                     return SizedBox(
                       width: 40,
                       height: 40,
@@ -124,120 +195,53 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                     );
                   },
                 ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 탭
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
               ],
             ),
-            const SizedBox(height: 16),
-
-            // 탭 — 커뮤니티 카테고리 버튼 톤에 맞춘 필 형태
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(child: _tabButton('땡그랑 마켓', 0)),
-                  Expanded(child: _tabButton('플리마켓', 1)),
-                ],
-              ),
+            child: Row(
+              children: [
+                Expanded(child: _tabButton('땡그랑 마켓', 0)),
+                Expanded(child: _tabButton('플리마켓', 1)),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            // 검색바
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search, color: Colors.grey[500], size: 20),
-                  const SizedBox(width: 8),
-                  Text('상품명 또는 카테고리를 검색하세요',
-                      style: TextStyle(color: Colors.grey[500], fontSize: 13)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            if (_tabIndex == 0) ..._buildDdaengMarketTab(),
-            if (_tabIndex == 1) ..._buildFleaMarketTab(),
-          ],
-        ),
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (_tabIndex == 1) ...[
-            FloatingActionButton.extended(
-              heroTag: 'registerFab',
-              backgroundColor: _green,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProductRegisterScreen()),
-                );
-              },
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('상품 등록', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 12),
-          ],
-          StreamBuilder<int>(
-            stream: ChatService().getTotalUnreadCount(_myId),
-            builder: (context, snapshot) {
-              final unreadCount = snapshot.data ?? 0;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  FloatingActionButton(
-                    heroTag: 'chatFab',
-                    backgroundColor: _greenLight,
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => ChatListScreen()),
-                    ),
-                    child: Icon(Icons.chat_bubble_outline, color: _green),
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: -2,
-                      top: -2,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Colors.redAccent,
-                          shape: BoxShape.circle,
-                        ),
-                        constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                        child: Text(
-                          unreadCount > 9 ? '9+' : '$unreadCount',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
           ),
+          const SizedBox(height: 16),
+
+          // 검색바
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, color: Colors.grey[500], size: 20),
+                const SizedBox(width: 8),
+                Text('상품명 또는 카테고리를 검색하세요',
+                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          if (_tabIndex == 0) ..._buildDdaengMarketTab(),
+          if (_tabIndex == 1) ..._buildFleaMarketTab(),
         ],
-      ),
-      bottomNavigationBar: BottomNavBar(
-        currentTab: NavTab.community,
-        onTabSelected: (tab) {
-          if (tab == NavTab.community) return;
-          Navigator.of(context).pop();
-        },
       ),
     );
   }
@@ -454,7 +458,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
           );
         },
       ),
-      const SizedBox(height: 80), // FAB에 가려지지 않게 여백
+      const SizedBox(height: 20),
     ];
   }
 
