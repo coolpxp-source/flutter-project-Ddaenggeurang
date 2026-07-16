@@ -2,17 +2,17 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// 수입 출처 (Firestore 저장값은 snake_case)
 enum IncomeSource {
-  salary('salary', '월급'),
-  freelanceIncome('freelance_income', '프리랜서/근로수입'),
-  partTime('part_time', '알바'),
+  salary('salary', '정기급여'),
+  freelanceIncome('freelance_income', '프리랜서'),
+  partTime('part_time', '단기알바'),
   allowance('allowance', '용돈'),
-  sideIncome('side_income', '부수입'),
-  etc('etc', '기타');
+  etc('etc', '기타 수입');
 
   final String code;
   final String label;
   const IncomeSource(this.code, this.label);
 
+  // 사라진 수입출처목록은 기타수입으로 묶어서 보내줌
   static IncomeSource fromCode(String? code) => IncomeSource.values.firstWhere(
         (e) => e.code == code,
     orElse: () => IncomeSource.etc,
