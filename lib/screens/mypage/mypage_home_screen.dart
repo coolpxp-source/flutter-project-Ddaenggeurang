@@ -8,8 +8,8 @@ import '../../widgets/common/ddaeng_modal.dart';
 import '../avatar/my_avatar_screen.dart';
 import '../avatar/point_shop_screen.dart';
 import '../mission/mission_list_screen.dart';
-import '../../widgets/common/placeholder_screen.dart';
 import 'coach_tone_setting_screen.dart';
+import 'monthly_report_screen.dart';
 import 'notification_setting_screen.dart';
 import 'profile_edit_screen.dart';
 import 'setting_screen.dart';
@@ -90,7 +90,7 @@ class MyPageHomeScreen extends StatelessWidget {
                         iconColor: _blue,
                         iconBg: _blueSoft,
                         onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => const PlaceholderScreen(title: '월간 소비 통계'))),
+                            builder: (_) => const MonthlyReportScreen())),
                       ),
                       _MenuRow(
                         icon: Icons.face_retouching_natural_rounded,

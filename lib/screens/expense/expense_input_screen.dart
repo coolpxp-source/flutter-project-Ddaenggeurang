@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/expense_model.dart';
+import '../../services/category_service.dart';
 import '../../services/expense_service.dart';
 import '../../utils/currency_formatter.dart';
 
@@ -19,18 +20,12 @@ class ExpenseInputScreen extends StatefulWidget {
 }
 
 
-class _ExpenseInputScreenState
-    extends State<ExpenseInputScreen> {
-  final TextEditingController _amountController =
-  TextEditingController();
-
-  final TextEditingController _memoController =
-  TextEditingController();
-
-  final ExpenseService _expenseService =
-  ExpenseService();
-
-
+class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
+  final _expenseService = ExpenseService();
+  final _categoryService = CategoryService();
+  final _amountController = TextEditingController(text: '0');
+  final _placeController = TextEditingController();
+  final _memoController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
   /// 카테고리 조회 상태

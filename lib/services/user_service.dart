@@ -82,4 +82,19 @@ class UserService {
     await _users.where('nickname', isEqualTo: nickname).limit(2).get();
     return snap.docs.any((d) => d.id != exceptUid);
   }
+
+  /// 포인트 지급(미션 보상 등) — 현재 값을 읽어서 더하는 트랜잭션이라
+  /// 동시에 여러 보상이 들어와도 유실되지 않는다.
+  Future<void> addPoints(String uid, int amount) async {
+    if (amount == 0) return;
+    final ref = _users.doc(uid);
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snap = await transaction.get(ref);
+      final current = (snap.data()?['points'] as num?)?.toInt() ?? 0;
+      transaction.update(ref, {
+        'points': current + amount,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
 }

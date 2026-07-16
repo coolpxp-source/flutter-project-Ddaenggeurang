@@ -16,6 +16,8 @@ import '../../services/category_summary_service.dart';
 import '../../services/emotion_summary_service.dart';
 import '../../services/notification_history_service.dart';
 import '../../services/psychology_test_service.dart';
+import '../../services/spending_challenge_service.dart';
+import '../../models/spending_challenge_model.dart';
 import '../../services/user_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
@@ -399,6 +401,9 @@ class _HomeDashboardState extends State<_HomeDashboard> {
 
                       _LiveSpendingInsightSection(
                           uid: widget.uid, nickname: user.nickname, month: _month),
+                      const SizedBox(height: 20),
+
+                      _LiveChallengeSection(uid: widget.uid, tone: user.coachTone),
                     ]
                         .animate(interval: 55.ms)
                         .fadeIn(duration: 320.ms, curve: Curves.easeOut)
@@ -2124,6 +2129,229 @@ class _SpendingTendencyCard extends StatelessWidget {
                 ],
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────── 소비 챌린지 ───────────────────────
+
+/// 매달 "지난달 대비 가장 많이 늘어난 카테고리" 절약 챌린지를 보여준다.
+/// 지출 이력이 두 달 미만이면 아직 비교할 데이터가 없다는 안내만 보여준다.
+class _LiveChallengeSection extends StatefulWidget {
+  final String uid;
+  final CoachTone tone;
+  const _LiveChallengeSection({required this.uid, required this.tone});
+
+  @override
+  State<_LiveChallengeSection> createState() => _LiveChallengeSectionState();
+}
+
+class _LiveChallengeSectionState extends State<_LiveChallengeSection> {
+  late Future<SpendingChallengeModel?> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = SpendingChallengeService().getOrCreateCurrentChallenge(widget.uid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SpendingChallengeModel?>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _ShimmerBlock(height: 150, radius: 20);
+        }
+        final challenge = snap.data;
+        if (challenge == null) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: _C.cardShadow,
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('이번 달 절약 챌린지',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+                SizedBox(height: 4),
+                Text('두 달 이상 지출 기록이 쌓이면 챌린지가 시작돼요',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
+              ],
+            ),
+          );
+        }
+        return _ChallengeCard(uid: widget.uid, tone: widget.tone, challenge: challenge);
+      },
+    );
+  }
+}
+
+class _ChallengeCard extends StatefulWidget {
+  final String uid;
+  final CoachTone tone;
+  final SpendingChallengeModel challenge;
+  const _ChallengeCard({required this.uid, required this.tone, required this.challenge});
+
+  @override
+  State<_ChallengeCard> createState() => _ChallengeCardState();
+}
+
+class _ChallengeCardState extends State<_ChallengeCard> {
+  late Future<int> _currentSpendFuture;
+  late Future<String> _messageFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSpendFuture = widget.challenge.status == 'in_progress'
+        ? SpendingChallengeService().getCurrentSpend(widget.uid, widget.challenge.categoryKey)
+        : Future.value(widget.challenge.previousAmount);
+    _messageFuture = _buildMessage();
+  }
+
+  Future<String> _buildMessage() async {
+    final c = widget.challenge;
+    final dataSummary = '카테고리: ${c.categoryName}, 목표: ${comma(c.targetAmount)}원 이하, '
+        '지난달: ${comma(c.previousAmount)}원';
+    try {
+      return await AiService().generateChallenge(widget.tone, dataSummary);
+    } catch (_) {
+      return '이번 달은 ${c.categoryName} 지출을 ${comma(c.targetAmount)}원 이하로 줄여봐요!';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.challenge;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF34D399), Color(0xFF10B981)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFF10B981).withValues(alpha: 0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 8)),
+        ],
+      ),
+      // ClipRRect로 감싸지 않는다 — home_screen.dart의 다른 카드들에서 확인된
+      // 렌더링 버그(ClipRRect가 그 안의 텍스트 첫 글자를 깨뜨림)를 피하기 위해,
+      // 장식 원은 클리핑 없이 살짝 넘치게 두고 진행률 바도 ClipRRect 없이 그린다.
+      child: Stack(
+        children: [
+          Positioned(
+            top: -30,
+            right: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [Colors.white.withValues(alpha: 0.18), Colors.white.withValues(alpha: 0.0)],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.24), shape: BoxShape.circle),
+                    alignment: Alignment.center,
+                    child: Icon(
+                        c.status == 'success' ? Icons.emoji_events_rounded : Icons.eco_rounded,
+                        size: 17,
+                        color: Colors.white),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('이번 달 절약 챌린지 · ${c.categoryName}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (c.status == 'in_progress')
+                FutureBuilder<int>(
+                  future: _currentSpendFuture,
+                  builder: (context, snap) {
+                    final spent = snap.data ?? 0;
+                    final progress =
+                        c.targetAmount == 0 ? 0.0 : (spent / c.targetAmount).clamp(0.0, 1.0);
+                    final over = spent > c.targetAmount;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Stack(
+                          children: [
+                            Container(
+                              height: 8,
+                              decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.28),
+                                  borderRadius: BorderRadius.circular(8)),
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: progress,
+                              child: Container(
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: over ? const Color(0xFFFFD166) : Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text('${comma(spent)}원 / 목표 ${comma(c.targetAmount)}원 이하',
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+                      ],
+                    );
+                  },
+                )
+              else
+                Text(
+                  c.status == 'success'
+                      ? '🎉 목표 달성! +${c.pointsReward}P 적립됐어요'
+                      : '아쉽게 목표는 못 채웠어요. 다음 달에 다시 도전!',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
+                ),
+              const SizedBox(height: 12),
+              FutureBuilder<String>(
+                future: _messageFuture,
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const SizedBox(height: 14);
+                  }
+                  return Text(snap.data ?? '',
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white, height: 1.4));
+                },
+              ),
+            ],
           ),
         ],
       ),
