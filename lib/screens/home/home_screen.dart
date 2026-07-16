@@ -404,6 +404,9 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                       const SizedBox(height: 20),
 
                       _LiveChallengeSection(uid: widget.uid, tone: user.coachTone),
+                      const SizedBox(height: 20),
+
+                      _LiveWeeklyBriefingSection(uid: widget.uid, tone: user.coachTone),
                     ]
                         .animate(interval: 55.ms)
                         .fadeIn(duration: 320.ms, curve: Curves.easeOut)
@@ -2357,4 +2360,240 @@ class _ChallengeCardState extends State<_ChallengeCard> {
       ),
     );
   }
+}
+
+// ─────────────────────── 주간 브리핑 ───────────────────────
+
+class _WeeklyBriefing {
+  final int totalSpent;
+  final int weekOverWeekPercent;
+  final int noSpendDays;
+  final int budgetRemainPercent;
+  final String topCategory;
+  final int topCategoryPercent;
+  final String aiMessage;
+
+  const _WeeklyBriefing({
+    required this.totalSpent,
+    required this.weekOverWeekPercent,
+    required this.noSpendDays,
+    required this.budgetRemainPercent,
+    required this.topCategory,
+    required this.topCategoryPercent,
+    required this.aiMessage,
+  });
+}
+
+/// 이번 주 지출을 요약해서 보여준다. 카테고리별 "주간" 집계 메서드가 따로 없어서
+/// 최다 카테고리는 이번 달 집계로 근사한다(화면에도 그렇게 표시).
+class _LiveWeeklyBriefingSection extends StatefulWidget {
+  final String uid;
+  final CoachTone tone;
+  const _LiveWeeklyBriefingSection({required this.uid, required this.tone});
+
+  @override
+  State<_LiveWeeklyBriefingSection> createState() => _LiveWeeklyBriefingSectionState();
+}
+
+class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> {
+  late final Future<_WeeklyBriefing?> _future = _load();
+
+  Future<_WeeklyBriefing?> _load() async {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday % 7));
+    final lastWeekStart = weekStart.subtract(const Duration(days: 7));
+    final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+    final results = await Future.wait([
+      CategorySummaryService().getWeeklyTotalExpense(userId: widget.uid, weekStart: weekStart),
+      CategorySummaryService().getWeeklyTotalExpense(userId: widget.uid, weekStart: lastWeekStart),
+      CategorySummaryService().getDailyTotals(userId: widget.uid, year: now.year, month: now.month),
+      CategorySummaryService().getCategorySummary(userId: widget.uid, year: now.year, month: now.month),
+      BudgetService().getBudget(userId: widget.uid, month: monthStr),
+    ]);
+
+    final thisWeekTotal = results[0] as int;
+    final lastWeekTotal = results[1] as int;
+    final dailyTotals = results[2] as Map<int, int>;
+    final categories = results[3] as List<CategorySummaryModel>;
+    final budget = results[4] as BudgetModel?;
+
+    if (thisWeekTotal == 0 && lastWeekTotal == 0 && categories.isEmpty) return null;
+
+    final wowPercent =
+        lastWeekTotal == 0 ? 0 : (((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100).round();
+
+    var noSpendDays = 0;
+    for (var i = 0; i < 7; i++) {
+      final d = weekStart.add(Duration(days: i));
+      if (d.isAfter(now)) break;
+      if (d.month != now.month) continue;
+      if ((dailyTotals[d.day] ?? 0) == 0) noSpendDays++;
+    }
+
+    final monthSpent = categories.fold<int>(0, (sum, c) => sum + c.totalAmount);
+    final budgetRemainPercent = (budget == null || budget.availableBudget == 0)
+        ? 0
+        : (((budget.availableBudget - monthSpent) / budget.availableBudget) * 100)
+            .round()
+            .clamp(0, 100);
+
+    final topCategory = categories.isEmpty ? null : categories.first;
+
+    String aiMessage;
+    try {
+      aiMessage = await AiService().generateWeekly(
+        widget.tone,
+        totalSpent: thisWeekTotal,
+        budgetRemainPercent: budgetRemainPercent,
+        topCategory: topCategory?.categoryName ?? '없음',
+        topCategoryPercent: topCategory == null ? 0 : topCategory.percentage.round(),
+        noSpendDays: noSpendDays,
+        weekOverWeekPercent: wowPercent,
+      );
+    } catch (_) {
+      aiMessage = '이번 주도 잘 관리하고 계세요!';
+    }
+
+    return _WeeklyBriefing(
+      totalSpent: thisWeekTotal,
+      weekOverWeekPercent: wowPercent,
+      noSpendDays: noSpendDays,
+      budgetRemainPercent: budgetRemainPercent,
+      topCategory: topCategory?.categoryName ?? '없음',
+      topCategoryPercent: topCategory == null ? 0 : topCategory.percentage.round(),
+      aiMessage: aiMessage,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<_WeeklyBriefing?>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _ShimmerBlock(height: 170, radius: 20);
+        }
+        final data = snap.data;
+        if (data == null) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: _C.cardShadow,
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('이번 주 브리핑',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+                SizedBox(height: 4),
+                Text('이번 주 지출 기록이 쌓이면 브리핑을 보여드려요',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
+              ],
+            ),
+          );
+        }
+
+        final wow = data.weekOverWeekPercent;
+        final wowText = wow == 0 ? '전주와 비슷해요' : (wow > 0 ? '전주 대비 +$wow%' : '전주 대비 $wow%');
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF6C93FF), Color(0xFF6C5CE7)],
+            ),
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                  color: _C.purple.withValues(alpha: 0.3), blurRadius: 18, offset: const Offset(0, 8)),
+            ],
+          ),
+          // ClipRRect로 감싸지 않는다 — 텍스트 첫 글자가 깨지는 렌더링 버그 회피
+          child: Stack(
+            children: [
+              Positioned(
+                top: -30,
+                right: -20,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [Colors.white.withValues(alpha: 0.18), Colors.white.withValues(alpha: 0.0)],
+                    ),
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('이번 주 브리핑',
+                      style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                  const SizedBox(height: 2),
+                  Text(wowText,
+                      style: const TextStyle(
+                          fontSize: 11.5, fontWeight: FontWeight.w600, color: Colors.white70)),
+                  const SizedBox(height: 14),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(comma(data.totalSpent),
+                          style: _displayNumber(fontSize: 28, color: Colors.white)),
+                      const Padding(
+                        padding: EdgeInsets.only(left: 4, bottom: 3),
+                        child: Text('원', style: TextStyle(fontSize: 13, color: Colors.white)),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(child: _stat('무지출일', '${data.noSpendDays}일')),
+                      Expanded(child: _stat('예산 잔여율', '${data.budgetRemainPercent}%')),
+                      Expanded(
+                          child: _stat('최다 카테고리(월)',
+                              '${data.topCategory} ${data.topCategoryPercent}%')),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(data.aiMessage,
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white, height: 1.4)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _stat(String label, String value) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70)),
+          const SizedBox(height: 3),
+          Text(value,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white)),
+        ],
+      );
 }
