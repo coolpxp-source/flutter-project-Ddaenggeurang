@@ -1,10 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'models/user_model.dart';
 import 'firebase_options.dart';
+import 'services/ai_service.dart';
+import 'services/notification_service.dart';
+import 'services/subscription_service.dart';
 import 'services/user_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_extra_screen.dart';
@@ -100,17 +105,47 @@ class AppGate extends StatelessWidget {
             if (snap.hasError) {
               return _ErrorView(message: '${snap.error}');
             }
-            return snap.data == null
-                ? SignupExtraScreen(
-                uid: user.uid,
-                email: user.email ?? '',
-                onboardingData: PendingOnboarding.data)
-                : const HomeScreen();
+            final profile = snap.data;
+            if (profile == null) {
+              return SignupExtraScreen(
+                  uid: user.uid,
+                  email: user.email ?? '',
+                  onboardingData: PendingOnboarding.data);
+            }
+            unawaited(UserService().touchLoginStreak(user.uid, profile));
+            unawaited(_maybeShowConsultReminder());
+            unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
+            return const HomeScreen();
           },
         );
       },
     );
   }
+}
+
+/// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
+/// SharedPreferences에 오늘 날짜를 남겨서 같은 날 재실행/재빌드로 중복 발송되지 않게 한다.
+Future<void> _maybeShowConsultReminder() async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString('lastConsultReminderDate') == today) return;
+  await prefs.setString('lastConsultReminderDate', today);
+  await NotificationService.instance.showConsultReminder(AiService().consultRemaining);
+}
+
+/// 하루 1번, 활성 구독 목록 기준으로 결제일 알림을 다시 걸어준다(설정 꺼져 있으면 취소).
+/// 구독을 새로 추가/해지해도 다음 앱 실행 시 자동으로 반영된다.
+Future<void> _maybeSyncSubscriptionReminders(String uid, UserModel profile) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString('lastSubscriptionSyncDate') == today) return;
+  await prefs.setString('lastSubscriptionSyncDate', today);
+
+  final subs = await SubscriptionService().getSubscriptions(uid).first;
+  await NotificationService.instance.syncSubscriptionReminders(
+    enabled: profile.notificationSettings.subscriptionAlert,
+    activeSubscriptions: subs.where((s) => s.isActive).toList(),
+  );
 }
 
 /// 공용 로딩 화면 — 스플래시와 같은 톤(민트 그라데이션 + 브랜드 로고 + 점 3개)으로
@@ -121,33 +156,96 @@ class DdaengLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Color(0xFFD9F2EC), Colors.white],
-            stops: [0.0, 0.55, 1.0],
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white, Color(0xFFD9F2EC), Colors.white],
+                stops: [0.0, 0.55, 1.0],
+              ),
+            ),
           ),
-        ),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/ddaeng_logo_transparent_trimmed.png',
-                width: 168,
-              )
-                  .animate(onPlay: (c) => c.repeat(reverse: true))
-                  .scaleXY(
-                      begin: 0.95, end: 1.05, duration: 1100.ms, curve: Curves.easeInOut),
-              const SizedBox(height: 28),
-              const BrandLoadingDots(),
-            ],
+          Positioned(
+            top: -40,
+            left: -50,
+            child: _LoadingBlob(color: const Color(0xFFFFC93C).withValues(alpha: 0.3), size: 180)
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(begin: 0, end: 20, duration: 3400.ms, curve: Curves.easeInOut),
           ),
-        ),
+          Positioned(
+            bottom: -60,
+            right: -50,
+            child: _LoadingBlob(color: const Color(0xFF63C5B5).withValues(alpha: 0.32), size: 200)
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(begin: 0, end: -18, duration: 3800.ms, curve: Curves.easeInOut),
+          ),
+          Positioned(
+            bottom: 120,
+            left: -30,
+            child: _LoadingBlob(color: const Color(0xFFFF9EB5).withValues(alpha: 0.24), size: 120)
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .moveY(begin: 0, end: 14, duration: 3000.ms, curve: Curves.easeInOut),
+          ),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 210,
+                      height: 210,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF63C5B5).withValues(alpha: 0.22),
+                            const Color(0xFF63C5B5).withValues(alpha: 0.0),
+                          ],
+                        ),
+                      ),
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(begin: 0.9, end: 1.08, duration: 1600.ms, curve: Curves.easeInOut),
+                    Image.asset(
+                      'assets/images/ddaeng_logo_transparent_trimmed.png',
+                      width: 168,
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(
+                            begin: 0.95, end: 1.05, duration: 1100.ms, curve: Curves.easeInOut),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const BrandLoadingDots(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 로딩 화면 배경에 은은하게 떠다니는 장식 블롭.
+class _LoadingBlob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _LoadingBlob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
       ),
     );
   }

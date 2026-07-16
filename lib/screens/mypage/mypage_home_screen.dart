@@ -52,9 +52,6 @@ class MyPageHomeScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator(color: _accent));
           }
           final user = snapshot.data!;
-          final joinedDays = user.createdAt == null
-              ? 0
-              : DateTime.now().difference(user.createdAt!).inDays;
 
           return Stack(
             children: [
@@ -79,7 +76,7 @@ class MyPageHomeScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ProfileCard(user: user, joinedDays: joinedDays)
+                    _ProfileCard(user: user)
                         .animate()
                         .fadeIn(duration: 420.ms, curve: Curves.easeOut)
                         .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
@@ -217,8 +214,7 @@ class _Blob extends StatelessWidget {
 
 class _ProfileCard extends StatelessWidget {
   final UserModel user;
-  final int joinedDays;
-  const _ProfileCard({required this.user, required this.joinedDays});
+  const _ProfileCard({required this.user});
 
   @override
   Widget build(BuildContext context) {
@@ -334,7 +330,8 @@ class _ProfileCard extends StatelessWidget {
                     Expanded(child: _stat(Icons.savings_rounded, '포인트', '${user.points}P')),
                     _divider(),
                     Expanded(
-                        child: _stat(Icons.favorite_rounded, '함께한 지', '$joinedDays일')),
+                        child: _stat(Icons.local_fire_department_rounded, '연속 접속',
+                            '${user.loginStreak}일')),
                   ],
                 ),
               ],

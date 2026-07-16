@@ -17,12 +17,13 @@ import '../../widgets/common/app_drawer.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import '../../widgets/common/placeholder_screen.dart';
-import '../expense/expense_input_screen.dart';
+import '../record/record_type_select_screen.dart';
 import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
 import '../mypage/mypage_home_screen.dart';
 import '../avatar/my_avatar_screen.dart';
 import '../psychology/psychology_test_start_screen.dart';
+import '../group/group_create_join_screen.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -353,6 +354,13 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                         isGroup: _isGroupMode,
                         onChanged: (v) => setState(() => _isGroupMode = v),
                       ),
+                      if (_isGroupMode) ...[
+                        const SizedBox(height: 10),
+                        _GroupManageBanner(
+                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                              builder: (_) => const GroupCreateJoinScreen())),
+                        ),
+                      ],
                       const SizedBox(height: 16),
 
                       _LiveWeekCalendarStrip(
@@ -811,7 +819,7 @@ class _QuickActionsGrid extends StatelessWidget {
             bg: _C.amberSoft,
             fg: _C.amberDeep,
             onTap: (context) => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const ExpenseInputScreen())),
+                .push(MaterialPageRoute(builder: (_) => const RecordTypeSelectScreen())),
           ),
         ),
         const SizedBox(width: 12),
@@ -955,6 +963,47 @@ class _MonthHeader extends StatelessWidget {
 }
 
 // ─────────────────────── 개인/그룹 토글 ───────────────────────
+
+/// 그룹 모드 선택 시 뜨는 안내 배너 — 토글 자체는 보기 전환일 뿐이고,
+/// 실제 "새 그룹 만들기/참여하기" 이동은 이 버튼으로 분리한다.
+class _GroupManageBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _GroupManageBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _C.cardShadow,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: const BoxDecoration(color: _C.purple, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: const Icon(Icons.group_add_rounded, size: 17, color: Colors.white),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('새 그룹 만들기 · 초대 코드로 참여하기',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _C.ink)),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: _C.inkSub),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 class _ModeToggle extends StatelessWidget {
   final bool isGroup;

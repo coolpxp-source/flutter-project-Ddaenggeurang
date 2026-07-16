@@ -36,6 +36,7 @@ dependencies:
 
   # 알림
   flutter_local_notifications:
+  timezone: ^0.11.1
 
   # 이미지
   image_picker: ^1.2.3
