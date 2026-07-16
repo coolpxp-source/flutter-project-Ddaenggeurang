@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 
 const _accent = Color(0xFFF5A623);
@@ -169,7 +170,10 @@ class _ContactScreenState extends State<ContactScreen> {
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),
           ),
-        ],
+        ]
+            .animate(interval: 55.ms)
+            .fadeIn(duration: 340.ms, curve: Curves.easeOut)
+            .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
       ),
     );
   }

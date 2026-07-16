@@ -235,9 +235,11 @@ class _ProfileCard extends StatelessWidget {
               offset: const Offset(0, 12)),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: Stack(
+      // 텍스트를 포함한 콘텐츠는 ClipRRect로 감싸지 않는다 — home_screen.dart의
+      // _BudgetHero에서 확인된 렌더링 버그(ClipRRect가 그 안의 텍스트 첫 글자를
+      // 깨뜨림)를 피하기 위해, 둥근 모서리는 바깥 Container의 BoxDecoration만으로
+      // 처리하고 장식 원은 클리핑 없이 살짝 넘치게 둔다.
+      child: Stack(
           children: [
             // 우상단 은은한 하이라이트 — 카드에 광택감을 준다
             Positioned(
@@ -338,7 +340,6 @@ class _ProfileCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 
