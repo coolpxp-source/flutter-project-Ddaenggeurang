@@ -26,6 +26,7 @@ class _GroupCreateJoinScreenState
   TextEditingController();
 
   List<GroupModel> _myGroups = [];
+  bool _isLoadingGroups = true;
 
   @override
   void initState() {
@@ -41,13 +42,33 @@ class _GroupCreateJoinScreenState
     super.dispose();
   }
 
-  void _loadGroups() {
-    setState(() {
-      _myGroups = _groupService.getMyGroups();
-    });
+  // 현재 사용자의 그룹 목록 조회 메서드
+  Future<void> _loadGroups() async {
+    try {
+      final groups = await _groupService.getMyGroups();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _myGroups = groups;
+        _isLoadingGroups = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoadingGroups = false;
+      });
+
+      _showMessage('그룹 목록을 불러오지 못했습니다: $e');
+    }
   }
 
-  void _createGroup() {
+  Future<void> _createGroup() async {
     final groupName = _groupNameController.text.trim();
     final description = _descriptionController.text.trim();
 
@@ -55,8 +76,8 @@ class _GroupCreateJoinScreenState
       _showMessage('그룹 이름을 입력해 주세요.');
       return;
     }
-
-    final createdGroup = _groupService.createGroup(
+  // 새 그룹 생성 처리 메서드
+    final createdGroup = await _groupService.createGroup(
       name: groupName,
       description: description.isEmpty
           ? null
@@ -66,14 +87,14 @@ class _GroupCreateJoinScreenState
     _groupNameController.clear();
     _descriptionController.clear();
 
-    _loadGroups();
+    await _loadGroups();
 
     FocusScope.of(context).unfocus();
 
     _showCreatedGroupDialog(createdGroup);
   }
 
-  void _joinGroup() {
+  void _joinGroup() async{
     final inviteCode =
     _inviteCodeController.text.trim();
 
@@ -82,7 +103,7 @@ class _GroupCreateJoinScreenState
       return;
     }
 
-    final joinedGroup = _groupService.joinGroup(
+    final joinedGroup = await _groupService.joinGroup(
       inviteCode: inviteCode,
     );
 
@@ -93,7 +114,7 @@ class _GroupCreateJoinScreenState
 
     _inviteCodeController.clear();
 
-    _loadGroups();
+    await _loadGroups();
 
     FocusScope.of(context).unfocus();
 
@@ -431,13 +452,19 @@ class _GroupCreateJoinScreenState
           ],
         ),
         const SizedBox(height: 14),
-        if (_myGroups.isEmpty)
+        if (_isLoadingGroups)
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: CircularProgressIndicator(),
+            ),
+          )
+        else if (_myGroups.isEmpty)
           _buildEmptyGroupCard()
         else
           ..._myGroups.map(
                 (group) => Padding(
-              padding:
-              const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.only(bottom: 12),
               child: _buildGroupCard(group),
             ),
           ),
