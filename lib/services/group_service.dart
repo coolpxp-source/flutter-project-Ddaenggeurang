@@ -56,57 +56,7 @@ class GroupService {
     ).toList();
   }
 
-  int getSharedExpenseTotal({
-    required String groupId,
-  }) {
-    return _sharedExpenses
-        .where(
-          (expense) => expense.groupId == groupId,
-    )
-        .fold<int>(
-      0,
-          (total, expense) => total + expense.amount,
-    );
-  }
-
   static final GroupService instance = GroupService._();
-
-  final List<SharedExpenseModel> _sharedExpenses = [
-    SharedExpenseModel(
-      id: 'expense_001',
-      groupId: 'group_001',
-      title: '마트 장보기',
-      amount: 68500,
-      paidByUserId: 'mock_user_001',
-      paidByNickname: '이태화',
-      category: '생활비',
-      date: DateTime(2026, 7, 14),
-      createdAt: DateTime(2026, 7, 14, 18, 30),
-      memo: '주말 장보기',
-    ),
-    SharedExpenseModel(
-      id: 'expense_002',
-      groupId: 'group_001',
-      title: '배달 음식',
-      amount: 32000,
-      paidByUserId: 'mock_user_002',
-      paidByNickname: '절약왕김땡',
-      category: '식비',
-      date: DateTime(2026, 7, 13),
-      createdAt: DateTime(2026, 7, 13, 20, 10),
-    ),
-    SharedExpenseModel(
-      id: 'expense_003',
-      groupId: 'group_001',
-      title: '인터넷 요금',
-      amount: 38500,
-      paidByUserId: 'mock_user_003',
-      paidByNickname: '통장지킴이',
-      category: '고정비',
-      date: DateTime(2026, 7, 10),
-      createdAt: DateTime(2026, 7, 10, 9, 0),
-    ),
-  ];
 
   // 공동지출 추가 메서드
   Future<void> addSharedExpense({
@@ -298,18 +248,6 @@ class GroupService {
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
-
-  final List<GroupModel> _groups = [
-    GroupModel(
-      id: 'group_001',
-      name: '우리 가족 생활비',
-      inviteCode: 'DDANG123',
-      ownerId: 'mock_user_001',
-      memberCount: 3,
-      createdAt: DateTime(2026, 7, 1),
-      description: '가족 공동 생활비를 관리하는 그룹입니다.',
-    ),
-  ];
 
   // 그룹 멤버 및 권한 조회 메서드
   Future<List<Map<String, dynamic>>> getGroupMembers({
