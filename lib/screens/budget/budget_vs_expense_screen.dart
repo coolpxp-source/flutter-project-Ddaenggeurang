@@ -6,14 +6,13 @@ import '../../services/budget_vs_expense_service.dart';
 
 /// 예산 대비 지출 화면
 ///
-/// 표시 내용:
-/// - 월별 예산 사용률
-/// - 실제 지출 / 설정 예산
-/// - 오늘 날짜 기준 권장 소비 페이스
-/// - 이번 달 예산
-/// - 현재 지출
-/// - 남은 예산
-/// - 현재 소비 속도 기준 예상 총지출
+/// 화면을 열면 expenses 컬렉션의 해당 월 지출을 합산하여
+/// monthlySummary/{실제UID}_{yyyy-MM} 문서를 생성하거나 갱신한다.
+///
+/// 그다음 아래 문서를 실시간으로 조회한다.
+///
+/// budgets/{실제UID}_{yyyy-MM}
+/// monthlySummary/{실제UID}_{yyyy-MM}
 class BudgetVsExpenseScreen extends StatefulWidget {
   /// 현재 로그인한 사용자의 Firebase UID
   final String userId;
@@ -31,12 +30,18 @@ class BudgetVsExpenseScreen extends StatefulWidget {
 
 class _BudgetVsExpenseScreenState
     extends State<BudgetVsExpenseScreen> {
-  /// Firestore에서 예산과 지출 정보를 조회하는 서비스
+  /// Firestore 예산 대비 지출 서비스
   final BudgetVsExpenseService _service =
   BudgetVsExpenseService();
 
   /// 현재 화면에서 조회 중인 월
   DateTime _selectedMonth = DateTime.now();
+
+  /// monthlySummary 동기화 중복 실행 방지
+  bool _isSyncingMonthlySummary = false;
+
+  /// monthlySummary 동기화 오류
+  String? _syncErrorMessage;
 
   /// Firestore 문서 조회에 사용하는 월 키
   ///
@@ -51,9 +56,6 @@ class _BudgetVsExpenseScreenState
   }
 
   /// 해당 월의 마지막 날짜
-  ///
-  /// 예:
-  /// 2026년 7월 → 31일
   int get _daysInSelectedMonth {
     return DateTime(
       _selectedMonth.year,
@@ -76,12 +78,12 @@ class _BudgetVsExpenseScreenState
       now.month,
     );
 
-    // 과거 월은 마지막 날까지 모두 지난 것으로 계산
+    // 과거 월은 해당 월 전체가 지난 것으로 계산
     if (selectedMonth.isBefore(currentMonth)) {
       return _daysInSelectedMonth;
     }
 
-    // 미래 월은 아직 소비 기간이 시작되지 않은 것으로 계산
+    // 미래 월은 아직 시작되지 않은 것으로 계산
     if (selectedMonth.isAfter(currentMonth)) {
       return 0;
     }
@@ -94,9 +96,6 @@ class _BudgetVsExpenseScreenState
   }
 
   /// 오늘 날짜 기준 권장 예산 사용률
-  ///
-  /// 예:
-  /// 31일 중 16일이 지났다면 약 51.6%
   double get _recommendedPaceRate {
     if (_daysInSelectedMonth <= 0) {
       return 0.0;
@@ -105,35 +104,111 @@ class _BudgetVsExpenseScreenState
     return _elapsedDays / _daysInSelectedMonth;
   }
 
+  @override
+  void initState() {
+    super.initState();
+
+    /// 첫 화면이 완전히 만들어진 뒤 monthlySummary 동기화 실행
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncMonthlySummary();
+    });
+  }
+
+  /// expenses 데이터를 합산하여 monthlySummary에 저장
+  ///
+  /// 서비스에 다음 함수가 있어야 한다.
+  ///
+  /// rebuildMonthlySummary(
+  ///   userId: 사용자 UID,
+  ///   monthKey: yyyy-MM,
+  /// )
+  Future<void> _syncMonthlySummary() async {
+    if (_isSyncingMonthlySummary) {
+      return;
+    }
+
+    if (widget.userId.trim().isEmpty) {
+      setState(() {
+        _syncErrorMessage =
+        '사용자 UID가 비어 있어 월별 지출을 저장할 수 없습니다.';
+      });
+
+      return;
+    }
+
+    setState(() {
+      _isSyncingMonthlySummary = true;
+      _syncErrorMessage = null;
+    });
+
+    try {
+      await _service.rebuildMonthlySummary(
+        userId: widget.userId,
+        monthKey: _monthKey,
+      );
+    } catch (error) {
+      debugPrint(
+        '[BudgetVsExpenseScreen] '
+            'monthlySummary 저장 실패: $error',
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _syncErrorMessage = error.toString();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '월별 지출 합계 저장 실패\n$error',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSyncingMonthlySummary = false;
+        });
+      }
+    }
+  }
+
   /// 이전 달로 이동
-  void _movePreviousMonth() {
+  Future<void> _movePreviousMonth() async {
     setState(() {
       _selectedMonth = DateTime(
         _selectedMonth.year,
         _selectedMonth.month - 1,
       );
     });
+
+    /// 변경된 월의 monthlySummary 생성 및 갱신
+    await _syncMonthlySummary();
   }
 
   /// 다음 달로 이동
-  void _moveNextMonth() {
+  Future<void> _moveNextMonth() async {
     setState(() {
       _selectedMonth = DateTime(
         _selectedMonth.year,
         _selectedMonth.month + 1,
       );
     });
+
+    /// 변경된 월의 monthlySummary 생성 및 갱신
+    await _syncMonthlySummary();
   }
 
-  /// 금액에 천 단위 쉼표를 추가한다.
-  ///
-  /// 예:
-  /// 2000000 → 2,000,000
+  /// 금액에 천 단위 쉼표 추가
   String _formatAmount(int amount) {
     return NumberFormat('#,###').format(amount);
   }
 
-  /// 현재 소비 속도가 계속된다고 가정한 월말 예상 지출
+  /// 현재 소비 속도를 기준으로 월말 예상 지출 계산
   int _calculateExpectedTotalSpent(
       BudgetVsExpenseModel data,
       ) {
@@ -145,16 +220,14 @@ class _BudgetVsExpenseScreenState
       return 0;
     }
 
-    // 일평균 지출
     final dailyAverage =
         data.totalSpent / _elapsedDays;
 
-    // 일평균 지출 × 해당 월 전체 일수
     return (dailyAverage * _daysInSelectedMonth)
         .round();
   }
 
-  /// 실제 사용률이 권장 소비 페이스보다 여유 있는지 판단
+  /// 현재 소비 속도가 권장 페이스보다 여유 있는지 확인
   bool _isPaceSafe(
       BudgetVsExpenseModel data,
       ) {
@@ -162,7 +235,7 @@ class _BudgetVsExpenseScreenState
         _recommendedPaceRate;
   }
 
-  /// 소비 상태에 사용할 색상
+  /// 소비 상태 색상
   Color _getStatusColor(
       BudgetVsExpenseModel data,
       ) {
@@ -196,7 +269,7 @@ class _BudgetVsExpenseScreenState
     return '페이스보다 빠름';
   }
 
-  /// 예상 총지출 문구의 색상
+  /// 예상 총지출 색상
   Color _getExpectedSpentColor(
       BudgetVsExpenseModel data,
       int expectedTotalSpent,
@@ -216,7 +289,6 @@ class _BudgetVsExpenseScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-
       appBar: AppBar(
         title: const Text(
           '예산 대비 지출',
@@ -230,77 +302,128 @@ class _BudgetVsExpenseScreenState
         foregroundColor: Colors.black,
         elevation: 0,
         surfaceTintColor: Colors.white,
+
+        /// 오른쪽 새로고침 버튼
+        ///
+        /// 누르면 현재 월 expenses를 다시 합산해
+        /// monthlySummary에 저장한다.
+        actions: [
+          IconButton(
+            tooltip: '월별 지출 다시 계산',
+            onPressed: _isSyncingMonthlySummary
+                ? null
+                : _syncMonthlySummary,
+            icon: _isSyncingMonthlySummary
+                ? const SizedBox(
+              width: 19,
+              height: 19,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
+              Icons.refresh_rounded,
+            ),
+          ),
+        ],
       ),
 
-      body: StreamBuilder<BudgetVsExpenseModel>(
-        stream: _service.watchBudgetVsExpense(
-          userId: widget.userId,
-          monthKey: _monthKey,
-        ),
-        builder: (context, snapshot) {
-          // Firestore 최초 조회 중
-          if (snapshot.connectionState ==
-              ConnectionState.waiting &&
-              !snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          }
-
-          // Firestore 조회 실패
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  '예산 정보를 불러오지 못했습니다.\n'
-                      '${snapshot.error}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-            );
-          }
-
-          // 문서가 없으면 0원으로 표시
-          final data = snapshot.data ??
-              const BudgetVsExpenseModel(
-                totalBudget: 0,
-                totalSpent: 0,
+      /// 새로고침으로 당겨서 monthlySummary 다시 계산 가능
+      body: RefreshIndicator(
+        onRefresh: _syncMonthlySummary,
+        child: StreamBuilder<BudgetVsExpenseModel>(
+          stream: _service.watchBudgetVsExpense(
+            userId: widget.userId,
+            monthKey: _monthKey,
+          ),
+          builder: (context, snapshot) {
+            // Firestore 최초 조회 중
+            if (snapshot.connectionState ==
+                ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(
+                child: CircularProgressIndicator(),
               );
+            }
 
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(
-              16,
-              20,
-              16,
-              24,
-            ),
-            children: [
-              // 월 변경 영역
-              _buildMonthSelector(),
+            // Firestore 조회 실패
+            if (snapshot.hasError) {
+              return ListView(
+                physics:
+                const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                children: [
+                  const SizedBox(height: 180),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 42,
+                    color: Colors.red,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '예산 정보를 불러오지 못했습니다.\n'
+                        '${snapshot.error}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black54,
+                    ),
+                  ),
+                ],
+              );
+            }
 
-              const SizedBox(height: 14),
+            // 문서가 없으면 0원으로 표시
+            final data = snapshot.data ??
+                const BudgetVsExpenseModel(
+                  totalBudget: 0,
+                  totalSpent: 0,
+                );
 
-              // 예산 대비 지출 메인 카드
-              _buildBudgetStatusCard(data),
-            ],
-          );
-        },
+            return ListView(
+              physics:
+              const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                20,
+                16,
+                24,
+              ),
+              children: [
+                _buildMonthSelector(),
+
+                if (_isSyncingMonthlySummary) ...[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(
+                    minHeight: 2,
+                  ),
+                ],
+
+                if (_syncErrorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  _buildSyncErrorBox(),
+                ],
+
+                const SizedBox(height: 14),
+
+                _buildBudgetStatusCard(data),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  /// 이전 달과 다음 달을 선택하는 영역
+  /// 월 선택 영역
   Widget _buildMonthSelector() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         IconButton(
-          onPressed: _movePreviousMonth,
+          onPressed: _isSyncingMonthlySummary
+              ? null
+              : _movePreviousMonth,
           icon: const Icon(
             Icons.chevron_left,
           ),
@@ -318,7 +441,9 @@ class _BudgetVsExpenseScreenState
           ),
         ),
         IconButton(
-          onPressed: _moveNextMonth,
+          onPressed: _isSyncingMonthlySummary
+              ? null
+              : _moveNextMonth,
           icon: const Icon(
             Icons.chevron_right,
           ),
@@ -327,7 +452,44 @@ class _BudgetVsExpenseScreenState
     );
   }
 
-  /// 예산 대비 지출 정보를 모두 보여주는 메인 카드
+  /// monthlySummary 동기화 실패 안내
+  Widget _buildSyncErrorBox() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEEEE),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: Colors.red.shade200,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '월별 지출 합계를 저장하지 못했습니다.\n'
+                  '$_syncErrorMessage',
+              style: const TextStyle(
+                fontSize: 12,
+                color: Colors.red,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 예산 대비 지출 메인 카드
   Widget _buildBudgetStatusCard(
       BudgetVsExpenseModel data,
       ) {
@@ -366,13 +528,11 @@ class _BudgetVsExpenseScreenState
         crossAxisAlignment:
         CrossAxisAlignment.start,
         children: [
-          // 월별 지출 현황 제목과 상태 배지
           Row(
             children: [
               Expanded(
                 child: Text(
-                  '${_selectedMonth.month}월 '
-                      '지출 현황',
+                  '${_selectedMonth.month}월 지출 현황',
                   style: const TextStyle(
                     fontSize: 16,
                     color: Colors.black87,
@@ -388,7 +548,6 @@ class _BudgetVsExpenseScreenState
 
           const SizedBox(height: 18),
 
-          // 사용률과 실제 지출/예산
           Wrap(
             crossAxisAlignment:
             WrapCrossAlignment.end,
@@ -426,7 +585,6 @@ class _BudgetVsExpenseScreenState
 
           const SizedBox(height: 18),
 
-          // 실제 사용률과 권장 페이스 표시
           _buildPaceProgressBar(
             usageProgress:
             data.progressValue,
@@ -453,7 +611,6 @@ class _BudgetVsExpenseScreenState
 
           const SizedBox(height: 20),
 
-          // 이번 달 예산과 현재 지출
           Row(
             children: [
               Expanded(
@@ -474,7 +631,6 @@ class _BudgetVsExpenseScreenState
 
           const SizedBox(height: 14),
 
-          // 남은 예산
           _buildRemainingBudgetBox(data),
 
           const SizedBox(height: 18),
@@ -486,7 +642,6 @@ class _BudgetVsExpenseScreenState
 
           const SizedBox(height: 16),
 
-          // 예상 총지출
           Row(
             children: [
               const Expanded(
@@ -518,7 +673,7 @@ class _BudgetVsExpenseScreenState
     );
   }
 
-  /// 페이스 상태 배지
+  /// 상태 배지
   Widget _buildStatusBadge({
     required String text,
     required Color color,
@@ -565,7 +720,6 @@ class _BudgetVsExpenseScreenState
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              // 전체 배경 막대
               Positioned(
                 top: 4,
                 left: 0,
@@ -580,8 +734,6 @@ class _BudgetVsExpenseScreenState
                   ),
                 ),
               ),
-
-              // 실제 예산 사용률
               Positioned(
                 top: 4,
                 left: 0,
@@ -601,8 +753,6 @@ class _BudgetVsExpenseScreenState
                   ),
                 ),
               ),
-
-              // 오늘 날짜 기준 권장 페이스 기준선
               Positioned(
                 left: (markerPosition - 1)
                     .clamp(
@@ -623,7 +773,7 @@ class _BudgetVsExpenseScreenState
     );
   }
 
-  /// 이번 달 예산 / 현재 지출 박스
+  /// 예산 또는 지출 금액 박스
   Widget _buildAmountBox({
     required String title,
     required int amount,
