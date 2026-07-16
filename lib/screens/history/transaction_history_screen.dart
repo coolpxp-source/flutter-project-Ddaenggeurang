@@ -3,7 +3,6 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../utils/currency_formatter.dart';
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -35,22 +34,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 💡 1. FirebaseAuth를 통해 현재 로그인된 유저 객체 가져오기
-      final currentUser = FirebaseAuth.instance.currentUser;
-
-      // 💡 2. 혹시 로그인이 풀려있다면 함수를 종료시켜서 에러 방지
-      if (currentUser == null) {
-        print('⚠️ 로그인된 사용자가 없습니다.');
-        setState(() => _isLoading = false);
-        return;
-      }
-
       final start = DateTime(_focusedDay.year, _focusedDay.month, 1);
       final end = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
 
-      // 💡 3. 하드코딩했던 아이디 대신 진짜 유저 아이디(currentUser.uid) 주입!
       final data = await _transactionService.getMonthlyTransactions(
-        userId: currentUser.uid,
+        userId: 'test_user', // 💡 현재 파이어베이스에 있는 실제 데이터의 userId로 바꿔주시면 바로 데이터가 뜹니다!
         start: start,
         end: end,
       );
@@ -59,8 +47,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         _allTransactions = data;
       });
     } catch (e) {
+      // 에러가 나면 앱이 멈추지 않고 콘솔에 원인을 출력합니다.
       print('⚠️ 데이터 불러오기 실패: $e');
     } finally {
+      // 성공하든 에러가 나든 마지막에 무조건 로딩 스피너를 꺼줍니다.
       setState(() {
         _isLoading = false;
       });
