@@ -36,4 +36,33 @@ class PsychologyTestService {
 
     return resultRef.id;
   }
+
+  // 최신 소비심리 테스트 결과 조회 메서드
+  Future<Map<String, dynamic>?> getLatestTestResult() async {
+    final querySnapshot = await _firestore
+        .collection('users')
+        .doc(_currentUserId)
+        .collection('testResults')
+        .where(
+      'testType',
+      isEqualTo: 'consumption_psychology',
+    )
+        .orderBy(
+      'createdAt',
+      descending: true,
+    )
+        .limit(1)
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      return null;
+    }
+
+    final document = querySnapshot.docs.first;
+
+    return {
+      'id': document.id,
+      ...document.data(),
+    };
+  }
 }
