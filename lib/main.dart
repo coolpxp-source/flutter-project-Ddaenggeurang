@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models/user_model.dart';
 import 'firebase_options.dart';
 import 'services/ai_service.dart';
+import 'services/category_summary_service.dart';
 import 'services/notification_service.dart';
 import 'services/subscription_service.dart';
 import 'services/user_service.dart';
@@ -115,6 +116,7 @@ class AppGate extends StatelessWidget {
             unawaited(UserService().touchLoginStreak(user.uid, profile));
             unawaited(_maybeShowConsultReminder());
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
+            unawaited(_maybeShowDailyNagging(user.uid, profile));
             return const HomeScreen();
           },
         );
@@ -146,6 +148,41 @@ Future<void> _maybeSyncSubscriptionReminders(String uid, UserModel profile) asyn
     enabled: profile.notificationSettings.subscriptionAlert,
     activeSubscriptions: subs.where((s) => s.isActive).toList(),
   );
+}
+
+/// 하루 1번, 이번 달 최다 지출 카테고리를 계산해서(코드로) 코치 톤으로 문장을
+/// 만든 뒤(AI) 로컬 알림으로 보여준다 — 홈 화면 코치 말풍선과 같은 데이터/캐시를
+/// 재사용한다. AI 서버(은동 PC)가 꺼져 있으면 오늘 날짜를 저장하지 않고 조용히
+/// 스킵해서 다음 실행 때 다시 시도한다.
+Future<void> _maybeShowDailyNagging(String uid, UserModel profile) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString('lastNaggingDate') == today) return;
+
+  final now = DateTime.now();
+  final summaries = await CategorySummaryService()
+      .getCategorySummary(userId: uid, year: now.year, month: now.month);
+  if (summaries.isEmpty) return;
+
+  final top = summaries.first;
+  final dataSummary = '이번 달 최다 지출 카테고리: ${top.categoryName} ${_won(top.totalAmount)} '
+      '(전체 지출의 ${top.percentage.round()}%)';
+
+  try {
+    final text = await AiService().generateNagging(profile.coachTone, dataSummary);
+    await prefs.setString('lastNaggingDate', today);
+    await NotificationService.instance.showDailyNagging(
+      text,
+      title: '${profile.coachTone.emoji} ${profile.coachTone.label}가 한마디',
+    );
+  } catch (_) {
+    // AI 서버 연결 실패 — 알림 없이 조용히 넘어간다.
+  }
+}
+
+String _won(int n) {
+  final s = n.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
+  return '$s원';
 }
 
 /// 공용 로딩 화면 — 스플래시와 같은 톤(민트 그라데이션 + 브랜드 로고 + 점 3개)으로

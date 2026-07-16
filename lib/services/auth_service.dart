@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'consultation_service.dart';
+import 'notification_service.dart';
 
 class AuthService {
   final _auth = FirebaseAuth.instance;
@@ -112,8 +114,12 @@ class AuthService {
   Future<void> deleteAccount() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return;
+    // users/{uid} 문서를 지워도 서브컬렉션(상담이력 등)은 자동으로 안 지워지므로
+    // 먼저 직접 정리한다 — 그래야 탈퇴 후 고아 데이터가 안 남는다.
+    await ConsultationService().deleteAll(uid);
     await _db.collection('users').doc(uid).delete();
     await _auth.currentUser?.delete();
     await GoogleSignIn().signOut();
+    await NotificationService.instance.cancelAll();
   }
 }

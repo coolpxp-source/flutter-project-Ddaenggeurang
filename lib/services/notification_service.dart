@@ -51,6 +51,21 @@ class NotificationService {
     );
   }
 
+  /// 오늘의 코치 잔소리(AiService.generateNagging 결과)를 알려주는 즉시 알림.
+  Future<void> showDailyNagging(String message, {required String title}) async {
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'daily_nagging',
+        '오늘의 잔소리',
+        channelDescription: '코치가 오늘 소비에 대해 한마디 해줘요',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+    );
+    await _plugin.show(id: 1, title: title, body: message, notificationDetails: details);
+  }
+
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
   int _subscriptionNotificationId(String subscriptionId) =>
       subscriptionId.hashCode & 0x7fffffff;
@@ -103,6 +118,9 @@ class NotificationService {
       }
     }
   }
+
+  /// 예약된 모든 로컬 알림을 취소한다 — 회원탈퇴 등 계정 자체가 없어질 때 호출.
+  Future<void> cancelAll() => _plugin.cancelAll();
 
   static String _comma(int n) =>
       n.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+$)'), (m) => '${m[1]},');
