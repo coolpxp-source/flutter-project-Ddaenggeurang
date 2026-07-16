@@ -65,6 +65,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Widget _tagBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   String _statusLabel(ProductStatus status) {
     switch (status) {
       case ProductStatus.selling:
@@ -114,25 +128,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: product.status == ProductStatus.selling
-                        ? _greenLight
-                        : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _statusLabel(product.status),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: product.status == ProductStatus.selling
-                          ? _green
-                          : Colors.grey[600],
-                      fontWeight: FontWeight.bold,
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: product.status == ProductStatus.selling
+                            ? _greenLight
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _statusLabel(product.status),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: product.status == ProductStatus.selling
+                              ? _green
+                              : Colors.grey[600],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (product.isUrgent) _tagBadge('급처', Colors.redAccent),
+                    if (product.isNegotiable) _tagBadge('네고가능', const Color(0xFF5B9BD5)),
+                    if (product.isDirectDeal) _tagBadge('직거래', const Color(0xFF4CAF87)),
+                  ],
                 ),
+                const SizedBox(height: 12),
                 const SizedBox(height: 12),
 
                 Row(
