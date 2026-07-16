@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/auth_service.dart';
@@ -55,111 +56,158 @@ class MyPageHomeScreen extends StatelessWidget {
               ? 0
               : DateTime.now().difference(user.createdAt!).inDays;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ProfileCard(user: user, joinedDays: joinedDays),
-                const SizedBox(height: 24),
+          return Stack(
+            children: [
+              // ── 은은하게 떠다니는 배경 블롭 ──
+              Positioned(
+                top: -30,
+                right: -40,
+                child: _Blob(color: _amberSoft, size: 150)
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .moveY(begin: 0, end: 16, duration: 3400.ms, curve: Curves.easeInOut),
+              ),
+              Positioned(
+                top: 260,
+                left: -50,
+                child: _Blob(color: _purpleSoft, size: 130)
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .moveY(begin: 0, end: -14, duration: 3000.ms, curve: Curves.easeInOut),
+              ),
 
-                _MenuGroup(children: [
-                  _MenuRow(
-                    icon: Icons.bar_chart_rounded,
-                    title: '월간 소비 통계',
-                    subtitle: '카테고리별 지출 흐름 한눈에 보기',
-                    iconColor: _blue,
-                    iconBg: _blueSoft,
-                    onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const PlaceholderScreen(title: '월간 소비 통계'))),
-                  ),
-                  _MenuRow(
-                    icon: Icons.face_retouching_natural_rounded,
-                    title: '아바타 꾸미기',
-                    subtitle: '${user.coachTone.emoji} 캐릭터 커스터마이징',
-                    iconColor: _purple,
-                    iconBg: _purpleSoft,
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const MyAvatarScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.storefront_rounded,
-                    title: '포인트 상점',
-                    subtitle: '${user.points}P 보유',
-                    iconColor: _amberDeep,
-                    iconBg: _amberSoft,
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const PointShopScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.flag_rounded,
-                    title: '예산 미션 기록',
-                    subtitle: '출석하고 예산 지키면 포인트 적립',
-                    iconColor: _pink,
-                    iconBg: _pinkSoft,
-                    onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const MissionListScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.person_outline_rounded,
-                    title: '프로필 수정',
-                    subtitle: '닉네임 · 수입 · 연령대 · 직군',
-                    iconColor: _amberDeep,
-                    iconBg: _amberSoft,
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.notifications_none_rounded,
-                    title: '구독/결제일 알림',
-                    subtitle: '고정비 · 구독 · 카드포인트 알림',
-                    iconColor: _blue,
-                    iconBg: _blueSoft,
-                    onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const NotificationSettingScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.record_voice_over_rounded,
-                    title: '잔소리 캐릭터 설정',
-                    subtitle:
-                    '${user.coachTone.emoji} ${user.coachTone.label} · ${user.coachTone.title}',
-                    iconColor: _purple,
-                    iconBg: _purpleSoft,
-                    onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const CoachToneSettingScreen())),
-                  ),
-                  _MenuRow(
-                    icon: Icons.settings_outlined,
-                    title: '설정',
-                    subtitle: '로그아웃 · 회원탈퇴 · 앱 정보',
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const SettingScreen())),
-                    showDivider: false,
-                  ),
-                ]),
-                const SizedBox(height: 28),
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _ProfileCard(user: user, joinedDays: joinedDays)
+                        .animate()
+                        .fadeIn(duration: 420.ms, curve: Curves.easeOut)
+                        .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+                    const SizedBox(height: 24),
 
-                Center(
-                  child: TextButton(
-                    onPressed: () async {
-                      final ok = await DdaengModal.confirm(
-                        context,
-                        title: '로그아웃 하시겠어요?',
-                        message: '다시 로그인하면 이어서 사용할 수 있어요',
-                        type: ModalType.warning,
-                        confirmText: '로그아웃',
-                      );
-                      if (ok) await AuthService().signOut();
-                    },
-                    style: TextButton.styleFrom(foregroundColor: _inkSub),
-                    child: const Text('로그아웃',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                  ),
+                    _MenuGroup(children: [
+                      _MenuRow(
+                        icon: Icons.bar_chart_rounded,
+                        title: '월간 소비 통계',
+                        subtitle: '카테고리별 지출 흐름 한눈에 보기',
+                        iconColor: _blue,
+                        iconBg: _blueSoft,
+                        onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => const PlaceholderScreen(title: '월간 소비 통계'))),
+                      ),
+                      _MenuRow(
+                        icon: Icons.face_retouching_natural_rounded,
+                        title: '아바타 꾸미기',
+                        subtitle: '${user.coachTone.emoji} 캐릭터 커스터마이징',
+                        iconColor: _purple,
+                        iconBg: _purpleSoft,
+                        onTap: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const MyAvatarScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.storefront_rounded,
+                        title: '포인트 상점',
+                        subtitle: '${user.points}P 보유',
+                        iconColor: _amberDeep,
+                        iconBg: _amberSoft,
+                        onTap: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const PointShopScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.flag_rounded,
+                        title: '예산 미션 기록',
+                        subtitle: '출석하고 예산 지키면 포인트 적립',
+                        iconColor: _pink,
+                        iconBg: _pinkSoft,
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const MissionListScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.person_outline_rounded,
+                        title: '프로필 수정',
+                        subtitle: '닉네임 · 수입 · 연령대 · 직군',
+                        iconColor: _amberDeep,
+                        iconBg: _amberSoft,
+                        onTap: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.notifications_none_rounded,
+                        title: '구독/결제일 알림',
+                        subtitle: '고정비 · 구독 · 카드포인트 알림',
+                        iconColor: _blue,
+                        iconBg: _blueSoft,
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const NotificationSettingScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.record_voice_over_rounded,
+                        title: '잔소리 캐릭터 설정',
+                        subtitle:
+                        '${user.coachTone.emoji} ${user.coachTone.label} · ${user.coachTone.title}',
+                        iconColor: _purple,
+                        iconBg: _purpleSoft,
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const CoachToneSettingScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.settings_outlined,
+                        title: '설정',
+                        subtitle: '로그아웃 · 회원탈퇴 · 앱 정보',
+                        onTap: () => Navigator.of(context)
+                            .push(MaterialPageRoute(builder: (_) => const SettingScreen())),
+                        showDivider: false,
+                      ),
+                    ])
+                        .animate(delay: 120.ms)
+                        .fadeIn(duration: 420.ms, curve: Curves.easeOut)
+                        .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
+                    const SizedBox(height: 28),
+
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () async {
+                          final ok = await DdaengModal.confirm(
+                            context,
+                            title: '로그아웃 하시겠어요?',
+                            message: '다시 로그인하면 이어서 사용할 수 있어요',
+                            type: ModalType.warning,
+                            confirmText: '로그아웃',
+                          );
+                          if (ok) await AuthService().signOut();
+                        },
+                        style: TextButton.styleFrom(foregroundColor: _inkSub),
+                        icon: const Icon(Icons.logout_rounded, size: 15),
+                        label: const Text('로그아웃',
+                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                    )
+                        .animate(delay: 220.ms)
+                        .fadeIn(duration: 380.ms),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _Blob extends StatelessWidget {
+  final Color color;
+  final double size;
+  const _Blob({required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0.0)]),
       ),
     );
   }
@@ -186,79 +234,130 @@ class _ProfileCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-              color: const Color(0xFFFF8A45).withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10)),
+              color: const Color(0xFFFF8A45).withValues(alpha: 0.32),
+              blurRadius: 22,
+              offset: const Offset(0, 12)),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: Colors.white,
-                backgroundImage: AssetImage(user.coachTone.imagePath),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Stack(
+          children: [
+            // 우상단 은은한 하이라이트 — 카드에 광택감을 준다
+            Positioned(
+              top: -40,
+              right: -30,
+              child: Container(
+                width: 130,
+                height: 130,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.22), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(user.nickname,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
-                    const SizedBox(height: 2),
-                    Text(user.email,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.85))),
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.6),
+                      ),
+                      child: CircleAvatar(
+                        radius: 27,
+                        backgroundColor: Colors.white,
+                        backgroundImage: AssetImage(user.coachTone.imagePath),
+                      ),
+                    )
+                        .animate(onPlay: (c) => c.repeat(reverse: true))
+                        .scaleXY(begin: 1.0, end: 1.04, duration: 1800.ms, curve: Curves.easeInOut),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(user.nickname,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
+                              ),
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.24),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text('Lv.${user.level}',
+                                    style: const TextStyle(
+                                        fontSize: 10.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(user.email,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.white.withValues(alpha: 0.85))),
+                        ],
+                      ),
+                    ),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(20),
+                      onTap: () => Navigator.of(context)
+                          .push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(Icons.edit_outlined, size: 19, color: Colors.white),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const ProfileEditScreen())),
-                child: const Padding(
-                  padding: EdgeInsets.all(6),
-                  child: Icon(Icons.edit_outlined, size: 19, color: Colors.white),
+                const SizedBox(height: 18),
+                Container(height: 1, color: Colors.white.withValues(alpha: 0.35)),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Expanded(child: _stat(Icons.star_rounded, '레벨', 'Lv.${user.level}')),
+                    _divider(),
+                    Expanded(child: _stat(Icons.savings_rounded, '포인트', '${user.points}P')),
+                    _divider(),
+                    Expanded(
+                        child: _stat(Icons.favorite_rounded, '함께한 지', '$joinedDays일')),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Container(height: 1, color: Colors.white.withOpacity(0.35)),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(child: _stat('레벨', 'Lv.${user.level}')),
-              _divider(),
-              Expanded(child: _stat('포인트', '${user.points}P')),
-              _divider(),
-              Expanded(child: _stat('함께한 지', '$joinedDays일')),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _divider() => Container(width: 1, height: 30, color: Colors.white.withOpacity(0.35));
+  Widget _divider() => Container(width: 1, height: 34, color: Colors.white.withValues(alpha: 0.35));
 
-  Widget _stat(String label, String value) => Column(
+  Widget _stat(IconData icon, String label, String value) => Column(
     crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      Text(label,
-          style: TextStyle(
-              fontSize: 10.5, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.85))),
-      const SizedBox(height: 3),
+      Icon(icon, size: 14, color: Colors.white.withValues(alpha: 0.85)),
+      const SizedBox(height: 4),
       Text(value,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+      const SizedBox(height: 2),
+      Text(label,
+          style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.8))),
     ],
   );
 }
@@ -277,7 +376,7 @@ class _MenuGroup extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-              color: _ink.withOpacity(0.04), blurRadius: 14, offset: const Offset(0, 4)),
+              color: _ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 6)),
         ],
       ),
       child: Column(children: children),
@@ -310,14 +409,28 @@ class _MenuRow extends StatelessWidget {
       children: [
         InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [iconBg, Color.lerp(iconBg, Colors.white, 0.15)!],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: iconColor.withValues(alpha: 0.16),
+                          blurRadius: 8,
+                          offset: const Offset(0, 3)),
+                    ],
+                  ),
                   alignment: Alignment.center,
                   child: Icon(icon, size: 18, color: iconColor),
                 ),

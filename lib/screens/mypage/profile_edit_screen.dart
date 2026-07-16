@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -324,7 +325,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _line),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _ink.withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4)),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -351,7 +357,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: _line),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _ink.withValues(alpha: 0.04),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4)),
+                  ],
                 ),
                 child: Row(
                   children: [
@@ -401,7 +412,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
             ),
-          ],
+          ]
+              .animate(interval: 45.ms)
+              .fadeIn(duration: 320.ms, curve: Curves.easeOut)
+              .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
         ),
       ),
     );
@@ -421,33 +435,76 @@ class _PreviewCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: _accentSoft, borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 26,
-            backgroundColor: Colors.white,
-            backgroundImage:
-                AssetImage(user?.coachTone.imagePath ?? CoachTone.ddaengjwi.imagePath),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFB648), Color(0xFFFF7A45)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFFFF8A45).withValues(alpha: 0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 10)),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -36,
+              right: -24,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Row(
               children: [
-                Text(displayName,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 16.5, fontWeight: FontWeight.w800, color: _ink)),
-                const SizedBox(height: 2),
-                Text(user?.email ?? '',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 11.5, fontWeight: FontWeight.w500, color: _inkSub)),
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.6),
+                  ),
+                  child: CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.white,
+                    backgroundImage:
+                        AssetImage(user?.coachTone.imagePath ?? CoachTone.ddaengjwi.imagePath),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(displayName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 16.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(user?.email ?? '',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.85))),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

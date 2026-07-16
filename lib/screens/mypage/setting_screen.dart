@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'change_password_screen.dart';
@@ -157,6 +158,12 @@ class _SettingScreenState extends State<SettingScreen> {
               decoration: BoxDecoration(
                 color: _dangerSoft,
                 borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                      color: _dangerColor.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4)),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -178,7 +185,10 @@ class _SettingScreenState extends State<SettingScreen> {
             const SizedBox(height: 40),
 
             const _BrandFooter(),
-          ],
+          ]
+              .animate(interval: 55.ms)
+              .fadeIn(duration: 340.ms, curve: Curves.easeOut)
+              .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
         ),
       ),
     );
@@ -208,7 +218,20 @@ class _BrandFooter extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(color: _accentSoft, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_accentSoft, Color.lerp(_accentSoft, Colors.white, 0.15)!],
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: _accent.withValues(alpha: 0.14),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4)),
+              ],
+            ),
             padding: const EdgeInsets.all(8),
             child: Image.asset('assets/images/Icon.png'),
           ),
@@ -233,7 +256,10 @@ class _Group extends StatelessWidget {
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: _line),
+      boxShadow: [
+        BoxShadow(
+            color: _ink.withValues(alpha: 0.045), blurRadius: 14, offset: const Offset(0, 5)),
+      ],
     ),
     child: Column(children: children),
   );
@@ -267,7 +293,20 @@ class _Row extends StatelessWidget {
                 Container(
                   width: 34,
                   height: 34,
-                  decoration: const BoxDecoration(color: _accentSoft, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_accentSoft, Color.lerp(_accentSoft, Colors.white, 0.15)!],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                          color: _accent.withValues(alpha: 0.16),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2)),
+                    ],
+                  ),
                   alignment: Alignment.center,
                   child: Icon(icon, size: 17, color: _accent),
                 ),
