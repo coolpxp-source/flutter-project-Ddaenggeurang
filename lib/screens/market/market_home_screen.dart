@@ -246,6 +246,20 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     );
   }
 
+  Widget _tagBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   Widget _tabButton(String label, int index) {
     final selected = _tabIndex == index;
     return GestureDetector(
@@ -542,6 +556,21 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
               ],
             ),
             const SizedBox(height: 8),
+            // 거래 옵션 뱃지 — 새로 추가
+            if (product.isUrgent || product.isNegotiable || product.isDirectDeal)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    if (product.isUrgent) _tagBadge('급처', Colors.redAccent),
+                    if (product.isNegotiable) _tagBadge('네고가능', const Color(0xFF5B9BD5)),
+                    if (product.isDirectDeal) _tagBadge('직거래', const Color(0xFF4CAF87)),
+                  ],
+                ),
+              ),
+
             Text(product.title,
                 style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
