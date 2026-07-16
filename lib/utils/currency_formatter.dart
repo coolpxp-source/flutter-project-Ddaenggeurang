@@ -21,4 +21,9 @@ class CurrencyFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: newString.length),
     );
   }
+
+  // 화면에 단순히 금액을 보여줄 때 사용할 변환 함수!
+  static String format(num amount) {
+    return NumberFormat('#,###').format(amount);
+  }
 }
