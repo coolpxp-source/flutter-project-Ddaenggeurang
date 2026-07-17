@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'package:add_2_calendar/add_2_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
 import '../../services/ai_service.dart' as ai;
+import '../../services/budget_vs_expense_service.dart';
 import '../../services/consultation_service.dart';
+import '../../services/emotion_summary_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/coach_avatar.dart';
 import 'consult_history_screen.dart';
@@ -33,16 +36,19 @@ class _ChatEntry {
   final bool isError;
   final String text;
   final ai.Verdict? verdict;
+  final String? question; // coach 답변에만 채워짐 — 캘린더 등록 시 일정 제목으로 쓴다.
   const _ChatEntry.user(this.text)
-      : isUser = true, isError = false, verdict = null;
-  const _ChatEntry.coach(this.text, this.verdict)
+      : isUser = true, isError = false, verdict = null, question = null;
+  const _ChatEntry.coach(this.text, this.verdict, {this.question})
       : isUser = false, isError = false;
   const _ChatEntry.error(this.text)
-      : isUser = false, isError = true, verdict = null;
+      : isUser = false, isError = true, verdict = null, question = null;
 }
 
 class _AiConsultScreenState extends State<AiConsultScreen> {
   final _service = ai.AiService();
+  final _budgetService = BudgetVsExpenseService();
+  final _emotionService = EmotionSummaryService();
   final _questionCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
   final List<_ChatEntry> _messages = [];
@@ -50,18 +56,84 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
   UserModel? _user;
   bool _sending = false;
 
-  // TODO: 예산 파트(성기필)·지출 파트(임예림) 완성 전까지는 더미 컨텍스트로 상담한다.
-  // 실데이터 연동 시 이 5개 값만 실제 예산/지출 집계로 교체하면 됨.
-  static const _mockBudgetTotal = 2000000;
-  static const _mockBudgetRemain = 760000;
-  static const _mockUsedPercent = 62;
-  static const _mockImpulsePercent = 34;
-  static const _mockDaysToPayday = 12;
+  // 예산(성기필)·감정태그(임예림) 실데이터 로드 전까지 화면에 뿌려줄 폴백 값.
+  // 로그인 사용자의 이번 달 예산/지출 문서가 아직 없을 때도 상담이 끊기지 않도록 유지한다.
+  static const _fallbackBudgetTotal = 2000000;
+  static const _fallbackBudgetRemain = 760000;
+  static const _fallbackUsedPercent = 62;
+  static const _fallbackImpulsePercent = 34;
+
+  int _budgetTotal = _fallbackBudgetTotal;
+  int _budgetRemain = _fallbackBudgetRemain;
+  int _usedPercent = _fallbackUsedPercent;
+  int _impulsePercent = _fallbackImpulsePercent;
+
+  // 예산 컨텍스트 카드 표시 여부 제어용.
+  // hasBudgetData가 true일 때만 위 실데이터(혹은 폴백)를 화면에 그대로 노출한다 —
+  // 예산을 아직 설정 안 한 사용자에게 남의 폴백 숫자를 진짜처럼 보여주지 않기 위함.
+  bool _budgetContextLoaded = false;
+  bool _hasBudgetData = false;
+
+  /// 급여일 필드가 아직 사용자 모델에 없어 실제 페이데이 계산은 불가능하다.
+  /// 대신 이번 달 마지막 날까지 남은 일수를 근사치로 사용한다.
+  int get _daysToPayday {
+    final now = DateTime.now();
+    final nextMonthStart = DateTime(now.year, now.month + 1, 1);
+    return nextMonthStart.difference(DateTime(now.year, now.month, now.day)).inDays;
+  }
 
   @override
   void initState() {
     super.initState();
     _loadUser();
+    _loadBudgetContext();
+  }
+
+  Future<void> _loadBudgetContext() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final now = DateTime.now();
+    final monthKey = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+    bool hasBudget = false;
+
+    try {
+      final budget = await _budgetService
+          .watchBudgetVsExpense(userId: uid, monthKey: monthKey)
+          .first;
+      if (mounted && budget.totalBudget > 0) {
+        hasBudget = true;
+        setState(() {
+          _budgetTotal = budget.totalBudget;
+          _budgetRemain = budget.remainingAmount;
+          _usedPercent = (budget.usageRate * 100).round();
+        });
+      }
+    } catch (_) {
+      // 이번 달 예산 문서가 없거나 조회 실패 — 폴백 값 유지
+    }
+
+    try {
+      final emotions = await _emotionService.getEmotionSummary(
+        userId: uid,
+        year: now.year,
+        month: now.month,
+      );
+      final impulsive =
+          emotions.where((e) => e.emotionKey == 'impulsive').toList();
+      if (mounted && impulsive.isNotEmpty) {
+        setState(() => _impulsePercent = impulsive.first.percentage.round());
+      }
+    } catch (_) {
+      // 이번 달 지출 데이터가 없거나 조회 실패 — 폴백 값 유지
+    }
+
+    if (mounted) {
+      setState(() {
+        _budgetContextLoaded = true;
+        _hasBudgetData = hasBudget;
+      });
+    }
   }
 
   @override
@@ -94,14 +166,15 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
       final result = await _service.consult(
         tone,
         question: question,
-        budgetRemain: _mockBudgetRemain,
-        budgetTotal: _mockBudgetTotal,
-        usedPercent: _mockUsedPercent,
-        impulsePercent: _mockImpulsePercent,
-        daysToPayday: _mockDaysToPayday,
+        budgetRemain: _budgetRemain,
+        budgetTotal: _budgetTotal,
+        usedPercent: _usedPercent,
+        impulsePercent: _impulsePercent,
+        daysToPayday: _daysToPayday,
       );
       if (!mounted) return;
-      setState(() => _messages.add(_ChatEntry.coach(result.comment, result.verdict)));
+      setState(() =>
+          _messages.add(_ChatEntry.coach(result.comment, result.verdict, question: question)));
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
         unawaited(ConsultationService().save(
@@ -127,6 +200,15 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
     }
   }
 
+  /// 빈 상태에 뜨는 예시 질문 칩을 탭했을 때 — 바로 전송하지 않고 입력창에
+  /// 채워만 줘서, 사용자가 금액/상황을 바꿔서 보낼 수 있게 한다.
+  void _pickSuggestion(String text) {
+    _questionCtrl.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollCtrl.hasClients) return;
@@ -150,9 +232,17 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
             onHistoryTap: () => Navigator.of(context)
                 .push(MaterialPageRoute(builder: (_) => const ConsultHistoryScreen())),
           ),
+          _BudgetContextCard(
+            loaded: _budgetContextLoaded,
+            hasData: _hasBudgetData,
+            budgetRemain: _budgetRemain,
+            usedPercent: _usedPercent,
+            impulsePercent: _impulsePercent,
+            daysToPayday: _daysToPayday,
+          ),
           Expanded(
             child: _messages.isEmpty
-                ? _EmptyState(imagePath: imagePath)
+                ? _EmptyState(imagePath: imagePath, onSuggestionTap: _pickSuggestion)
                 : ListView.builder(
               controller: _scrollCtrl,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -209,26 +299,262 @@ class _RemainingBanner extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
-  final String imagePath;
-  const _EmptyState({required this.imagePath});
+class _BudgetContextCard extends StatelessWidget {
+  final bool loaded;
+  final bool hasData;
+  final int budgetRemain;
+  final int usedPercent;
+  final int impulsePercent;
+  final int daysToPayday;
+
+  const _BudgetContextCard({
+    required this.loaded,
+    required this.hasData,
+    required this.budgetRemain,
+    required this.usedPercent,
+    required this.impulsePercent,
+    required this.daysToPayday,
+  });
+
+  Color get _progressColor {
+    if (usedPercent >= 100) return _errorColor;
+    if (usedPercent >= 70) return _accent;
+    return const Color(0xFF12B76A);
+  }
+
+  String _formatWon(int amount) {
+    final digits = amount.abs().toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buf.write(',');
+      buf.write(digits[i]);
+    }
+    return '${amount < 0 ? '-' : ''}$buf원';
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    if (!loaded) {
+      return const SizedBox.shrink();
+    }
+
+    if (!hasData) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _line),
+        ),
+        child: const Row(
           children: [
-            CoachAvatar(imagePath: imagePath, size: 72),
-            const SizedBox(height: 14),
-            const Text('살까 말까 고민되는 걸 물어보세요',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
-            const SizedBox(height: 6),
-            const Text('예산이랑 최근 소비 패턴을 보고 코치가 판정해드려요',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: _inkSub, height: 1.4)),
+            Icon(Icons.info_outline_rounded, size: 16, color: _inkSub),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '이번 달 예산을 등록하면 코치가 더 정확하게 판정해줘요',
+                style: TextStyle(fontSize: 12, color: _inkSub, height: 1.3),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _line),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text('이번 달 남은 예산',
+                  style: TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w700, color: _inkSub)),
+              Text('$usedPercent% 사용',
+                  style: TextStyle(
+                      fontSize: 11.5, fontWeight: FontWeight.w800, color: _progressColor)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(_formatWon(budgetRemain),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: budgetRemain < 0 ? _errorColor : _ink)),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: (usedPercent / 100).clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: _bg,
+              valueColor: AlwaysStoppedAnimation<Color>(_progressColor),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              _StatChip(
+                icon: Icons.local_fire_department_rounded,
+                label: '충동소비 $impulsePercent%',
+                color: const Color(0xFFF04438),
+              ),
+              const SizedBox(width: 8),
+              _StatChip(
+                icon: Icons.event_rounded,
+                label: '이번 달 D-$daysToPayday',
+                color: _accent,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _StatChip({required this.icon, required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 빈 상태에서 보여줄 예시 질문 — 뭘 물어봐야 할지 모르는 사용자를 위한
+/// 시작점. 탭하면 입력창에 그대로 채워지고, 전송은 사용자가 직접 한다.
+/// 아이콘/색을 질문 내용에 맞춰 다르게 줘서 4개가 다 똑같아 보이지 않게 한다.
+class _SuggestedQuestion {
+  final String text;
+  final IconData icon;
+  final Color color;
+  const _SuggestedQuestion(this.text, this.icon, this.color);
+}
+
+const _suggestedQuestions = <_SuggestedQuestion>[
+  _SuggestedQuestion('5만원짜리 옷 사도 될까요?', Icons.shopping_bag_rounded, Color(0xFFFF6F91)),
+  _SuggestedQuestion(
+      '친구랑 저녁 약속인데 얼마나 써도 될까요?', Icons.restaurant_rounded, Color(0xFF4F7DF3)),
+  _SuggestedQuestion('이번 달 예산 안에서 여유 있나요?', Icons.savings_rounded, Color(0xFF00C2A8)),
+  _SuggestedQuestion(
+      '스트레스 받아서 홧김에 지르고 싶은데 어때요?', Icons.local_fire_department_rounded, _accent),
+];
+
+class _EmptyState extends StatelessWidget {
+  final String imagePath;
+  final ValueChanged<String> onSuggestionTap;
+  const _EmptyState({required this.imagePath, required this.onSuggestionTap});
+
+  @override
+  Widget build(BuildContext context) {
+    // Center에 담아 화면 한가운데로 몰아두면 콘텐츠가 짧아서 위아래로 큰
+    // 빈 공간이 생겨 구도가 붕 뜬다. 대신 위쪽에 붙여 소개문+질문 목록이
+    // 하나의 흐름으로 이어지도록 한다.
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+      child: Column(
+        children: [
+          CoachAvatar(imagePath: imagePath, size: 64),
+          const SizedBox(height: 12),
+          const Text('살까 말까 고민되는 걸 물어보세요',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
+          const SizedBox(height: 6),
+          const Text('예산이랑 최근 소비 패턴을 보고 코치가 판정해드려요',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: _inkSub, height: 1.4)),
+          const SizedBox(height: 28),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text('이런 질문은 어때요?',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: _inkSub)),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                    color: _ink.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 6)),
+              ],
+            ),
+            child: Column(
+              children: [
+                for (final (i, q) in _suggestedQuestions.indexed) ...[
+                  if (i > 0) const Divider(height: 1, indent: 14, endIndent: 14, color: _line),
+                  _SuggestionRow(question: q, onTap: () => onSuggestionTap(q.text)),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionRow extends StatelessWidget {
+  final _SuggestedQuestion question;
+  final VoidCallback onTap;
+  const _SuggestionRow({required this.question, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                  color: question.color.withValues(alpha: 0.14), shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Icon(question.icon, size: 15, color: question.color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(question.text,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink)),
+            ),
+            const Icon(Icons.north_east_rounded, size: 14, color: _inkSub),
           ],
         ),
       ),
@@ -240,6 +566,24 @@ class _MessageBubble extends StatelessWidget {
   final _ChatEntry entry;
   final String imagePath;
   const _MessageBubble({required this.entry, required this.imagePath});
+
+  /// "사도 됨" 판정을 기기 캘린더에 할 일로 등록한다 — 지출 입력 화면과는
+  /// 완전히 별개로, 기기 캘린더 앱에 인텐트만 넘기는 방식이라 별도 권한이 필요 없다.
+  Future<void> _addToCalendar(BuildContext context) async {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day, now.hour + 1);
+    final event = Event(
+      title: '🛍️ ${entry.question}',
+      description: entry.text,
+      startDate: start,
+      endDate: start.add(const Duration(hours: 1)),
+    );
+    final added = await Add2Calendar.addEvent2Cal(event);
+    if (context.mounted && !added) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('캘린더 앱을 열지 못했어요')));
+    }
+  }
 
   Color? _verdictColor() {
     switch (entry.verdict) {
@@ -326,6 +670,33 @@ class _MessageBubble extends StatelessWidget {
                           height: 1.5,
                           fontWeight: FontWeight.w500,
                           color: entry.isError ? _errorColor : _ink)),
+                  if (entry.verdict == ai.Verdict.buy && entry.question != null) ...[
+                    const SizedBox(height: 10),
+                    InkWell(
+                      onTap: () => _addToCalendar(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF12B76A).withValues(alpha: 0.10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.event_available_rounded,
+                                size: 14, color: Color(0xFF12B76A)),
+                            SizedBox(width: 6),
+                            Text('캘린더에 등록하기',
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF12B76A))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

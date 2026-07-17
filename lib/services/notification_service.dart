@@ -2,10 +2,12 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/subscription_model.dart';
+import '../models/recurring_payment_model.dart';
 
 /// 로컬(기기 내) 알림 — 서버 발송 없이 기기에서 바로 띄운다.
 /// 1) "오늘 상담 남은 횟수" 즉시 알림
 /// 2) 구독 결제일 매달 반복 알림
+/// 3) 고정비(월세·공과금 등) 다음 결제일 알림
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
@@ -66,6 +68,27 @@ class NotificationService {
     await _plugin.show(id: 1, title: title, body: message, notificationDetails: details);
   }
 
+  /// 아침에 뜨는 짧은 "오늘의 다짐" — 잔소리(지출 집계 기반 분석)와 달리
+  /// AI/데이터 연동 없이 고정 문구 목록을 하루 하나씩 순서대로 보여준다.
+  Future<void> showDailyResolution(String message) async {
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'daily_resolution',
+        '오늘의 다짐',
+        channelDescription: '아침마다 짧은 소비 습관 다짐을 보여드려요',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+    );
+    await _plugin.show(
+      id: 2,
+      title: '오늘의 다짐 ☀️',
+      body: message,
+      notificationDetails: details,
+    );
+  }
+
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
   int _subscriptionNotificationId(String subscriptionId) =>
       subscriptionId.hashCode & 0x7fffffff;
@@ -102,6 +125,67 @@ class NotificationService {
 
   Future<void> cancelSubscriptionReminder(String subscriptionId) =>
       _plugin.cancel(id: _subscriptionNotificationId(subscriptionId));
+
+  /// 고정비 문서 id(String)를 알림 id로 변환 — 구독과 네임스페이스가 겹치지 않도록
+  /// 접두사를 붙여서 해시한다(같은 문서 id라도 구독/고정비가 다른 알림 id를 갖게).
+  int _fixedExpenseNotificationId(String recurringPaymentId) =>
+      'fixed_$recurringPaymentId'.hashCode & 0x7fffffff;
+
+  /// 고정비 하나에 대해 다음 결제일(nextBillingDate) 오전 9시 알림을 건다.
+  /// 구독과 달리 결제 주기가 매달/매년 다를 수 있어 "매달 같은 날" 반복이 아니라,
+  /// RecurringPaymentService가 결제 처리할 때마다 갱신하는 nextBillingDate를
+  /// 그대로 한 번 예약한다 — 매일 재동기화되므로 값이 바뀌면 자동으로 다시 걸린다.
+  Future<void> scheduleFixedExpenseReminder(RecurringPaymentModel payment) async {
+    await init();
+    final id = _fixedExpenseNotificationId(payment.recurringPaymentId);
+    final now = tz.TZDateTime.now(tz.local);
+    var scheduled = tz.TZDateTime(
+      tz.local,
+      payment.nextBillingDate.year,
+      payment.nextBillingDate.month,
+      payment.nextBillingDate.day,
+      9,
+    );
+    if (scheduled.isBefore(now)) {
+      // 동기화 지연 등으로 이미 지난 날짜면, 바로 다음 순간으로 대체해 알려준다.
+      scheduled = now.add(const Duration(minutes: 1));
+    }
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'fixed_expense_reminder',
+        '고정비 결제 알림',
+        channelDescription: '월세·공과금 등 고정비 결제일에 맞춰 알려드려요',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+    );
+    await _plugin.zonedSchedule(
+      id: id,
+      scheduledDate: scheduled,
+      title: '오늘 고정비 결제일이에요 🏠',
+      body: '${payment.name} ${_comma(payment.amount)}원이 오늘 결제될 예정이에요',
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    );
+  }
+
+  Future<void> cancelFixedExpenseReminder(String recurringPaymentId) =>
+      _plugin.cancel(id: _fixedExpenseNotificationId(recurringPaymentId));
+
+  /// 알림 설정 on/off와 현재 활성 고정비 목록에 맞춰 예약을 통째로 재조정한다.
+  /// syncSubscriptionReminders와 동일한 방식 — 항상 최신 상태로 수렴.
+  Future<void> syncFixedExpenseReminders({
+    required bool enabled,
+    required List<RecurringPaymentModel> activePayments,
+  }) async {
+    for (final payment in activePayments) {
+      if (enabled) {
+        await scheduleFixedExpenseReminder(payment);
+      } else {
+        await cancelFixedExpenseReminder(payment.recurringPaymentId);
+      }
+    }
+  }
 
   /// 알림 설정 on/off와 현재 활성 구독 목록에 맞춰 예약을 통째로 재조정한다.
   /// 해지/삭제된 구독은 굳이 추적하지 않고, 매번 활성 구독 기준으로 다시 걸어주는

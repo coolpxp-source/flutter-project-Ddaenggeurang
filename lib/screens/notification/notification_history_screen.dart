@@ -46,6 +46,8 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
     switch (type) {
       case 'nagging':
         return (Icons.record_voice_over_rounded, _purple, _purpleSoft);
+      case 'resolution':
+        return (Icons.wb_sunny_rounded, const Color(0xFF00C2A8), const Color(0xFFDBF7F3));
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
     }

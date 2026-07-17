@@ -82,6 +82,8 @@ class MyPageHomeScreen extends StatelessWidget {
                         .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
                     const SizedBox(height: 24),
 
+                    const _SectionLabel('나의 활동'),
+                    const SizedBox(height: 10),
                     _MenuGroup(children: [
                       _MenuRow(
                         icon: Icons.bar_chart_rounded,
@@ -118,7 +120,17 @@ class MyPageHomeScreen extends StatelessWidget {
                         iconBg: _pinkSoft,
                         onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const MissionListScreen())),
+                        showDivider: false,
                       ),
+                    ])
+                        .animate(delay: 100.ms)
+                        .fadeIn(duration: 420.ms, curve: Curves.easeOut)
+                        .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
+                    const SizedBox(height: 22),
+
+                    const _SectionLabel('계정 관리'),
+                    const SizedBox(height: 10),
+                    _MenuGroup(children: [
                       _MenuRow(
                         icon: Icons.person_outline_rounded,
                         title: '프로필 수정',
@@ -156,7 +168,7 @@ class MyPageHomeScreen extends StatelessWidget {
                         showDivider: false,
                       ),
                     ])
-                        .animate(delay: 120.ms)
+                        .animate(delay: 160.ms)
                         .fadeIn(duration: 420.ms, curve: Curves.easeOut)
                         .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
                     const SizedBox(height: 28),
@@ -179,7 +191,17 @@ class MyPageHomeScreen extends StatelessWidget {
                             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
                     )
-                        .animate(delay: 220.ms)
+                        .animate(delay: 240.ms)
+                        .fadeIn(duration: 380.ms),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: Text('땡그랑 v1.0.0',
+                          style: TextStyle(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w500,
+                              color: _inkSub.withValues(alpha: 0.7))),
+                    )
+                        .animate(delay: 260.ms)
                         .fadeIn(duration: 380.ms),
                   ],
                 ),
@@ -215,6 +237,21 @@ class _Blob extends StatelessWidget {
 class _ProfileCard extends StatelessWidget {
   final UserModel user;
   const _ProfileCard({required this.user});
+
+  /// 레벨 공식(user_service.dart의 1 + points~/100, 즉 100포인트당 1레벨)과
+  /// 맞춰서 다음 레벨까지 남은 포인트를 계산한다.
+  int get _pointsIntoLevel => user.points % 100;
+  int get _pointsToNextLevel => 100 - _pointsIntoLevel;
+
+  /// 가입일 기준 함께한 일수. createdAt이 아직 없으면(구버전 문서 등) 표시 생략.
+  int? get _daysSinceJoin {
+    final createdAt = user.createdAt;
+    if (createdAt == null) return null;
+    final joinDay = DateTime(createdAt.year, createdAt.month, createdAt.day);
+    final today = DateTime.now();
+    final todayDay = DateTime(today.year, today.month, today.day);
+    return todayDay.difference(joinDay).inDays + 1;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +345,14 @@ class _ProfileCard extends StatelessWidget {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.white.withValues(alpha: 0.85))),
+                          if (_daysSinceJoin != null) ...[
+                            const SizedBox(height: 2),
+                            Text('함께한 지 $_daysSinceJoin일째',
+                                style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withValues(alpha: 0.72))),
+                          ],
                         ],
                       ),
                     ),
@@ -336,6 +381,37 @@ class _ProfileCard extends StatelessWidget {
                             '${user.loginStreak}일')),
                   ],
                 ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('다음 레벨까지 ${_pointsToNextLevel}P',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.9))),
+                    Text('Lv.${user.level + 1}',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.9))),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: _pointsIntoLevel / 100),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) => LinearProgressIndicator(
+                      value: value,
+                      minHeight: 6,
+                      backgroundColor: Colors.white.withValues(alpha: 0.25),
+                      valueColor: const AlwaysStoppedAnimation(Colors.white),
+                    ),
+                  ),
+                ),
               ],
             ),
           ],
@@ -361,6 +437,23 @@ class _ProfileCard extends StatelessWidget {
 }
 
 // ─────────────────────── 공용 하위 위젯 ───────────────────────
+
+/// 메뉴 그룹 위에 붙는 섹션 라벨 — 메뉴가 한 덩어리 리스트로 이어지지 않고
+/// "나의 활동" / "계정 관리"로 성격이 나뉘어 보이도록 한다.
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(text,
+          style: const TextStyle(
+              fontSize: 12.5, fontWeight: FontWeight.w800, color: _inkSub)),
+    );
+  }
+}
 
 class _MenuGroup extends StatelessWidget {
   final List<Widget> children;

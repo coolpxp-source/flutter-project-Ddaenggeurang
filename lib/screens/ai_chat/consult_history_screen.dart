@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../models/consultation_model.dart';
 import '../../services/ai_service.dart' as ai;
 import '../../services/consultation_service.dart';
@@ -201,6 +202,15 @@ class _ConsultationCard extends StatelessWidget {
     return '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _share(BuildContext context) async {
+    final verdictLabel = _verdict?.label;
+    final text = '[땡그랑 AI상담]\n'
+        'Q. ${entry.question}\n'
+        '${verdictLabel != null ? '판정: $verdictLabel\n' : ''}'
+        'A. ${entry.answer}';
+    await SharePlus.instance.share(ShareParams(text: text));
+  }
+
   Future<void> _confirmDelete(BuildContext context) async {
     final ok = await DdaengModal.confirm(
       context,
@@ -247,6 +257,14 @@ class _ConsultationCard extends StatelessWidget {
               Expanded(
                 child: Text(_formatDate(entry.date),
                     style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _inkSub)),
+              ),
+              InkWell(
+                onTap: () => _share(context),
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.ios_share_rounded, size: 15, color: _inkSub),
+                ),
               ),
               InkWell(
                 onTap: () => _confirmDelete(context),
