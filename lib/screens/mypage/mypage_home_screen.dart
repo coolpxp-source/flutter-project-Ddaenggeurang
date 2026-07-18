@@ -378,7 +378,7 @@ class _ProfileCard extends StatelessWidget {
                     _divider(),
                     Expanded(
                         child: _stat(Icons.local_fire_department_rounded, '연속 접속',
-                            '${user.loginStreak}일')),
+                            '${user.loginStreak}일${_streakBadge(user.loginStreak)}')),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -420,6 +420,14 @@ class _ProfileCard extends StatelessWidget {
   }
 
   Widget _divider() => Container(width: 1, height: 34, color: Colors.white.withValues(alpha: 0.35));
+
+  /// 연속 접속 마일스톤(main.dart의 축하 알림과 같은 기준) 달성 시 붙는 배지.
+  String _streakBadge(int streak) {
+    if (streak >= 100) return ' 👑';
+    if (streak >= 30) return ' ⭐';
+    if (streak >= 7) return ' 🔥';
+    return '';
+  }
 
   Widget _stat(IconData icon, String label, String value) => Column(
     crossAxisAlignment: CrossAxisAlignment.center,

@@ -57,11 +57,13 @@ class UserService {
     });
   }
 
-  /// 연속 접속 스트릭 갱신 — 오늘 이미 접속 처리됐으면 아무 것도 하지 않는다.
-  /// 어제 접속한 상태로 오늘 다시 열면 스트릭 +1, 하루 이상 건너뛰었으면 1로 리셋.
-  Future<void> touchLoginStreak(String uid, UserModel current) async {
+  /// 연속 접속 스트릭 갱신 — 오늘 이미 접속 처리됐으면 아무 것도 안 하고 현재
+  /// 값을 그대로 반환한다. 어제 접속한 상태로 오늘 다시 열면 스트릭 +1, 하루
+  /// 이상 건너뛰었으면 1로 리셋. 반환값은 호출부(main.dart)가 마일스톤(7/30/100일)
+  /// 달성 여부를 판단하는 데 쓴다.
+  Future<int> touchLoginStreak(String uid, UserModel current) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    if (current.lastLoginDate == today) return;
+    if (current.lastLoginDate == today) return current.loginStreak;
 
     final yesterday = DateTime.now()
         .subtract(const Duration(days: 1))
@@ -74,6 +76,7 @@ class UserService {
       'lastLoginDate': today,
       'loginStreak': newStreak,
     });
+    return newStreak;
   }
 
   /// 닉네임 중복 검사

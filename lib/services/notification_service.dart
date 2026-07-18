@@ -89,6 +89,21 @@ class NotificationService {
     );
   }
 
+  /// 연속 접속 마일스톤(7/30/100일) 달성 축하 알림.
+  Future<void> showStreakMilestone({required String title, required String body}) async {
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'streak_milestone',
+        '연속 접속 달성',
+        channelDescription: '연속 접속 마일스톤을 달성하면 축하해드려요',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    );
+    await _plugin.show(id: 3, title: title, body: body, notificationDetails: details);
+  }
+
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
   int _subscriptionNotificationId(String subscriptionId) =>
       subscriptionId.hashCode & 0x7fffffff;

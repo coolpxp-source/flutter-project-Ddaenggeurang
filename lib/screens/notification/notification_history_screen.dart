@@ -48,6 +48,9 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
         return (Icons.record_voice_over_rounded, _purple, _purpleSoft);
       case 'resolution':
         return (Icons.wb_sunny_rounded, const Color(0xFF00C2A8), const Color(0xFFDBF7F3));
+      case 'streak':
+        return (Icons.local_fire_department_rounded, const Color(0xFFF04438),
+            const Color(0xFFFEE4E2));
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
     }

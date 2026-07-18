@@ -118,7 +118,7 @@ class AppGate extends StatelessWidget {
                   email: user.email ?? '',
                   onboardingData: PendingOnboarding.data);
             }
-            unawaited(UserService().touchLoginStreak(user.uid, profile));
+            unawaited(_maybeCelebrateStreakMilestone(user.uid, profile));
             unawaited(_maybeShowConsultReminder(user.uid));
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
             unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
@@ -130,6 +130,27 @@ class AppGate extends StatelessWidget {
       },
     );
   }
+}
+
+/// 로그인 스트릭(users.loginStreak)을 갱신하고, 7/30/100일 마일스톤을
+/// 처음 달성한 순간에만 축하 알림을 띄운다. 이미 축하한 마일스톤은
+/// SharedPreferences에 남겨서 같은 스트릭 값으로는 다시 뜨지 않게 한다.
+Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async {
+  final newStreak = await UserService().touchLoginStreak(uid, profile);
+
+  const milestones = {7, 30, 100};
+  if (!milestones.contains(newStreak)) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'celebratedStreak_$newStreak';
+  if (prefs.getBool(key) == true) return;
+  await prefs.setBool(key, true);
+
+  final title = '연속 접속 $newStreak일 달성! 🔥';
+  final body = '$newStreak일 동안 매일 와줬어요. 정말 대단해요!';
+  await NotificationService.instance.showStreakMilestone(title: title, body: body);
+  await NotificationHistoryService()
+      .record(uid: uid, title: title, body: body, type: 'streak');
 }
 
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
