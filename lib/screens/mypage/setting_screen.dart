@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/app_lock_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
@@ -65,6 +66,24 @@ class _SettingScreenState extends State<SettingScreen> {
     }
     await AppLockService.instance.setEnabled(value);
     if (mounted) setState(() => _appLockEnabled = value);
+  }
+
+  /// 홈 화면 첫 방문자 전용 스팟라이트 투어를 다시 보고 싶을 때 — 홈 화면
+  /// _HomeDashboardState는 탭을 벗어났다 돌아오면 새로 만들어지므로(홈 탭
+  /// 바디가 switch문으로 매번 새로 그려짐), 여기서는 "다시 보여줘도 되는 상태"로
+  /// 되돌려놓고 홈 탭으로 안내만 하면 기존 로직이 알아서 다시 틀어준다.
+  Future<void> _replayTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('homeTourShown');
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('홈 탭으로 이동하면 튜토리얼이 다시 시작돼요'),
+        backgroundColor: _ink,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _logout() async {
@@ -154,6 +173,17 @@ class _SettingScreenState extends State<SettingScreen> {
                   title: '앱 버전',
                   trailing: 'v1.0.0',
                   onTap: null,
+                  showDivider: false),
+            ]),
+            const SizedBox(height: 22),
+
+            const _SectionLabel('도움말'),
+            const SizedBox(height: 10),
+            _Group(children: [
+              _Row(
+                  icon: Icons.replay_rounded,
+                  title: '튜토리얼 다시보기',
+                  onTap: _replayTour,
                   showDivider: false),
             ]),
             const SizedBox(height: 22),

@@ -128,6 +128,22 @@ class NotificationService {
     await _plugin.show(id: 3, title: title, body: body, notificationDetails: details);
   }
 
+  /// 포인트가 쌓여 레벨이 오른 순간의 축하 알림.
+  Future<void> showLevelUp({required String title, required String body}) async {
+    if (await _isQuietHours()) return;
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'level_up',
+        '레벨업 축하',
+        channelDescription: '포인트가 쌓여 레벨이 오르면 축하해드려요',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    );
+    await _plugin.show(id: 4, title: title, body: body, notificationDetails: details);
+  }
+
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
   int _subscriptionNotificationId(String subscriptionId) =>
       subscriptionId.hashCode & 0x7fffffff;

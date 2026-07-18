@@ -63,6 +63,9 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
       case 'streak':
         return (Icons.local_fire_department_rounded, const Color(0xFFF04438),
             const Color(0xFFFEE4E2));
+      case 'levelup':
+        return (Icons.military_tech_rounded, const Color(0xFFFFB300),
+            const Color(0xFFFFF3D6));
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
     }

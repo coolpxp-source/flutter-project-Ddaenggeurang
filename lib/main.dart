@@ -127,6 +127,7 @@ class AppGate extends StatelessWidget {
             unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
             unawaited(_maybeShowDailyNagging(user.uid, profile));
             unawaited(_maybeShowDailyResolution(user.uid));
+            unawaited(_maybeCelebrateLevelUp(user.uid, profile));
             _syncAppBadgeForUser(user.uid);
             return const HomeScreen();
           },
@@ -183,6 +184,29 @@ Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async
   await NotificationService.instance.showStreakMilestone(title: title, body: body);
   await NotificationHistoryService()
       .record(uid: uid, title: title, body: body, type: 'streak');
+}
+
+/// 포인트가 쌓여 레벨이 오른 순간을 감지해서 축하 알림을 띄운다. 미션 보상
+/// 등 포인트가 어디서 지급되든(addPoints 호출부는 다른 파트 소관) users 문서의
+/// level 필드 변화만 지켜보면 되므로, 마지막으로 확인한 레벨을 SharedPreferences에
+/// uid별로 남겨서 그보다 올랐을 때만 반응한다. 처음 관찰하는 기기(첫 로그인 등)는
+/// 기준값만 저장하고 축하하지 않는다 — 안 그러면 가입 직후 Lv.1도 "레벨업"으로 오인한다.
+Future<void> _maybeCelebrateLevelUp(String uid, UserModel profile) async {
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'lastKnownLevel_$uid';
+  final lastKnown = prefs.getInt(key);
+  if (lastKnown == null) {
+    await prefs.setInt(key, profile.level);
+    return;
+  }
+  if (profile.level <= lastKnown) return;
+  await prefs.setInt(key, profile.level);
+
+  final title = '레벨 업! Lv.${profile.level} 달성 🎉';
+  final body = '포인트를 모아서 레벨이 올랐어요. 계속 이 기세로!';
+  await NotificationService.instance.showLevelUp(title: title, body: body);
+  await NotificationHistoryService()
+      .record(uid: uid, title: title, body: body, type: 'levelup');
 }
 
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
