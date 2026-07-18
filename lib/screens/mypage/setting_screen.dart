@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../../services/app_lock_service.dart';
 import '../../services/auth_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'change_password_screen.dart';
@@ -25,11 +26,45 @@ class SettingScreen extends StatefulWidget {
 class _SettingScreenState extends State<SettingScreen> {
   final _auth = AuthService();
   bool _busy = false;
+  bool? _appLockEnabled; // null이면 아직 로딩 중
 
   /// 이메일/비밀번호로 가입한 계정만 비밀번호를 갖고 있다.
   /// 소셜 로그인(카카오/네이버/구글/애플) 계정은 변경할 비밀번호가 없으므로 숨긴다.
   bool get _hasPasswordProvider =>
       _auth.currentUser?.providerData.any((p) => p.providerId == 'password') ?? false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppLockState();
+  }
+
+  Future<void> _loadAppLockState() async {
+    final enabled = await AppLockService.instance.isEnabled();
+    if (mounted) setState(() => _appLockEnabled = enabled);
+  }
+
+  Future<void> _toggleAppLock(bool value) async {
+    if (value) {
+      final supported = await AppLockService.instance.isDeviceSupported();
+      if (!supported) {
+        if (!mounted) return;
+        await DdaengModal.alert(
+          context,
+          title: '기기 잠금이 필요해요',
+          message: '지문·PIN·패턴 등 기기 자체 잠금이 설정돼 있어야 앱 잠금을 쓸 수 있어요',
+          type: ModalType.warning,
+        );
+        return;
+      }
+      // 켜기 전에 본인 확인 — 잠금을 걸어놓고 정작 본인이 인증을 못 하는
+      // 상황(다른 사람 지문 등록 등)을 미리 걸러낸다.
+      final verified = await AppLockService.instance.authenticate();
+      if (!verified) return;
+    }
+    await AppLockService.instance.setEnabled(value);
+    if (mounted) setState(() => _appLockEnabled = value);
+  }
 
   Future<void> _logout() async {
     final ok = await DdaengModal.confirm(
@@ -119,6 +154,18 @@ class _SettingScreenState extends State<SettingScreen> {
                   trailing: 'v1.0.0',
                   onTap: null,
                   showDivider: false),
+            ]),
+            const SizedBox(height: 22),
+
+            const _SectionLabel('보안'),
+            const SizedBox(height: 10),
+            _Group(children: [
+              _SwitchRow(
+                  icon: Icons.fingerprint_rounded,
+                  title: '앱 잠금',
+                  subtitle: '생체인증 또는 기기 잠금으로 앱을 보호해요',
+                  value: _appLockEnabled ?? false,
+                  onChanged: _appLockEnabled == null ? null : _toggleAppLock),
             ]),
             const SizedBox(height: 22),
 
@@ -328,6 +375,66 @@ class _Row extends StatelessWidget {
         ),
         if (showDivider) const Divider(height: 1, indent: 16, endIndent: 16, color: _line),
       ],
+    );
+  }
+}
+
+class _SwitchRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  const _SwitchRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [_accentSoft, Color.lerp(_accentSoft, Colors.white, 0.15)!],
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: _accent.withValues(alpha: 0.16), blurRadius: 6, offset: const Offset(0, 2)),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 17, color: _accent),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _ink)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 11.5, fontWeight: FontWeight.w500, color: _inkSub)),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged, activeThumbColor: _accent),
+        ],
+      ),
     );
   }
 }

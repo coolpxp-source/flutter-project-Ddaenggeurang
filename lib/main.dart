@@ -21,6 +21,7 @@ import 'screens/auth/signup_extra_screen.dart';
 import 'screens/auth/email_verification_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/splash_screen.dart'; // 방금 만든 스플래시 파일 import
+import 'widgets/common/app_lock_gate.dart';
 import 'widgets/common/brand_loading_dots.dart';
 
 Future<void> main() async {
@@ -65,7 +66,7 @@ class _DdaengAppState extends State<DdaengApp> {
                 key: const ValueKey('splash'),
                 onFinished: () => setState(() => _showSplash = false),
               )
-            : const AppGate(key: ValueKey('gate')),
+            : const AppLockGate(key: ValueKey('gate'), child: AppGate()),
       ),
     );
   }
