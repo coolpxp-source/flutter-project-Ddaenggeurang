@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/auth_service.dart';
+import '../../services/login_history_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../onboarding/onboarding_screen.dart'; // OnboardingData
@@ -74,7 +75,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithGoogle();
-      if (user != null) unawaited(_rememberMethod('google'));
+      if (user != null) {
+        unawaited(_rememberMethod('google'));
+        unawaited(LoginHistoryService().record(uid: user.uid, method: 'google'));
+      }
       await _afterAuthSuccess(user);
     } catch (e) {
       if (!mounted) return;
@@ -101,7 +105,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithEmail(email, pw);
-      if (user != null) unawaited(_rememberMethod('email'));
+      if (user != null) {
+        unawaited(_rememberMethod('email'));
+        unawaited(LoginHistoryService().record(uid: user.uid, method: 'email'));
+      }
       await _afterAuthSuccess(user);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;

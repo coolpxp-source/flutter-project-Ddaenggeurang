@@ -6,6 +6,7 @@ import '../../widgets/common/ddaeng_modal.dart';
 import 'change_password_screen.dart';
 import 'contact_screen.dart';
 import 'legal_doc_screen.dart';
+import 'login_history_screen.dart';
 
 const _accent = Color(0xFFF5A623);
 const _accentSoft = Color(0xFFFFF0A6);
@@ -166,6 +167,13 @@ class _SettingScreenState extends State<SettingScreen> {
                   subtitle: '생체인증 또는 기기 잠금으로 앱을 보호해요',
                   value: _appLockEnabled ?? false,
                   onChanged: _appLockEnabled == null ? null : _toggleAppLock),
+              const Divider(height: 1, indent: 16, endIndent: 16, color: _line),
+              _Row(
+                  icon: Icons.history_rounded,
+                  title: '로그인 활동',
+                  onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const LoginHistoryScreen())),
+                  showDivider: false),
             ]),
             const SizedBox(height: 22),
 
