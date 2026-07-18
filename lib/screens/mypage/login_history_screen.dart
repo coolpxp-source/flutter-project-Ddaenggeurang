@@ -9,6 +9,40 @@ const _inkSub = Color(0xFF8A7E77);
 const _bg = Color(0xFFFAF8F6);
 const _blue = Color(0xFF4F7DF3);
 const _blueSoft = Color(0xFFE8EFFE);
+const _ok = Color(0xFF12B76A);
+const _warn = Color(0xFFF5A623);
+
+/// 최근 로그인 기록(최대 30건, 최신순)을 코드로 훑어서 눈에 띄는 패턴만
+/// 짚어주는 간단한 보안 점검. AI 판단이 아니라 규칙 기반이라 즉시 계산된다.
+class _SecuritySummary {
+  final String? primaryMethod;
+  final bool methodChanged;
+  final bool rapidLogins;
+  const _SecuritySummary({
+    required this.primaryMethod,
+    required this.methodChanged,
+    required this.rapidLogins,
+  });
+
+  bool get isSafe => !methodChanged && !rapidLogins;
+}
+
+_SecuritySummary _analyzeSecurity(List<LoginHistoryEntry> items) {
+  if (items.isEmpty) {
+    return const _SecuritySummary(primaryMethod: null, methodChanged: false, rapidLogins: false);
+  }
+  final counts = <String, int>{};
+  for (final e in items) {
+    counts[e.method] = (counts[e.method] ?? 0) + 1;
+  }
+  final primary = counts.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
+  // 기록이 몇 건 안 되면 "평소와 다르다"는 판단 자체가 의미 없으므로 3건 이상일 때만 본다.
+  final methodChanged = items.length >= 3 && items.first.method != primary;
+  final recentWindow = items.first.date.subtract(const Duration(minutes: 10));
+  final rapidCount = items.where((e) => e.date.isAfter(recentWindow)).length;
+  final rapidLogins = rapidCount >= 3;
+  return _SecuritySummary(primaryMethod: primary, methodChanged: methodChanged, rapidLogins: rapidLogins);
+}
 
 /// 설정 > 로그인 활동 — 언제/어떤 방법으로 로그인했는지 최근 기록을 보여준다.
 /// 알림함(notification_history_screen.dart)과 동일한 리스트 톤을 따른다.
@@ -71,19 +105,102 @@ class LoginHistoryScreen extends StatelessWidget {
                 if (items.isEmpty) {
                   return const _EmptyHistory();
                 }
+                final security = _analyzeSecurity(items);
                 return ListView.separated(
                   padding: const EdgeInsets.all(20),
-                  itemCount: items.length,
+                  itemCount: items.length + 1,
                   separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) => _LoginHistoryCard(
-                    label: _methodLabel(items[i].method),
-                    icon: _methodIcon(items[i].method),
-                    relativeTime: _relativeTime(items[i].date),
-                    isLatest: i == 0,
-                  ),
+                  itemBuilder: (context, i) {
+                    if (i == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: _SecurityReportCard(
+                          summary: security,
+                          primaryMethodLabel:
+                              security.primaryMethod == null ? null : _methodLabel(security.primaryMethod!),
+                        ),
+                      );
+                    }
+                    final entry = items[i - 1];
+                    return _LoginHistoryCard(
+                      label: _methodLabel(entry.method),
+                      icon: _methodIcon(entry.method),
+                      relativeTime: _relativeTime(entry.date),
+                      isLatest: i - 1 == 0,
+                    );
+                  },
                 );
               },
             ),
+    );
+  }
+}
+
+class _SecurityReportCard extends StatelessWidget {
+  final _SecuritySummary summary;
+  final String? primaryMethodLabel;
+  const _SecurityReportCard({required this.summary, required this.primaryMethodLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = summary.isSafe ? _ok : _warn;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: _ink.withValues(alpha: 0.045), blurRadius: 14, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(summary.isSafe ? Icons.shield_rounded : Icons.shield_moon_rounded,
+                  size: 18, color: color),
+              const SizedBox(width: 8),
+              Text(summary.isSafe ? '보안 상태: 안전해요' : '눈에 띄는 로그인 패턴이 있어요',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
+            ],
+          ),
+          if (primaryMethodLabel != null) ...[
+            const SizedBox(height: 8),
+            Text('평소 로그인 방법: $primaryMethodLabel',
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _inkSub)),
+          ],
+          if (summary.methodChanged) ...[
+            const SizedBox(height: 6),
+            const _WarningLine('최근 로그인이 평소와 다른 방법이에요. 본인이 아니라면 비밀번호를 바꿔주세요'),
+          ],
+          if (summary.rapidLogins) ...[
+            const SizedBox(height: 6),
+            const _WarningLine('짧은 시간 안에 로그인이 여러 번 있었어요'),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _WarningLine extends StatelessWidget {
+  final String text;
+  const _WarningLine(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(Icons.error_outline_rounded, size: 14, color: _warn),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: _ink, height: 1.4)),
+        ),
+      ],
     );
   }
 }

@@ -10,6 +10,7 @@ import 'models/user_model.dart';
 import 'firebase_options.dart';
 import 'services/activity_calendar_service.dart';
 import 'services/ai_service.dart';
+import 'services/app_badge_service.dart';
 import 'services/category_summary_service.dart';
 import 'services/emotion_summary_service.dart';
 import 'services/notification_history_service.dart';
@@ -90,6 +91,7 @@ class AppGate extends StatelessWidget {
 
         // ── 비로그인 ──
         if (user == null) {
+          _cancelAppBadgeSync();
           // 이제 온보딩 여부를 확인하지 않고 항상 로그인 화면으로 보냅니다.
           return const LoginScreen();
         }
@@ -125,12 +127,36 @@ class AppGate extends StatelessWidget {
             unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
             unawaited(_maybeShowDailyNagging(user.uid, profile));
             unawaited(_maybeShowDailyResolution(user.uid));
+            _syncAppBadgeForUser(user.uid);
             return const HomeScreen();
           },
         );
       },
     );
   }
+}
+
+// 로그인 세션 동안 딱 한 번만 구독을 걸어두기 위한 전역 상태.
+// AppGate.build()는 프로필 스트림이 갱신될 때마다 다시 호출되므로, uid가
+// 그대로면 재구독하지 않고 넘어간다.
+StreamSubscription<int>? _badgeSub;
+String? _badgeSubUid;
+
+/// 앱 아이콘 배지(안 읽은 알림 개수)를 로그인 세션 내내 실시간으로 동기화한다.
+void _syncAppBadgeForUser(String uid) {
+  if (_badgeSubUid == uid) return;
+  _badgeSub?.cancel();
+  _badgeSubUid = uid;
+  _badgeSub = NotificationHistoryService()
+      .watchUnreadCount(uid)
+      .listen((count) => AppBadgeService.instance.setCount(count));
+}
+
+void _cancelAppBadgeSync() {
+  _badgeSub?.cancel();
+  _badgeSub = null;
+  _badgeSubUid = null;
+  unawaited(AppBadgeService.instance.clear());
 }
 
 /// 로그인 스트릭(users.loginStreak)을 갱신하고, 7/30/100일 마일스톤을
