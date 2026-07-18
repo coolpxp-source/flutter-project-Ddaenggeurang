@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:shimmer/shimmer.dart';
@@ -26,6 +28,7 @@ import '../../widgets/expense/category_icon_map.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import '../../widgets/common/placeholder_screen.dart';
+import '../../widgets/common/spotlight_tour.dart';
 import '../record/record_type_select_screen.dart';
 import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
@@ -309,6 +312,46 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   DateTime _month = DateTime.now();
   late DateTime _selectedDay = DateTime.now();
 
+  // 첫 방문자 전용 스팟라이트 투어 — 대상 위젯 3곳의 위치만 알면 되므로
+  // GlobalKey만 붙이고, 하이라이트/툴팁은 별도 오버레이(spotlight_tour.dart)가 그린다.
+  final _budgetHeroKey = GlobalKey();
+  final _quickActionsKey = GlobalKey();
+  final _categoryCardKey = GlobalKey();
+  final _tourController = SpotlightTourController();
+  bool _tourChecked = false;
+
+  @override
+  void dispose() {
+    _tourController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _maybeStartTour() async {
+    if (_tourChecked) return;
+    _tourChecked = true;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('homeTourShown') == true) return;
+    await prefs.setBool('homeTourShown', true);
+    if (!mounted) return;
+    _tourController.start(context, [
+      SpotlightStep(
+        targetKey: _budgetHeroKey,
+        title: '이번 달 예산 확인',
+        description: '여기서 남은 예산과 사용률을 한눈에 볼 수 있어요',
+      ),
+      SpotlightStep(
+        targetKey: _quickActionsKey,
+        title: '빠르게 기록하기',
+        description: '지출·수입·저축을 여기서 바로 입력할 수 있어요',
+      ),
+      SpotlightStep(
+        targetKey: _categoryCardKey,
+        title: '카테고리별 지출',
+        description: '어디에 얼마나 썼는지 도넛 차트로 확인해보세요',
+      ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<UserModel?>(
@@ -318,6 +361,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
           return const _DashboardSkeleton();
         }
         final user = snapshot.data!;
+        unawaited(_maybeStartTour());
 
         return Stack(
           children: [
@@ -352,18 +396,24 @@ class _HomeDashboardState extends State<_HomeDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _LiveBudgetSection(
-                    uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+                KeyedSubtree(
+                  key: _budgetHeroKey,
+                  child: _LiveBudgetSection(
+                      uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+                ),
 
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _QuickActionsGrid(),
+                      KeyedSubtree(key: _quickActionsKey, child: const _QuickActionsGrid()),
                       const SizedBox(height: 24),
 
-                      _CategorySpendingSection(uid: widget.uid, month: _month),
+                      KeyedSubtree(
+                        key: _categoryCardKey,
+                        child: _CategorySpendingSection(uid: widget.uid, month: _month),
+                      ),
                       const SizedBox(height: 28),
 
                       _MonthHeader(

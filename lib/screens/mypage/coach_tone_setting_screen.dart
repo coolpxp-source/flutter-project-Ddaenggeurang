@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/coach_tone.dart';
@@ -98,6 +99,49 @@ String _exampleLine(CoachTone tone) {
   }
 }
 
+/// 캐릭터 이미지를 길게 누르면 나오는 숨겨진 대사 — 이스터에그.
+String _hiddenLine(CoachTone tone) {
+  switch (tone.name) {
+    case 'ddaenggu':
+      return '사실 저도 몰래 배달 시켜먹어요... 이건 비밀이에요 🤫';
+    case 'ddaengjwi':
+      return '데이터는 거짓말 안 해요. 근데 저도 가끔 홧김에 지릅니다.';
+    case 'ddaengnyang':
+      return '냉장고 파먹기? 그거 제가 만든 말인데 저도 안 지켜요 ㅋㅋ';
+    default:
+      return '비밀이에요 🤐';
+  }
+}
+
+void _showEasterEgg(BuildContext context, CoachTone tone) {
+  HapticFeedback.mediumImpact();
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('🎉 히든 대사 발견!',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _accent)),
+            const SizedBox(height: 14),
+            CoachAvatar(imagePath: tone.imagePath, size: 72),
+            const SizedBox(height: 14),
+            Text(_hiddenLine(tone),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w600, color: _ink, height: 1.5)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _CoachCard extends StatelessWidget {
   final CoachTone tone;
   final bool selected;
@@ -145,29 +189,32 @@ class _CoachCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: selected
-                          ? [Colors.white, const Color(0xFFFFF4D6)]
-                          : [const Color(0xFFFFF8E5), const Color(0xFFFFEFC7)],
+                GestureDetector(
+                  onLongPress: () => _showEasterEgg(context, tone),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: selected
+                            ? [Colors.white, const Color(0xFFFFF4D6)]
+                            : [const Color(0xFFFFF8E5), const Color(0xFFFFEFC7)],
+                      ),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                  color: _accent.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3)),
+                            ]
+                          : null,
                     ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                                color: _accent.withValues(alpha: 0.2),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3)),
-                          ]
-                        : null,
+                    alignment: Alignment.center,
+                    child: CoachAvatar(imagePath: tone.imagePath, size: 40),
                   ),
-                  alignment: Alignment.center,
-                  child: CoachAvatar(imagePath: tone.imagePath, size: 40),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
