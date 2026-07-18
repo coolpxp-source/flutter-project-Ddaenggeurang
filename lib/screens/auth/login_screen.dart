@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
@@ -22,6 +24,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   bool _showEmailForm = false;
   bool _obscurePw = true;
+
+  // 마지막으로 성공했던 로그인 방법 — 매번 4개 버튼 중 뭘 눌러야 할지
+  // 헷갈리지 않도록 "최근 로그인" 배지로 알려준다. 아직 실제로 붙어있는
+  // google/email만 기록한다(카카오·네이버·애플은 준비 중이라 기록할 대상이 없음).
+  String? _lastMethod;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastMethod();
+  }
+
+  Future<void> _loadLastMethod() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() => _lastMethod = prefs.getString('lastLoginMethod'));
+  }
+
+  Future<void> _rememberMethod(String method) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastLoginMethod', method);
+  }
 
   @override
   void dispose() {
@@ -50,6 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithGoogle();
+      if (user != null) unawaited(_rememberMethod('google'));
       await _afterAuthSuccess(user);
     } catch (e) {
       if (!mounted) return;
@@ -76,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final user = await _auth.signInWithEmail(email, pw);
+      if (user != null) unawaited(_rememberMethod('email'));
       await _afterAuthSuccess(user);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
@@ -289,11 +315,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              _SocialButton(
-                                label: '이메일로 로그인',
-                                bg: const Color(0xFF1D4ED8),
-                                fg: Colors.white,
-                                onTap: _loading ? null : _signInWithEmail,
+                              _LastUsedBadge(
+                                show: _lastMethod == 'email',
+                                child: _SocialButton(
+                                  label: '이메일로 로그인',
+                                  bg: const Color(0xFF1D4ED8),
+                                  fg: Colors.white,
+                                  onTap: _loading ? null : _signInWithEmail,
+                                ),
                               ),
                               const SizedBox(height: 14),
                               const _Divider(),
@@ -326,13 +355,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         onTap: _loading ? null : _comingSoon,
                       ),
                       const SizedBox(height: 10),
-                      _SocialButton(
-                        label: 'Google로 계속하기',
-                        bg: Colors.white,
-                        fg: const Color(0xFF1F2937),
-                        border: const Color(0xFFE8ECF3),
-                        icon: Image.asset('assets/images/구글.png', width: 22, height: 22),
-                        onTap: _loading ? null : _signInWithGoogle,
+                      _LastUsedBadge(
+                        show: _lastMethod == 'google',
+                        child: _SocialButton(
+                          label: 'Google로 계속하기',
+                          bg: Colors.white,
+                          fg: const Color(0xFF1F2937),
+                          border: const Color(0xFFE8ECF3),
+                          icon: Image.asset('assets/images/구글.png', width: 22, height: 22),
+                          onTap: _loading ? null : _signInWithGoogle,
+                        ),
                       ),
                       const SizedBox(height: 10),
                       _SocialButton(
@@ -348,21 +380,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 18),
 
                       // ─── 이메일로 계속하기 (아웃라인 CTA) ───
-                      SizedBox(
-                        width: double.infinity,
-                        height: 54,
-                        child: OutlinedButton(
-                          onPressed: _loading
-                              ? null
-                              : () => setState(() => _showEmailForm = !_showEmailForm),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFFB8860B),
-                            side: const BorderSide(color: Color(0xFFFFC93C), width: 1.6),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
-                          ),
-                          child: Text(
-                            _showEmailForm ? '이메일 로그인 닫기' : '이메일로 계속하기',
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                      // 폼을 펼쳐야만 보이는 안쪽 버튼 말고, 접힌 초기 화면에서부터
+                      // "최근 로그인" 배지가 바로 보여야 의미가 있어서 여기도 감싼다.
+                      _LastUsedBadge(
+                        show: _lastMethod == 'email' && !_showEmailForm,
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 54,
+                          child: OutlinedButton(
+                            onPressed: _loading
+                                ? null
+                                : () => setState(() => _showEmailForm = !_showEmailForm),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFB8860B),
+                              side: const BorderSide(color: Color(0xFFFFC93C), width: 1.6),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(27)),
+                            ),
+                            child: Text(
+                              _showEmailForm ? '이메일 로그인 닫기' : '이메일로 계속하기',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                            ),
                           ),
                         ),
                       ),
@@ -429,6 +466,43 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 지난번 로그인에 썼던 방법 위에 "최근 로그인" 배지를 얹어준다.
+class _LastUsedBadge extends StatelessWidget {
+  final bool show;
+  final Widget child;
+  const _LastUsedBadge({required this.show, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!show) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -8,
+          right: 12,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2F6BFF),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: const Text('최근 로그인',
+                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white)),
+          ),
+        ),
+      ],
     );
   }
 }

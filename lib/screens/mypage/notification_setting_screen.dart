@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/user_model.dart';
 import '../../services/notification_service.dart';
 import '../../services/subscription_service.dart';
@@ -27,6 +28,52 @@ class NotificationSettingScreen extends StatefulWidget {
 class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
   final _userService = UserService();
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
+
+  // 방해금지 시간대 — 기기 로컬 설정(SharedPreferences)이라 Firestore의
+  // NotificationSettings와 별개로 관리한다. null이면 아직 로딩 중.
+  bool? _dndEnabled;
+  int _dndStartMinutes = 22 * 60;
+  int _dndEndMinutes = 7 * 60;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDndSettings();
+  }
+
+  Future<void> _loadDndSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _dndEnabled = prefs.getBool('dndEnabled') ?? false;
+      _dndStartMinutes = prefs.getInt('dndStartMinutes') ?? 22 * 60;
+      _dndEndMinutes = prefs.getInt('dndEndMinutes') ?? 7 * 60;
+    });
+  }
+
+  Future<void> _toggleDnd(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('dndEnabled', value);
+    if (mounted) setState(() => _dndEnabled = value);
+  }
+
+  Future<void> _pickDndTime({required bool isStart}) async {
+    final initial = isStart ? _dndStartMinutes : _dndEndMinutes;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: initial ~/ 60, minute: initial % 60),
+    );
+    if (picked == null) return;
+    final minutes = picked.hour * 60 + picked.minute;
+    final prefs = await SharedPreferences.getInstance();
+    if (isStart) {
+      await prefs.setInt('dndStartMinutes', minutes);
+      if (mounted) setState(() => _dndStartMinutes = minutes);
+    } else {
+      await prefs.setInt('dndEndMinutes', minutes);
+      if (mounted) setState(() => _dndEndMinutes = minutes);
+    }
+  }
 
   Future<void> _toggle(NotificationSettings current, {
     bool? fixedExpenseAlert,
@@ -139,6 +186,21 @@ class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
                 value: settings.cardPointExpiryAlert,
                 onChanged: (v) => _toggle(settings, cardPointExpiryAlert: v),
               ),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.only(left: 4, bottom: 10),
+                child: Text('방해금지 시간대',
+                    style:
+                    TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _inkSub)),
+              ),
+              _QuietHoursTile(
+                enabled: _dndEnabled ?? false,
+                startMinutes: _dndStartMinutes,
+                endMinutes: _dndEndMinutes,
+                onToggle: _dndEnabled == null ? null : _toggleDnd,
+                onPickStart: () => _pickDndTime(isStart: true),
+                onPickEnd: () => _pickDndTime(isStart: false),
+              ),
             ]
                 .animate(interval: 60.ms)
                 .fadeIn(duration: 340.ms, curve: Curves.easeOut)
@@ -234,6 +296,125 @@ class _MasterTile extends StatelessWidget {
             ),
           ],
         ),
+    );
+  }
+}
+
+class _QuietHoursTile extends StatelessWidget {
+  final bool enabled;
+  final int startMinutes;
+  final int endMinutes;
+  final ValueChanged<bool>? onToggle;
+  final VoidCallback onPickStart;
+  final VoidCallback onPickEnd;
+
+  const _QuietHoursTile({
+    required this.enabled,
+    required this.startMinutes,
+    required this.endMinutes,
+    required this.onToggle,
+    required this.onPickStart,
+    required this.onPickEnd,
+  });
+
+  String _format(int minutes) {
+    final h = (minutes ~/ 60).toString().padLeft(2, '0');
+    final m = (minutes % 60).toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+              color: _ink.withValues(alpha: 0.045), blurRadius: 14, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFEDE9FE), Color.lerp(const Color(0xFFEDE9FE), Colors.white, 0.15)!],
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Color(0x296C5CE7), blurRadius: 8, offset: Offset(0, 3)),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: const Icon(Icons.bedtime_rounded, size: 19, color: Color(0xFF6C5CE7)),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('방해금지 시간대',
+                        style: TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w700, color: _ink)),
+                    SizedBox(height: 3),
+                    Text('이 시간엔 다짐·잔소리 같은 가벼운 알림을 미뤄요',
+                        style: TextStyle(
+                            fontSize: 11.5, fontWeight: FontWeight.w500, color: _inkSub, height: 1.4)),
+                  ],
+                ),
+              ),
+              Switch(value: enabled, onChanged: onToggle, activeThumbColor: _accent),
+            ],
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(child: _TimeButton(label: '시작', time: _format(startMinutes), onTap: onPickStart)),
+                const SizedBox(width: 10),
+                Expanded(child: _TimeButton(label: '종료', time: _format(endMinutes), onTap: onPickEnd)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TimeButton extends StatelessWidget {
+  final String label;
+  final String time;
+  final VoidCallback onTap;
+  const _TimeButton({required this.label, required this.time, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(color: _bg, borderRadius: BorderRadius.circular(12)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: _inkSub)),
+            const SizedBox(height: 2),
+            Text(time, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
+          ],
+        ),
+      ),
     );
   }
 }

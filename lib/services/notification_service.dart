@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/subscription_model.dart';
@@ -14,6 +15,25 @@ class NotificationService {
 
   final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  /// 방해금지 시간대(설정 화면에서 지정, 기본 꺼짐)에 해당하면 true.
+  /// 결제일처럼 시점이 중요한 예약 알림(구독/고정비)에는 적용하지 않고,
+  /// "오늘의 다짐"·잔소리·상담 리마인더·스트릭 축하처럼 미뤄도 되는
+  /// 즉시 알림에만 적용한다.
+  Future<bool> _isQuietHours() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('dndEnabled') != true) return false;
+    final startMin = prefs.getInt('dndStartMinutes') ?? 22 * 60;
+    final endMin = prefs.getInt('dndEndMinutes') ?? 7 * 60;
+    final now = DateTime.now();
+    final nowMin = now.hour * 60 + now.minute;
+    if (startMin == endMin) return false;
+    if (startMin < endMin) {
+      return nowMin >= startMin && nowMin < endMin;
+    }
+    // 자정을 넘기는 구간 (예: 22:00 ~ 07:00)
+    return nowMin >= startMin || nowMin < endMin;
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -37,6 +57,7 @@ class NotificationService {
   /// 문구를 main.dart 쪽에 중복 하드코딩하지 않기 위함). 안 띄웠으면 null.
   Future<({String title, String body})?> showConsultReminder(int remaining) async {
     if (remaining <= 0) return null;
+    if (await _isQuietHours()) return null;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -55,6 +76,7 @@ class NotificationService {
 
   /// 오늘의 코치 잔소리(AiService.generateNagging 결과)를 알려주는 즉시 알림.
   Future<void> showDailyNagging(String message, {required String title}) async {
+    if (await _isQuietHours()) return;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -71,6 +93,7 @@ class NotificationService {
   /// 아침에 뜨는 짧은 "오늘의 다짐" — 잔소리(지출 집계 기반 분석)와 달리
   /// AI/데이터 연동 없이 고정 문구 목록을 하루 하나씩 순서대로 보여준다.
   Future<void> showDailyResolution(String message) async {
+    if (await _isQuietHours()) return;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -91,6 +114,7 @@ class NotificationService {
 
   /// 연속 접속 마일스톤(7/30/100일) 달성 축하 알림.
   Future<void> showStreakMilestone({required String title, required String body}) async {
+    if (await _isQuietHours()) return;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
