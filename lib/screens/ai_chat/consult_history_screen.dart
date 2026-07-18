@@ -5,6 +5,7 @@ import '../../models/consultation_model.dart';
 import '../../services/ai_service.dart' as ai;
 import '../../services/consultation_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import 'consult_share_card_screen.dart';
 
 const _accent = Color(0xFFF5A623);
 const _ink = Color(0xFF221A16);
@@ -302,6 +303,25 @@ class _InsightCard extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 12, fontWeight: FontWeight.w600, color: _ink, height: 1.4)),
           ),
+          if (total > 0) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => ConsultShareCardScreen(items: items))),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _accent,
+                  side: const BorderSide(color: _accent, width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+                label: const Text('카드로 공유하기',
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -435,7 +455,57 @@ class _ConsultationCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                   fontSize: 12.5, fontWeight: FontWeight.w500, color: _inkSub, height: 1.5)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Text('이 답변이 도움됐나요?',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _inkSub)),
+              const SizedBox(width: 8),
+              _FeedbackIcon(
+                icon: Icons.thumb_up_alt_rounded,
+                active: entry.feedback == 'helpful',
+                onTap: () => _setFeedback('helpful'),
+              ),
+              const SizedBox(width: 4),
+              _FeedbackIcon(
+                icon: Icons.thumb_down_alt_rounded,
+                active: entry.feedback == 'unhelpful',
+                onTap: () => _setFeedback('unhelpful'),
+              ),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  /// 같은 버튼을 다시 누르면 평가를 취소한다. 별도 setState 없이 Firestore
+  /// 스트림(watchHistory)이 업데이트를 받아 화면을 다시 그려준다.
+  Future<void> _setFeedback(String value) {
+    final next = entry.feedback == value ? null : value;
+    return ConsultationService()
+        .setFeedback(uid: uid, consultationId: entry.id, feedback: next);
+  }
+}
+
+class _FeedbackIcon extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  const _FeedbackIcon({required this.icon, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: active ? const Color(0xFFFFF0A6) : _bg,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, size: 13, color: active ? _accent : _inkSub),
       ),
     );
   }

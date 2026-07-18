@@ -7,6 +7,7 @@ class ConsultationEntry {
   final String answer;
   final String? verdictCode; // buy | hold | conditional | null(파싱 실패)
   final DateTime date;
+  final String? feedback; // helpful | unhelpful | null(미평가)
 
   const ConsultationEntry({
     required this.id,
@@ -14,6 +15,7 @@ class ConsultationEntry {
     required this.answer,
     required this.verdictCode,
     required this.date,
+    this.feedback,
   });
 
   factory ConsultationEntry.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -24,6 +26,7 @@ class ConsultationEntry {
       answer: d['answer'] as String? ?? '',
       verdictCode: d['verdictCode'] as String?,
       date: (d['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      feedback: d['feedback'] as String?,
     );
   }
 

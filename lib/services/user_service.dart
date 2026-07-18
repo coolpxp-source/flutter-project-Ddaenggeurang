@@ -79,6 +79,13 @@ class UserService {
     return newStreak;
   }
 
+  /// AI상담을 이용할 때마다 코치와의 친밀도를 조금씩 쌓는다.
+  /// 포인트처럼 레벨을 서버에 미리 계산해서 저장하지 않고, 원점수만 늘려두고
+  /// 화면(coach_tone_setting_screen.dart)에서 그때그때 레벨을 계산해 보여준다.
+  Future<void> addCoachAffection(String uid, int amount) {
+    return _users.doc(uid).update({'coachAffection': FieldValue.increment(amount)});
+  }
+
   /// 닉네임 중복 검사
   Future<bool> isNicknameTaken(String nickname, {String? exceptUid}) async {
     final snap =

@@ -8,6 +8,7 @@ import '../../widgets/common/ddaeng_modal.dart';
 import '../avatar/my_avatar_screen.dart';
 import '../avatar/point_shop_screen.dart';
 import '../mission/mission_list_screen.dart';
+import 'activity_heatmap_screen.dart';
 import 'coach_tone_setting_screen.dart';
 import 'monthly_report_screen.dart';
 import 'notification_setting_screen.dart';
@@ -120,6 +121,15 @@ class MyPageHomeScreen extends StatelessWidget {
                         iconBg: _pinkSoft,
                         onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (_) => const MissionListScreen())),
+                      ),
+                      _MenuRow(
+                        icon: Icons.calendar_month_rounded,
+                        title: '접속 캘린더',
+                        subtitle: '연속 ${user.loginStreak}일째 접속 중',
+                        iconColor: _blue,
+                        iconBg: _blueSoft,
+                        onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const ActivityHeatmapScreen())),
                         showDivider: false,
                       ),
                     ])

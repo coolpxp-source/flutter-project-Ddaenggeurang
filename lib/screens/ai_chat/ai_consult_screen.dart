@@ -37,11 +37,16 @@ class _ChatEntry {
   final String text;
   final ai.Verdict? verdict;
   final String? question; // coach 답변에만 채워짐 — 캘린더 등록 시 일정 제목으로 쓴다.
-  const _ChatEntry.user(this.text)
+  // 저장 완료 후(비동기) 채워지는 문서 id — 피드백(도움됐어요/별로예요) 버튼을
+  // 누를 때 어느 상담 문서를 업데이트할지 알아야 하므로 final이 아니다.
+  String? consultationId;
+  String? feedback;
+
+  _ChatEntry.user(this.text)
       : isUser = true, isError = false, verdict = null, question = null;
-  const _ChatEntry.coach(this.text, this.verdict, {this.question})
+  _ChatEntry.coach(this.text, this.verdict, {this.question})
       : isUser = false, isError = false;
-  const _ChatEntry.error(this.text)
+  _ChatEntry.error(this.text)
       : isUser = false, isError = true, verdict = null, question = null;
 }
 
@@ -173,16 +178,24 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
         daysToPayday: _daysToPayday,
       );
       if (!mounted) return;
-      setState(() =>
-          _messages.add(_ChatEntry.coach(result.comment, result.verdict, question: question)));
+      final coachEntry = _ChatEntry.coach(result.comment, result.verdict, question: question);
+      setState(() => _messages.add(coachEntry));
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid != null) {
-        unawaited(ConsultationService().save(
+        unawaited(ConsultationService()
+            .save(
           uid: uid,
           question: question,
           answer: result.comment,
           verdictCode: result.verdict?.name,
-        ));
+        )
+            .then((id) {
+          coachEntry.consultationId = id;
+          if (mounted) setState(() {});
+        }));
+        // 상담 한 건마다 코치와의 친밀도가 조금씩 쌓인다 — 잔소리 캐릭터 설정
+        // 화면의 호감도 게이지에 반영된다.
+        unawaited(UserService().addCoachAffection(uid, 5));
       }
     } on ai.RateLimitException catch (e) {
       if (!mounted) return;
@@ -193,7 +206,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _messages
-          .add(const _ChatEntry.error('알 수 없는 오류가 발생했어요. 다시 시도해주세요.')));
+          .add(_ChatEntry.error('알 수 없는 오류가 발생했어요. 다시 시도해주세요.')));
     } finally {
       if (mounted) setState(() => _sending = false);
       _scrollToBottom();
@@ -249,7 +262,11 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
               itemCount: _messages.length + (_sending ? 1 : 0),
               itemBuilder: (context, i) {
                 if (i == _messages.length) return const _TypingBubble();
-                return _MessageBubble(entry: _messages[i], imagePath: imagePath);
+                return _MessageBubble(
+                  entry: _messages[i],
+                  imagePath: imagePath,
+                  onFeedbackChanged: () => setState(() {}),
+                );
               },
             ),
           ),
@@ -565,7 +582,23 @@ class _SuggestionRow extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   final _ChatEntry entry;
   final String imagePath;
-  const _MessageBubble({required this.entry, required this.imagePath});
+  final VoidCallback onFeedbackChanged;
+  const _MessageBubble({
+    required this.entry,
+    required this.imagePath,
+    required this.onFeedbackChanged,
+  });
+
+  Future<void> _tapFeedback(String value) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final consultationId = entry.consultationId;
+    if (uid == null || consultationId == null) return;
+    final next = entry.feedback == value ? null : value; // 다시 누르면 평가 취소
+    entry.feedback = next;
+    onFeedbackChanged();
+    await ConsultationService()
+        .setFeedback(uid: uid, consultationId: consultationId, feedback: next);
+  }
 
   /// "사도 됨" 판정을 기기 캘린더에 할 일로 등록한다 — 지출 입력 화면과는
   /// 완전히 별개로, 기기 캘린더 앱에 인텐트만 넘기는 방식이라 별도 권한이 필요 없다.
@@ -697,11 +730,55 @@ class _MessageBubble extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (!entry.isError && entry.consultationId != null) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _FeedbackButton(
+                          icon: Icons.thumb_up_alt_rounded,
+                          active: entry.feedback == 'helpful',
+                          onTap: () => _tapFeedback('helpful'),
+                        ),
+                        const SizedBox(width: 6),
+                        _FeedbackButton(
+                          icon: Icons.thumb_down_alt_rounded,
+                          active: entry.feedback == 'unhelpful',
+                          onTap: () => _tapFeedback('unhelpful'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 코치 답변이 도움이 됐는지 즉석에서 평가하는 작은 토글 버튼.
+/// 같은 버튼을 다시 누르면 평가를 취소한다.
+class _FeedbackButton extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  const _FeedbackButton({required this.icon, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: active ? _accentSoft : _bg,
+          shape: BoxShape.circle,
+          border: active ? Border.all(color: _accent, width: 1.2) : null,
+        ),
+        child: Icon(icon, size: 14, color: active ? _accent : _inkSub),
       ),
     );
   }

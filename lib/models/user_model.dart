@@ -52,6 +52,7 @@ class UserModel {
   final NotificationSettings notificationSettings;
   final String? lastLoginDate; // "yyyy-MM-dd" — 연속 접속 스트릭 계산용
   final int loginStreak;
+  final int coachAffection; // AI상담 이용할 때마다 쌓이는 코치와의 친밀도
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -72,6 +73,7 @@ class UserModel {
     this.notificationSettings = const NotificationSettings(),
     this.lastLoginDate,
     this.loginStreak = 0,
+    this.coachAffection = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -95,6 +97,7 @@ class UserModel {
       NotificationSettings.fromMap(d['notificationSettings']),
       lastLoginDate: d['lastLoginDate'] as String?,
       loginStreak: (d['loginStreak'] ?? 0).toInt(),
+      coachAffection: (d['coachAffection'] ?? 0).toInt(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate(),
     );

@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models/emotion_summary_model.dart';
 import 'models/user_model.dart';
 import 'firebase_options.dart';
+import 'services/activity_calendar_service.dart';
 import 'services/ai_service.dart';
 import 'services/category_summary_service.dart';
 import 'services/emotion_summary_service.dart';
@@ -136,6 +137,11 @@ class AppGate extends StatelessWidget {
 /// 처음 달성한 순간에만 축하 알림을 띄운다. 이미 축하한 마일스톤은
 /// SharedPreferences에 남겨서 같은 스트릭 값으로는 다시 뜨지 않게 한다.
 Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  if (profile.lastLoginDate != today) {
+    unawaited(ActivityCalendarService().markActive(uid, today));
+  }
+
   final newStreak = await UserService().touchLoginStreak(uid, profile);
 
   const milestones = {7, 30, 100};
