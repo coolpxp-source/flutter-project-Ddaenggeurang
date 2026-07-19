@@ -141,24 +141,46 @@ class _HomeScreenState extends State<HomeScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(color: _C.amberSoft, shape: BoxShape.circle),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [_C.amberSoft, Color.lerp(_C.amberSoft, Colors.white, 0.4)!],
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                              color: _C.amberDeep.withValues(alpha: 0.16),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3)),
+                        ],
+                      ),
                       alignment: Alignment.center,
-                      child:
-                          const Icon(Icons.notifications_none_rounded, size: 18, color: _C.amberDeep),
+                      child: Icon(
+                        unread > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+                        size: 19,
+                        color: _C.amberDeep,
+                      ),
                     ),
                     if (unread > 0)
                       Positioned(
-                        top: -2,
-                        right: -2,
+                        top: -3,
+                        right: -3,
                         child: Container(
-                          width: 10,
-                          height: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
                           decoration: BoxDecoration(
                             color: _C.pink,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white, width: 1.6),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(
+                                fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2),
                           ),
                         ),
                       ),
