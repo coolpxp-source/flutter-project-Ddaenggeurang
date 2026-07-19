@@ -6,6 +6,8 @@ import '../../models/coach_tone.dart';
 import '../../models/user_model.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/coach_avatar.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+import 'coach_rps_screen.dart';
 
 const _accent = Color(0xFFF5A623);
 const _accentSoft = Color(0xFFFFF0A6);
@@ -40,6 +42,92 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
     );
   }
 
+  Future<void> _editNickname(UserModel user) async {
+    final ctrl = TextEditingController(text: user.coachNickname);
+    final formKey = GlobalKey<FormState>();
+
+    final result = await DdaengModal.custom<String>(
+      context,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+        child: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${user.coachTone.emoji} 코치 애칭 짓기',
+                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 8),
+              const Text('앞으로 이 이름으로 불러드릴게요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: _inkSub)),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: ctrl,
+                autofocus: true,
+                maxLength: 8,
+                textAlign: TextAlign.center,
+                validator: (v) {
+                  if (v != null && v.trim().length > 8) return '8자 이내로 입력해주세요';
+                  return null;
+                },
+                decoration: InputDecoration(
+                  counterText: '',
+                  hintText: user.coachTone.label,
+                  filled: true,
+                  fillColor: _bg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, ''),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        foregroundColor: _inkSub,
+                        side: const BorderSide(color: Color(0xFFE8ECF3)),
+                        shape:
+                            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('기본 이름으로'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (formKey.currentState!.validate()) {
+                          Navigator.pop(context, ctrl.text.trim());
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        backgroundColor: _accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape:
+                            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('저장'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (result == null) return;
+    await _userService.updateCoachNickname(_uid, result);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -64,6 +152,27 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
             padding: const EdgeInsets.all(20),
             children: [
               _AffectionCard(tone: selected, affection: user.coachAffection),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _CoachActionButton(
+                      icon: Icons.edit_outlined,
+                      label: '${user.coachDisplayName} 애칭 짓기',
+                      onTap: () => _editNickname(user),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _CoachActionButton(
+                      icon: Icons.back_hand_outlined,
+                      label: '오늘의 가위바위보',
+                      onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const CoachRpsScreen())),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 18),
               const Text('코치의 성향에 따라 잔소리 수위가 달라져요',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: _inkSub)),
@@ -172,6 +281,43 @@ class _AffectionCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 애칭 짓기 / 가위바위보 진입용 작은 액션 버튼 — 나란히 2개 배치.
+class _CoachActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _CoachActionButton({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(color: _ink.withValues(alpha: 0.045), blurRadius: 12, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 18, color: _accent),
+            const SizedBox(height: 6),
+            Text(label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _ink)),
+          ],
+        ),
       ),
     );
   }

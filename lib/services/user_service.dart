@@ -79,6 +79,14 @@ class UserService {
     return newStreak;
   }
 
+  /// 코치에게 지어준 애칭 — 빈 문자열로 저장하면 기본 이름(coachTone.label)으로 되돌아간다.
+  Future<void> updateCoachNickname(String uid, String nickname) {
+    return _users.doc(uid).update({
+      'coachNickname': nickname.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   /// AI상담을 이용할 때마다 코치와의 친밀도를 조금씩 쌓는다.
   /// 포인트처럼 레벨을 서버에 미리 계산해서 저장하지 않고, 원점수만 늘려두고
   /// 화면(coach_tone_setting_screen.dart)에서 그때그때 레벨을 계산해 보여준다.

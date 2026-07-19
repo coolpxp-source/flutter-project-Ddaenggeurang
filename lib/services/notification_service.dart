@@ -55,7 +55,13 @@ class NotificationService {
   /// 오늘 남은 AI상담 횟수를 알려주는 즉시 알림.
   /// 실제로 띄운 제목/본문을 반환한다(호출부가 알림함에 그대로 기록할 수 있도록 —
   /// 문구를 main.dart 쪽에 중복 하드코딩하지 않기 위함). 안 띄웠으면 null.
-  Future<({String title, String body})?> showConsultReminder(int remaining) async {
+  /// coachEmoji/coachName은 선택한 코치 톤과 애칭을 반영하기 위한 값 — 안 넘기면
+  /// 기존처럼 땡쥐 기준 문구를 쓴다.
+  Future<({String title, String body})?> showConsultReminder(
+    int remaining, {
+    String coachEmoji = '🐭',
+    String coachName = '땡쥐',
+  }) async {
     if (remaining <= 0) return null;
     if (await _isQuietHours()) return null;
     await init();
@@ -68,7 +74,7 @@ class NotificationService {
         priority: Priority.defaultPriority,
       ),
     );
-    const title = '땡쥐가 기다리고 있어요 🐭';
+    final title = '$coachName가 기다리고 있어요 $coachEmoji';
     final body = '오늘 상담 $remaining회 남았어요. 궁금한 소비가 있다면 물어보세요!';
     await _plugin.show(id: 0, title: title, body: body, notificationDetails: details);
     return (title: title, body: body);

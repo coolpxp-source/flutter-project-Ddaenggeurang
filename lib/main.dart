@@ -122,7 +122,7 @@ class AppGate extends StatelessWidget {
                   onboardingData: PendingOnboarding.data);
             }
             unawaited(_maybeCelebrateStreakMilestone(user.uid, profile));
-            unawaited(_maybeShowConsultReminder(user.uid));
+            unawaited(_maybeShowConsultReminder(user.uid, profile));
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
             unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
             unawaited(_maybeShowDailyNagging(user.uid, profile));
@@ -211,14 +211,17 @@ Future<void> _maybeCelebrateLevelUp(String uid, UserModel profile) async {
 
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
 /// SharedPreferences에 오늘 날짜를 남겨서 같은 날 재실행/재빌드로 중복 발송되지 않게 한다.
-Future<void> _maybeShowConsultReminder(String uid) async {
+Future<void> _maybeShowConsultReminder(String uid, UserModel profile) async {
   final today = DateTime.now().toIso8601String().substring(0, 10);
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getString('lastConsultReminderDate') == today) return;
   await prefs.setString('lastConsultReminderDate', today);
 
-  final shown = await NotificationService.instance
-      .showConsultReminder(AiService().consultRemaining);
+  final shown = await NotificationService.instance.showConsultReminder(
+    AiService().consultRemaining,
+    coachEmoji: profile.coachTone.emoji,
+    coachName: profile.coachDisplayName,
+  );
   if (shown == null) return;
   await NotificationHistoryService()
       .record(uid: uid, title: shown.title, body: shown.body, type: 'consult');
@@ -335,7 +338,7 @@ Future<void> _maybeShowDailyNagging(String uid, UserModel profile) async {
 
   try {
     final text = await AiService().generateNagging(profile.coachTone, dataSummary);
-    final title = '${profile.coachTone.emoji} ${profile.coachTone.label}가 한마디';
+    final title = '${profile.coachTone.emoji} ${profile.coachDisplayName}가 한마디';
     await prefs.setString('lastNaggingDate', today);
     await NotificationService.instance.showDailyNagging(text, title: title);
     await NotificationHistoryService()

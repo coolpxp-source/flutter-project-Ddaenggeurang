@@ -173,7 +173,7 @@ class MyPageHomeScreen extends StatelessWidget {
                         icon: Icons.record_voice_over_rounded,
                         title: '잔소리 캐릭터 설정',
                         subtitle:
-                        '${user.coachTone.emoji} ${user.coachTone.label} · ${user.coachTone.title}',
+                        '${user.coachTone.emoji} ${user.coachDisplayName} · ${user.coachTone.title}',
                         iconColor: _purple,
                         iconBg: _purpleSoft,
                         onTap: () => Navigator.of(context).push(
