@@ -25,6 +25,7 @@ import '../../services/user_service.dart';
 import '../../services/weekly_emotion_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
+import '../../widgets/common/attendance_roulette_dialog.dart';
 import '../../widgets/expense/category_icon_map.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
@@ -98,6 +99,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     HomeRefreshService.signal.addListener(_onHomeRefreshRequested);
+    // 홈 화면(탭 전환이 아니라 앱 진입 시 한 번만 새로 만들어지는 최상위
+    // 위젯)에 처음 들어왔을 때 하루 한 번 출석 룰렛을 띄운다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowRoulette());
   }
 
   @override
@@ -108,6 +112,14 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _onHomeRefreshRequested() {
     if (mounted) setState(() => _dashboardVersion++);
+  }
+
+  Future<void> _maybeShowRoulette() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || !mounted) return;
+    final should = await shouldShowAttendanceRoulette(uid);
+    if (!should || !mounted) return;
+    await showAttendanceRoulette(context, uid: uid);
   }
 
   @override
