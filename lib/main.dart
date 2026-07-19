@@ -122,6 +122,7 @@ class AppGate extends StatelessWidget {
                   onboardingData: PendingOnboarding.data);
             }
             unawaited(_maybeCelebrateStreakMilestone(user.uid, profile));
+            unawaited(_maybeBackfillActivityCalendar(user.uid, profile));
             unawaited(_maybeShowConsultReminder(user.uid, profile));
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
             unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
@@ -184,6 +185,25 @@ Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async
   await NotificationService.instance.showStreakMilestone(title: title, body: body);
   await NotificationHistoryService()
       .record(uid: uid, title: title, body: body, type: 'streak');
+}
+
+/// 접속 캘린더(activityDays)는 이 기능을 배포한 날부터만 기록되기 시작해서,
+/// 그전부터 쌓여 있던 users.loginStreak과 화면에 보이는 숫자가 서로 안 맞는
+/// 문제가 있었다. 기기당 한 번만 loginStreak 기준으로 과거 날짜를 역산해서
+/// activityDays를 채워 넣어 두 값을 맞춘다.
+Future<void> _maybeBackfillActivityCalendar(String uid, UserModel profile) async {
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'activityBackfillDone_$uid';
+  if (prefs.getBool(key) == true) return;
+  await prefs.setBool(key, true);
+
+  final lastLoginDate = profile.lastLoginDate;
+  if (lastLoginDate == null) return;
+  await ActivityCalendarService().backfillFromStreak(
+    uid,
+    lastLoginDate: lastLoginDate,
+    loginStreak: profile.loginStreak,
+  );
 }
 
 /// 포인트가 쌓여 레벨이 오른 순간을 감지해서 축하 알림을 띄운다. 미션 보상
