@@ -16,6 +16,7 @@ import '../../services/ai_service.dart';
 import '../../services/budget_service.dart';
 import '../../services/category_summary_service.dart';
 import '../../services/emotion_summary_service.dart';
+import '../../services/home_refresh_service.dart';
 import '../../services/notification_history_service.dart';
 import '../../services/psychology_test_service.dart';
 import '../../services/spending_challenge_service.dart';
@@ -87,6 +88,27 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   NavTab _currentTab = NavTab.home;
+
+  // 홈 대시보드는 데이터를 FutureBuilder로 한 번만 읽어오므로, 지출 입력 등
+  // 다른 화면에서 돌아왔을 때 HomeRefreshService 신호를 받으면 이 값을 올려서
+  // _HomeDashboard에 새 key를 줘 통째로 다시 만든다(모든 FutureBuilder 재실행).
+  int _dashboardVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    HomeRefreshService.signal.addListener(_onHomeRefreshRequested);
+  }
+
+  @override
+  void dispose() {
+    HomeRefreshService.signal.removeListener(_onHomeRefreshRequested);
+    super.dispose();
+  }
+
+  void _onHomeRefreshRequested() {
+    if (mounted) setState(() => _dashboardVersion++);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -173,7 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody(String uid) {
     switch (_currentTab) {
       case NavTab.home:
-        return _HomeDashboard(uid: uid);
+        return _HomeDashboard(key: ValueKey(_dashboardVersion), uid: uid);
       case NavTab.expense:
         return const _TabPlaceholder(title: '지출');
       case NavTab.aiConsult:
@@ -216,7 +238,7 @@ class _TabPlaceholder extends StatelessWidget {
 
 class _HomeDashboard extends StatefulWidget {
   final String uid;
-  const _HomeDashboard({required this.uid});
+  const _HomeDashboard({super.key, required this.uid});
 
   @override
   State<_HomeDashboard> createState() => _HomeDashboardState();
@@ -905,7 +927,8 @@ class _QuickActionsGrid extends StatelessWidget {
         bg: _C.amberSoft,
         fg: _C.amberDeep,
         onTap: (context) => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const RecordTypeSelectScreen())),
+            .push(MaterialPageRoute(builder: (_) => const RecordTypeSelectScreen()))
+            .then((_) => HomeRefreshService.requestRefresh()),
       ),
       _QuickActionButton(
         label: '영수증',

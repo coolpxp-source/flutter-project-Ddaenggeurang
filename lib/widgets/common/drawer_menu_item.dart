@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../services/home_refresh_service.dart';
 
 /// 사이드바(Drawer) 안의 메뉴 한 줄.
 /// icon/title/destinationScreen만 넘기면 탭 시 사이드바 닫고 해당 화면으로 이동.
@@ -40,7 +41,7 @@ class DrawerMenuItem extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => destinationScreen),
-        );
+        ).then((_) => HomeRefreshService.requestRefresh());
       },
     );
   }
