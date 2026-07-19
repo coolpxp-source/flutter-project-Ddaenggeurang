@@ -39,6 +39,9 @@ class _NotificationSettingScreenState extends State<NotificationSettingScreen> {
   void initState() {
     super.initState();
     _loadDndSettings();
+    // 마이페이지 "시작하기 체크리스트"의 "알림 설정 확인하기" 항목용 방문 기록.
+    SharedPreferences.getInstance()
+        .then((prefs) => prefs.setBool('visitedNotificationSettings', true));
   }
 
   Future<void> _loadDndSettings() async {

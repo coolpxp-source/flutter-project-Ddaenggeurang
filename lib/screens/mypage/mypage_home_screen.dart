@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/user_model.dart';
+import '../../services/app_lock_service.dart';
 import '../../services/auth_service.dart';
 import '../../services/user_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
@@ -10,6 +13,7 @@ import '../avatar/point_shop_screen.dart';
 import '../mission/mission_list_screen.dart';
 import 'activity_heatmap_screen.dart';
 import 'coach_tone_setting_screen.dart';
+import 'login_history_screen.dart';
 import 'monthly_report_screen.dart';
 import 'notification_setting_screen.dart';
 import 'profile_edit_screen.dart';
@@ -79,6 +83,12 @@ class MyPageHomeScreen extends StatelessWidget {
                   children: [
                     _ProfileCard(user: user)
                         .animate()
+                        .fadeIn(duration: 420.ms, curve: Curves.easeOut)
+                        .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
+                    const SizedBox(height: 16),
+
+                    _StartupChecklistCard(user: user)
+                        .animate(delay: 60.ms)
                         .fadeIn(duration: 420.ms, curve: Curves.easeOut)
                         .slideY(begin: 0.08, end: 0, curve: Curves.easeOutCubic),
                     const SizedBox(height: 24),
@@ -452,6 +462,192 @@ class _ProfileCard extends StatelessWidget {
               fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white.withValues(alpha: 0.8))),
     ],
   );
+}
+
+// ─────────────────────── 시작하기 체크리스트 ───────────────────────
+
+class _ChecklistItem {
+  final String label;
+  final IconData icon;
+  final bool done;
+  final VoidCallback onTap;
+  const _ChecklistItem({
+    required this.label,
+    required this.icon,
+    required this.done,
+    required this.onTap,
+  });
+}
+
+/// 계정을 처음 만들고 나서 놓치기 쉬운 설정들을 한 번씩 둘러보게 유도하는
+/// 체크리스트. 닉네임·연령대·직군은 가입할 때 이미 필수로 채워지므로 게이지에
+/// 넣어봐야 항상 꽉 차 있어 의미가 없다 — 대신 "월 수입 입력"처럼 진짜 비어있을
+/// 수 있는 값과, 그동안 만든 기능(알림설정/로그인활동/앱잠금/AI상담)을 한 번씩
+/// 써봤는지를 기준으로 삼는다. 5개를 다 채우면 포인트를 지급한다.
+class _StartupChecklistCard extends StatefulWidget {
+  final UserModel user;
+  const _StartupChecklistCard({required this.user});
+
+  @override
+  State<_StartupChecklistCard> createState() => _StartupChecklistCardState();
+}
+
+class _StartupChecklistCardState extends State<_StartupChecklistCard> {
+  bool? _appLockOn;
+  bool _visitedNotificationSettings = false;
+  bool _visitedLoginHistory = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final appLockOn = await AppLockService.instance.isEnabled();
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _appLockOn = appLockOn;
+      _visitedNotificationSettings = prefs.getBool('visitedNotificationSettings') ?? false;
+      _visitedLoginHistory = prefs.getBool('visitedLoginHistory') ?? false;
+    });
+  }
+
+  /// 체크리스트 항목 화면(알림설정/로그인활동/설정)은 전부 push로 열리는데,
+  /// pop으로 돌아왔을 때 방문 플래그나 앱잠금 상태가 바뀌었을 수 있으니
+  /// initState에서 한 번만 읽고 끝내지 않고 매번 다시 읽어와 갱신한다.
+  Future<void> _pushAndReload(Widget screen) async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+    if (mounted) _load();
+  }
+
+  Future<void> _maybeRewardCompletion(bool allDone) async {
+    if (!allDone) return;
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'startupChecklistRewarded_${widget.user.userId}';
+    if (prefs.getBool(key) == true) return;
+    await prefs.setBool(key, true);
+    await UserService().addPoints(widget.user.userId, 20);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('시작하기 체크리스트 완료! +20P 지급됐어요 🎉'),
+        backgroundColor: _accent,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_appLockOn == null) return const SizedBox.shrink(); // 로딩 중엔 표시 안 함
+
+    final items = [
+      _ChecklistItem(
+        label: '월 수입 입력하기',
+        icon: Icons.savings_outlined,
+        done: widget.user.salary > 0,
+        onTap: () => _pushAndReload(const ProfileEditScreen()),
+      ),
+      _ChecklistItem(
+        label: 'AI상담 한 번 이용해보기',
+        icon: Icons.forum_outlined,
+        done: widget.user.coachAffection > 0,
+        onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('AI상담 탭에서 살까 말까 고민되는 걸 물어보세요'),
+          backgroundColor: _ink,
+          behavior: SnackBarBehavior.floating,
+        )),
+      ),
+      _ChecklistItem(
+        label: '알림 설정 확인하기',
+        icon: Icons.notifications_none_rounded,
+        done: _visitedNotificationSettings,
+        onTap: () => _pushAndReload(const NotificationSettingScreen()),
+      ),
+      _ChecklistItem(
+        label: '로그인 보안 확인하기',
+        icon: Icons.shield_outlined,
+        done: _visitedLoginHistory,
+        onTap: () => _pushAndReload(const LoginHistoryScreen()),
+      ),
+      _ChecklistItem(
+        label: '앱 잠금 켜기',
+        icon: Icons.fingerprint_rounded,
+        done: _appLockOn == true,
+        onTap: () => _pushAndReload(const SettingScreen()),
+      ),
+    ];
+
+    final doneCount = items.where((e) => e.done).length;
+    final allDone = doneCount == items.length;
+    unawaited(_maybeRewardCompletion(allDone));
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: _ink.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('시작하기 체크리스트',
+                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: _ink)),
+              ),
+              Text('$doneCount/${items.length}',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: _accent)),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: LinearProgressIndicator(
+              value: doneCount / items.length,
+              minHeight: 6,
+              backgroundColor: _bg,
+              valueColor: const AlwaysStoppedAnimation(_accent),
+            ),
+          ),
+          if (allDone) ...[
+            const SizedBox(height: 12),
+            const Text('전부 완료했어요! 땡그랑을 제대로 쓸 준비 끝 🎉',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _accent)),
+          ] else ...[
+            const SizedBox(height: 6),
+            for (final item in items.where((e) => !e.done))
+              InkWell(
+                onTap: item.onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Icon(item.icon, size: 16, color: _inkSub),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(item.label,
+                            style: const TextStyle(
+                                fontSize: 12.5, fontWeight: FontWeight.w600, color: _ink)),
+                      ),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: _inkSub),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────── 공용 하위 위젯 ───────────────────────

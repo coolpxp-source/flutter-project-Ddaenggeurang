@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/login_history_entry.dart';
 import '../../services/login_history_service.dart';
 
@@ -83,6 +85,9 @@ class LoginHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
+    // 마이페이지 "시작하기 체크리스트"의 "로그인 보안 확인하기" 항목용 방문 기록.
+    unawaited(SharedPreferences.getInstance()
+        .then((prefs) => prefs.setBool('visitedLoginHistory', true)));
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
