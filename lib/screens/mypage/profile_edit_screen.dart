@@ -18,6 +18,16 @@ const _line = Color(0xFFF0E9E4);
 const _errorColor = Color(0xFFF04438);
 const _okColor = Color(0xFF12B76A);
 
+// 필드마다 성격에 맞는 포인트 컬러 — 마이페이지 홈의 메뉴 팔레트와 톤을 맞춘다.
+const _amberDeep = Color(0xFF8A5200);
+const _amberSoft = Color(0xFFFFF3DE);
+const _mint = Color(0xFF00A98A);
+const _mintSoft = Color(0xFFDBF7F3);
+const _pink = Color(0xFFFF6F91);
+const _pinkSoft = Color(0xFFFFE3EC);
+const _purple = Color(0xFF6C5CE7);
+const _purpleSoft = Color(0xFFEDE9FE);
+
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
 
@@ -233,175 +243,137 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _PreviewCard(user: _user, nickname: _nicknameCtrl.text),
-            const SizedBox(height: 26),
+            const SizedBox(height: 24),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const _FieldLabel('닉네임', icon: Icons.badge_outlined),
-                Text('$_nicknameLength/10',
-                    style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w600,
-                        color: _nicknameLength > 10 ? _errorColor : _inkSub)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _nicknameCtrl,
-              maxLength: 10,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: _ink),
-              decoration: InputDecoration(
-                counterText: '',
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                suffixIcon: _checkingNickname
-                    ? const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: SizedBox(
-                      width: 16,
-                      height: 16,
-                      child:
-                      CircularProgressIndicator(strokeWidth: 2, color: _accent)),
-                )
-                    : _nicknameAvailable == true
-                    ? const Icon(Icons.check_circle_rounded, color: _okColor)
-                    : _nicknameAvailable == false
-                    ? const Icon(Icons.cancel_rounded, color: _errorColor)
-                    : null,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _line)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _line)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _accent, width: 1.6)),
+            const _SectionLabel('기본 정보'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                      color: _ink.withValues(alpha: 0.045), blurRadius: 16, offset: const Offset(0, 6)),
+                ],
               ),
-            ),
-            if (_nicknameAvailable == false)
-              const Padding(
-                padding: EdgeInsets.only(top: 6, left: 4),
-                child: Text('이미 사용 중인 닉네임이에요',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _errorColor)),
-              )
-            else if (_nicknameAvailable == true)
-              const Padding(
-                padding: EdgeInsets.only(top: 6, left: 4),
-                child: Text('✓ 사용 가능한 닉네임이에요',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _okColor)),
-              ),
-            const SizedBox(height: 22),
-
-            const _FieldLabel('월 실수령액', icon: Icons.savings_outlined),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _salaryCtrl,
-              keyboardType: TextInputType.number,
-              inputFormatters: [ThousandsFormatter()],
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink),
-              decoration: InputDecoration(
-                suffixText: '원',
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _line)),
-                enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _line)),
-                focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: _accent, width: 1.6)),
-              ),
-            ),
-            if (parseAmount(_salaryCtrl.text) > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 6, left: 4),
-                child: Text(koreanAmount(parseAmount(_salaryCtrl.text)),
-                    style: const TextStyle(
-                        fontSize: 12, fontWeight: FontWeight.w700, color: _accent)),
-              ),
-            const SizedBox(height: 22),
-
-            const _FieldLabel('연령대', icon: Icons.cake_outlined),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _openAgeSheet,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _ink.withValues(alpha: 0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                        child: Text(_ageGroup.isEmpty ? '선택해주세요' : _ageGroup,
-                            style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                                color: _ageGroup.isEmpty ? _inkSub : _ink))),
-                    const Icon(Icons.keyboard_arrow_down_rounded, color: _inkSub),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 22),
-
-            const _FieldLabel('직군', icon: Icons.work_outline_rounded),
-            const SizedBox(height: 8),
-            GestureDetector(
-              onTap: _openJobSheet,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                        color: _ink.withValues(alpha: 0.04),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration:
-                      const BoxDecoration(color: _accentSoft, shape: BoxShape.circle),
-                      alignment: Alignment.center,
-                      child: Text(_job != null ? (_jobIcons[_job] ?? '✨') : '💭',
-                          style: const TextStyle(fontSize: 16)),
+              child: Column(
+                children: [
+                  _FieldBlock(
+                    icon: Icons.badge_rounded,
+                    iconColor: _amberDeep,
+                    iconBg: _amberSoft,
+                    label: '닉네임',
+                    trailing: Text('$_nicknameLength/10',
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: _nicknameLength > 10 ? _errorColor : _inkSub)),
+                    footer: _nicknameAvailable == false
+                        ? const Text('이미 사용 중인 닉네임이에요',
+                            style:
+                                TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _errorColor))
+                        : _nicknameAvailable == true
+                            ? const Text('✓ 사용 가능한 닉네임이에요',
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w600, color: _okColor))
+                            : null,
+                    child: TextField(
+                      controller: _nicknameCtrl,
+                      maxLength: 10,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: _ink),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        isDense: true,
+                        filled: true,
+                        fillColor: _bg,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        suffixIcon: _checkingNickname
+                            ? const Padding(
+                                padding: EdgeInsets.all(14),
+                                child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: _accent)),
+                              )
+                            : _nicknameAvailable == true
+                                ? const Icon(Icons.check_circle_rounded, color: _okColor)
+                                : _nicknameAvailable == false
+                                    ? const Icon(Icons.cancel_rounded, color: _errorColor)
+                                    : null,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _accent, width: 1.6)),
+                      ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                        child: Text(_job ?? '직군을 선택해주세요',
-                            style: TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w600,
-                                color: _job == null ? _inkSub : _ink))),
-                    const Icon(Icons.keyboard_arrow_down_rounded, color: _inkSub),
-                  ],
-                ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.savings_rounded,
+                    iconColor: _mint,
+                    iconBg: _mintSoft,
+                    label: '월 실수령액',
+                    footer: parseAmount(_salaryCtrl.text) > 0
+                        ? Text(koreanAmount(parseAmount(_salaryCtrl.text)),
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700, color: _mint))
+                        : null,
+                    child: TextField(
+                      controller: _salaryCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsFormatter()],
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink),
+                      decoration: InputDecoration(
+                        suffixText: '원',
+                        isDense: true,
+                        filled: true,
+                        fillColor: _bg,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _accent, width: 1.6)),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.cake_rounded,
+                    iconColor: _pink,
+                    iconBg: _pinkSoft,
+                    label: '연령대',
+                    child: _PickerTile(
+                      onTap: _openAgeSheet,
+                      text: _ageGroup.isEmpty ? '선택해주세요' : _ageGroup,
+                      placeholder: _ageGroup.isEmpty,
+                    ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.work_rounded,
+                    iconColor: _purple,
+                    iconBg: _purpleSoft,
+                    label: '직군',
+                    child: _PickerTile(
+                      onTap: _openJobSheet,
+                      text: _job ?? '직군을 선택해주세요',
+                      placeholder: _job == null,
+                      leadingEmoji: _job != null ? (_jobIcons[_job] ?? '✨') : null,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 28),
 
             SizedBox(
               width: double.infinity,
@@ -425,6 +397,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     : const Text('저장하기',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ),
+            ),
+            const SizedBox(height: 14),
+            Center(
+              child: Text('입력한 정보는 코치가 나에게 맞는 조언을 해줄 때만 쓰여요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _inkSub)),
             ),
           ]
               .animate(interval: 45.ms)
@@ -525,23 +503,119 @@ class _PreviewCard extends StatelessWidget {
   }
 }
 
-class _FieldLabel extends StatelessWidget {
+class _SectionLabel extends StatelessWidget {
   final String text;
-  final IconData? icon;
-  const _FieldLabel(this.text, {this.icon});
+  const _SectionLabel(this.text);
 
   @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      if (icon != null) ...[
-        Icon(icon, size: 15, color: _inkSub),
-        const SizedBox(width: 5),
-      ],
-      Text(text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _ink)),
-    ],
-  );
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(text,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _inkSub)),
+      );
+}
+
+/// 프로필 수정 카드 안의 필드 한 칸 — 컬러 아이콘 + 라벨(+옵션 트레일링) 위에
+/// 실제 입력 위젯을, 그 아래에 옵션 안내문(footer)을 쌓는다. 필드마다 흩어져
+/// 있던 흰 박스들을 카드 하나로 묶으면서 성격이 잘 드러나도록 아이콘에 색을 준다.
+class _FieldBlock extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final Widget child;
+  final Widget? trailing;
+  final Widget? footer;
+
+  const _FieldBlock({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.child,
+    this.trailing,
+    this.footer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 14, color: iconColor),
+              ),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _ink)),
+              const Spacer(),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+          if (footer != null) ...[
+            const SizedBox(height: 6),
+            Padding(padding: const EdgeInsets.only(left: 2), child: footer!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 연령대/직군처럼 바텀시트를 여는 선택형 필드의 공통 모양.
+class _PickerTile extends StatelessWidget {
+  final VoidCallback onTap;
+  final String text;
+  final bool placeholder;
+  final String? leadingEmoji;
+
+  const _PickerTile({
+    required this.onTap,
+    required this.text,
+    required this.placeholder,
+    this.leadingEmoji,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            if (leadingEmoji != null) ...[
+              Text(leadingEmoji!, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: placeholder ? _inkSub : _ink)),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: _inkSub),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─────────────────────── 직군 검색 그리드 바텀시트 ───────────────────────
