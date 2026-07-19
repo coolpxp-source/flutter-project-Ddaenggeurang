@@ -137,50 +137,33 @@ class _HomeScreenState extends State<HomeScreen> {
               stream: NotificationHistoryService().watchUnreadCount(uid),
               builder: (context, snap) {
                 final unread = snap.data ?? 0;
+                // 다른 헤더 아이콘(햄버거 메뉴)처럼 배경 없이 아이콘 자체만 두고,
+                // 안 읽은 알림이 있을 때만 우상단에 작은 개수 배지를 얹는다.
                 return Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [_C.amberSoft, Color.lerp(_C.amberSoft, Colors.white, 0.4)!],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                              color: _C.amberDeep.withValues(alpha: 0.16),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3)),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Icon(
-                        unread > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
-                        size: 19,
-                        color: _C.amberDeep,
-                      ),
+                    Icon(
+                      unread > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+                      size: 24,
+                      color: _C.ink,
                     ),
                     if (unread > 0)
                       Positioned(
-                        top: -3,
-                        right: -3,
+                        top: -4,
+                        right: -4,
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 4),
-                          constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           decoration: BoxDecoration(
                             color: _C.pink,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white, width: 1.6),
+                            border: Border.all(color: Colors.white, width: 1.4),
                           ),
                           alignment: Alignment.center,
                           child: Text(
                             unread > 9 ? '9+' : '$unread',
                             style: const TextStyle(
-                                fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2),
+                                fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2),
                           ),
                         ),
                       ),
