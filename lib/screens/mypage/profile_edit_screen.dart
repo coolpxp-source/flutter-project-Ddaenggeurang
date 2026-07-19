@@ -64,30 +64,44 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _load() async {
-    final user = await _userService.getUser(_uid);
-    final optionsDoc =
-    await FirebaseFirestore.instance.collection('metadata').doc('options').get();
-    final options = optionsDoc.data();
-    if (options != null) {
-      if (options['ageGroups'] != null) {
-        _ageGroups = List<String>.from(options['ageGroups']);
+    try {
+      final user = await _userService.getUser(_uid);
+      if (user != null) {
+        _user = user;
+        _originalNickname = user.nickname;
+        _nicknameCtrl.text = user.nickname;
+        _salaryCtrl.text = comma(user.salary);
+        _ageGroup = user.ageGroup;
+        _job = user.job.isEmpty ? null : user.job;
       }
-      if (options['jobs'] != null) {
-        _jobs = List<String>.from(options['jobs']);
-        if (!_jobs.contains('기타')) _jobs.add('기타');
-      }
-      if (options['jobIcons'] != null) {
-        _jobIcons = Map<String, String>.from(options['jobIcons']);
-      }
+    } catch (_) {
+      // 내 프로필 정보 로드 실패 — 그래도 화면은 열어서 재시도할 수 있게 한다.
     }
-    if (user != null) {
-      _user = user;
-      _originalNickname = user.nickname;
-      _nicknameCtrl.text = user.nickname;
-      _salaryCtrl.text = comma(user.salary);
-      _ageGroup = user.ageGroup;
-      _job = user.job.isEmpty ? null : user.job;
+
+    // metadata/options(연령대·직군 옵션)는 별도 문서라 실패해도 프로필 자체는
+    // 볼 수 있어야 하므로 독립적으로 try/catch한다 — 여기서 던지면 위 유저 정보까지
+    // 화면에 못 띄우고 로딩에 영원히 갇힌다(실제로 발생했던 버그).
+    try {
+      final optionsDoc =
+          await FirebaseFirestore.instance.collection('metadata').doc('options').get();
+      final options = optionsDoc.data();
+      if (options != null) {
+        if (options['ageGroups'] != null) {
+          _ageGroups = List<String>.from(options['ageGroups']);
+        }
+        if (options['jobs'] != null) {
+          _jobs = List<String>.from(options['jobs']);
+          if (!_jobs.contains('기타')) _jobs.add('기타');
+        }
+        if (options['jobIcons'] != null) {
+          _jobIcons = Map<String, String>.from(options['jobIcons']);
+        }
+      }
+    } catch (_) {
+      // 옵션 목록 로드 실패 — 최소한 "기타"는 고를 수 있게 fallback을 남긴다.
+      if (_jobs.isEmpty) _jobs = ['기타'];
     }
+
     if (mounted) setState(() => _loading = false);
   }
 
