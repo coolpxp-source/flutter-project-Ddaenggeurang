@@ -27,6 +27,53 @@ class GroupService {
     return user.uid;
   }
 
+  // 현재 사용자의 그룹 권한 조회 메서드
+  Future<String> getCurrentUserGroupRole({
+    required String groupId,
+  }) async {
+    final String userId = _currentUserId;
+
+    if (groupId.trim().isEmpty) {
+      throw Exception('그룹 정보가 올바르지 않습니다.');
+    }
+
+    final DocumentSnapshot<Map<String, dynamic>> groupDocument =
+    await _firestore
+        .collection('groups')
+        .doc(groupId)
+        .get();
+
+    if (!groupDocument.exists) {
+      throw Exception('그룹 정보를 찾을 수 없습니다.');
+    }
+
+    final Map<String, dynamic> groupData =
+        groupDocument.data() ?? {};
+
+    final List<String> memberIds = List<String>.from(
+      groupData['memberIds'] as List? ?? <String>[],
+    );
+
+    if (!memberIds.contains(userId)) {
+      throw Exception('해당 그룹의 멤버만 접근할 수 있습니다.');
+    }
+
+    final String ownerId =
+        groupData['ownerId'] as String? ?? '';
+
+    if (ownerId == userId) {
+      return 'owner';
+    }
+
+    final Map<String, dynamic> memberRoles =
+    Map<String, dynamic>.from(
+      groupData['memberRoles'] as Map? ??
+          <String, dynamic>{},
+    );
+
+    return memberRoles[userId] as String? ?? 'viewer';
+  }
+
   // 그룹 공동지출 목록 조회 메서드
   Future<List<SharedExpenseModel>> getSharedExpenses({
     required String groupId,

@@ -697,6 +697,8 @@ class _GroupPermissionScreenState
               ],
             ),
           ),
+
+          // 그룹장 멤버는 그룹장 표시
           if (isOwner)
             Container(
               padding: const EdgeInsets.symmetric(
@@ -716,7 +718,9 @@ class _GroupPermissionScreenState
                 ),
               ),
             )
-          else
+
+          // 현재 로그인 사용자가 그룹장일 때만 멤버 권한 변경 가능
+          else if (_isOwner)
             PopupMenuButton<String>(
               onSelected: (value) {
                 _changeRole(member, value);
@@ -761,6 +765,30 @@ class _GroupPermissionScreenState
                       size: 18,
                     ),
                   ],
+                ),
+              ),
+            )
+
+          // editor / viewer는 현재 권한만 표시
+          else
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 8,
+              ),
+              decoration: BoxDecoration(
+                color: roleColor.withValues(
+                  alpha: 0.1,
+                ),
+                borderRadius:
+                BorderRadius.circular(14),
+              ),
+              child: Text(
+                _getRoleLabel(role),
+                style: TextStyle(
+                  color: roleColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),

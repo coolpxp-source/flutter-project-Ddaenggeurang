@@ -28,11 +28,57 @@ class _SharedExpenseListScreenState
   List<SharedExpenseModel> _expenses = [];
   int _totalAmount = 0;
   bool _isLoadingExpenses = true;
+  String _currentUserRole = 'viewer';
+  bool _isLoadingRole = true;
+  // 공동지출 수정 권한 확인
+  bool get _canEditExpense {
+    return _currentUserRole == 'owner' ||
+        _currentUserRole == 'editor';
+  }
+
 
   @override
   void initState() {
     super.initState();
+    _loadCurrentUserRole();
     _loadExpenses();
+  }
+
+  // 현재 사용자의 그룹 권한 조회 메서드
+  Future<void> _loadCurrentUserRole() async {
+    try {
+      final String role =
+      await GroupService.instance
+          .getCurrentUserGroupRole(
+        groupId: widget.group.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUserRole = role;
+        _isLoadingRole = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentUserRole = 'viewer';
+        _isLoadingRole = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '그룹 권한을 확인하지 못했습니다: $error',
+          ),
+        ),
+      );
+    }
   }
 
   // 공동지출 목록 조회 메서드
@@ -143,23 +189,29 @@ class _SharedExpenseListScreenState
         ),
       ),
       floatingActionButton:
-      FloatingActionButton.extended(
+      !_isLoadingRole && _canEditExpense
+          ? FloatingActionButton.extended(
         onPressed: () async {
-          final bool? isAdded = await Navigator.push<bool>(
+          final bool? isAdded =
+          await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => SharedExpenseAddScreen(
-                groupId: widget.group.id,
-              ),
+              builder: (context) =>
+                  SharedExpenseAddScreen(
+                    groupId: widget.group.id,
+                  ),
             ),
           );
+
           if (isAdded == true) {
             _loadExpenses();
 
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(context).showSnackBar(
+
+            ScaffoldMessenger.of(context)
+                .showSnackBar(
               const SnackBar(
                 content: Text(
                   '공동 지출이 등록되었습니다.',
@@ -180,7 +232,8 @@ class _SharedExpenseListScreenState
             fontWeight: FontWeight.bold,
           ),
         ),
-      ),
+      )
+          : null,
       body: SafeArea(
         child: ListView(
           padding:
@@ -691,105 +744,90 @@ class _SharedExpenseListScreenState
 
                 const SizedBox(height: 24),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          Navigator.pop(
-                            bottomSheetContext,
-                          );
+                if (_canEditExpense)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            Navigator.pop(
+                              bottomSheetContext,
+                            );
 
-                          final bool? isUpdated =
-                          await Navigator.push<bool>(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  SharedExpenseEditScreen(
-                                    expense: expense,
-                                  ),
-                            ),
-                          );
-
-                          if (isUpdated == true) {
-                            _loadExpenses();
-
-                            if (!mounted) {
-                              return;
-                            }
-
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  '공동 지출이 수정되었습니다.',
-                                ),
+                            final bool? isUpdated =
+                            await Navigator.push<bool>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    SharedExpenseEditScreen(
+                                      expense: expense,
+                                    ),
                               ),
                             );
-                          }
-                        },
-                        icon: const Icon(
-                          Icons.edit_outlined,
-                        ),
-                        label:
-                        const Text('수정'),
-                        style:
-                        OutlinedButton
-                            .styleFrom(
-                          foregroundColor:
-                          const Color(
-                            0xFF8566FF,
+
+                            if (isUpdated == true) {
+                              _loadExpenses();
+
+                              if (!mounted) {
+                                return;
+                              }
+
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    '공동 지출이 수정되었습니다.',
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.edit_outlined,
                           ),
-                          side:
-                          const BorderSide(
-                            color: Color(
-                              0xFF8566FF,
+                          label: const Text('수정'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor:
+                            const Color(0xFF8566FF),
+                            side: const BorderSide(
+                              color: Color(0xFF8566FF),
+                            ),
+                            padding:
+                            const EdgeInsets.symmetric(
+                              vertical: 14,
                             ),
                           ),
-                          padding:
-                          const EdgeInsets
-                              .symmetric(
-                            vertical: 14,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            _confirmDeleteExpense(
+                              bottomSheetContext,
+                              expense,
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                          ),
+                          label: const Text('삭제'),
+                          style:
+                          ElevatedButton.styleFrom(
+                            backgroundColor:
+                            const Color(0xFFE66A9F),
+                            foregroundColor:
+                            Colors.white,
+                            elevation: 0,
+                            padding:
+                            const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child:
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          _confirmDeleteExpense(
-                            bottomSheetContext,
-                            expense,
-                          );
-                        },
-                        icon: const Icon(
-                          Icons
-                              .delete_outline_rounded,
-                        ),
-                        label:
-                        const Text('삭제'),
-                        style:
-                        ElevatedButton
-                            .styleFrom(
-                          backgroundColor:
-                          const Color(
-                            0xFFE66A9F,
-                          ),
-                          foregroundColor:
-                          Colors.white,
-                          elevation: 0,
-                          padding:
-                          const EdgeInsets
-                              .symmetric(
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
