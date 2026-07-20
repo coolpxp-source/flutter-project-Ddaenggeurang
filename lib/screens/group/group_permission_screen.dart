@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'shared_expense_list_screen.dart';
 import '../../models/group_model.dart';
 import '../../services/group_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
 
 class GroupPermissionScreen extends StatefulWidget {
   const GroupPermissionScreen({
@@ -19,6 +21,7 @@ class GroupPermissionScreen extends StatefulWidget {
 class _GroupPermissionScreenState
     extends State<GroupPermissionScreen> {
 
+
   final GroupService _groupService =
       GroupService.instance;
 
@@ -27,9 +30,19 @@ class _GroupPermissionScreenState
   bool _isLoadingMembers = true;
   bool _isChangingRole = false;
 
+  late String _groupName;
+
+// 현재 로그인 사용자가 그룹장인지 확인
+  bool get _isOwner {
+    return widget.group.ownerId ==
+        FirebaseAuth.instance.currentUser?.uid;
+  }
+  bool _hasGroupChanged = false;
+
   @override
   void initState() {
     super.initState();
+    _groupName = widget.group.name;
     _loadMembers();
   }
 
@@ -114,6 +127,139 @@ class _GroupPermissionScreenState
     }
   }
 
+  // 그룹 이름 변경 다이얼로그를 표시하는 메서드
+  Future<void> _showRenameGroupDialog() async {
+    final controller = TextEditingController(
+      text: _groupName,
+    );
+
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('그룹 이름 변경'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: '새 그룹 이름을 입력하세요',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+              },
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  controller.text.trim(),
+                );
+              },
+              child: const Text('변경'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (newName == null || newName.isEmpty) {
+      return;
+    }
+
+    try {
+      await _groupService.updateGroupName(
+        groupId: widget.group.id,
+        name: newName,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _groupName = newName;
+        _hasGroupChanged = true;
+      });
+
+      _showMessage('그룹 이름을 변경했습니다.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
+  // 그룹 삭제 여부를 확인하는 메서드
+  Future<void> _confirmDeleteGroup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('그룹 삭제'),
+          content: const Text(
+            '그룹을 삭제하면 공동지출 데이터도 함께 삭제됩니다.\n'
+                '정말 삭제하시겠습니까?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  false,
+                );
+              },
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  dialogContext,
+                  true,
+                );
+              },
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await _groupService.deleteGroup(
+        groupId: widget.group.id,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pop(
+        context,
+        true,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
   // 안내 메시지 표시 메서드
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -152,6 +298,17 @@ class _GroupPermissionScreenState
     return Scaffold(
       backgroundColor: const Color(0xFFF7F6FA),
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+          ),
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _hasGroupChanged,
+            );
+          },
+        ),
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
         elevation: 0,
@@ -175,9 +332,17 @@ class _GroupPermissionScreenState
           children: [
             _buildGroupHeader(),
             const SizedBox(height: 20),
+
             _buildPermissionGuide(),
             const SizedBox(height: 20),
+
             _buildMemberSection(),
+
+            if (_isOwner) ...[
+              const SizedBox(height: 20),
+              _buildGroupManagementSection(),
+            ],
+
             const SizedBox(height: 20),
             _buildSharedExpenseButton(),
           ],
@@ -221,7 +386,7 @@ class _GroupPermissionScreenState
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.group.name,
+                  _groupName,
                   style: const TextStyle(
                     color: Color(0xFF332A30),
                     fontSize: 18,
@@ -230,11 +395,52 @@ class _GroupPermissionScreenState
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  '멤버 ${_members.length}명',
+                  '멤버 ${_members.length} / '
+                      '${GroupService.maxGroupMembers}명',
                   style: const TextStyle(
                     color: Color(0xFF786C72),
                     fontSize: 13,
                   ),
+                ),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '초대코드 ${widget.group.inviteCode}',
+                        style: const TextStyle(
+                          color: Color(0xFF786C72),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    InkWell(
+                      onTap: () async {
+                        await Clipboard.setData(
+                          ClipboardData(
+                            text: widget.group.inviteCode,
+                          ),
+                        );
+
+                        if (!mounted) {
+                          return;
+                        }
+
+                        _showMessage('초대코드를 복사했습니다.');
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: const Padding(
+                        padding: EdgeInsets.all(6),
+                        child: Icon(
+                          Icons.copy_rounded,
+                          size: 18,
+                          color: Color(0xFF8566FF),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -325,6 +531,72 @@ class _GroupPermissionScreenState
                 child: _buildMemberCard(member),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  // 그룹장 전용 그룹 관리 영역
+  Widget _buildGroupManagementSection() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 12,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '그룹 관리',
+            style: TextStyle(
+              color: Color(0xFF252735),
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _showRenameGroupDialog,
+              icon: const Icon(
+                Icons.edit_rounded,
+              ),
+              label: const Text(
+                '그룹 이름 변경',
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmDeleteGroup,
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+              ),
+              label: const Text(
+                '그룹 삭제',
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                const Color(0xFFE85B5B),
+              ),
+            ),
+          ),
         ],
       ),
     );

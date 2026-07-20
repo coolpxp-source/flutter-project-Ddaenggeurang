@@ -37,6 +37,9 @@ class _MissionListScreenState extends State<MissionListScreen> {
     try {
       final now = DateTime.now();
 
+      // 예산 조건을 만족하면 이번 달 budget_success 미션을 자동 완료
+      await _missionService.completeBudgetSuccessMission();
+
       final results = await Future.wait([
         _missionService.getMissions(),
         _missionService.getMissionProgress(),
@@ -113,15 +116,28 @@ class _MissionListScreenState extends State<MissionListScreen> {
           'points': mission.points,
           'icon': Icons.calendar_month,
           'color': const Color(0xFFFF6CAE),
-          'requiresApproval': mission.requiresApproval,
+          'requiresApproval': mission.requiresApproval
         };
 
       case 'budget_success':
+        final now = DateTime.now();
+
+        final currentMonth =
+            '${now.year}-'
+            '${now.month.toString().padLeft(2, '0')}';
+
+        final completedMonth =
+        progressData?['month'] as String?;
+
+        final isBudgetCompleted =
+            progressData?['status'] == 'completed' &&
+                completedMonth == currentMonth;
+
         return {
           'id': mission.id,
           'title': mission.title,
           'description': '설정한 예산 안에서 소비해보세요',
-          'progress': isCompleted ? 1 : 0,
+          'progress': isBudgetCompleted ? 1 : 0,
           'target': 1,
           'points': mission.points,
           'icon': Icons.savings_outlined,
@@ -170,19 +186,24 @@ class _MissionListScreenState extends State<MissionListScreen> {
     }
   }
 
-  Future<void> _openMission(Map<String, dynamic> mission) async {
+  Future<void> _openMission(
+      Map<String, dynamic> mission,
+      ) async {
     if (mission['id'] == 'attendance') {
       final result = await Navigator.push<bool>(
         context,
         MaterialPageRoute(
-          builder: (_) => const AttendanceCheckScreen(),
+          builder: (_) =>
+          const AttendanceCheckScreen(),
         ),
       );
 
       if (result == true && mounted) {
         setState(() {
           _isAttendanceCompleted = true;
-          _completedDays.add(DateTime.now().day);
+          _completedDays.add(
+            DateTime.now().day,
+          );
         });
       }
 
@@ -193,8 +214,32 @@ class _MissionListScreenState extends State<MissionListScreen> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => MissionProofUploadScreen(
-            missionTitle: mission['title'] as String,
+          builder: (_) =>
+              MissionProofUploadScreen(
+                missionTitle:
+                mission['title'] as String,
+              ),
+        ),
+      );
+
+      return;
+    }
+
+    if (mission['id'] == 'budget_success') {
+      final progressData =
+      _missionProgress['budget_success'];
+
+      final isCompleted =
+          progressData?['status'] ==
+              'completed';
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        SnackBar(
+          content: Text(
+            isCompleted
+                ? '이번 달 예산 미션을 이미 완료했어요.'
+                : '이번 달 예산을 지키면 자동으로 완료되는 미션이에요.',
           ),
         ),
       );
@@ -204,11 +249,12 @@ class _MissionListScreenState extends State<MissionListScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${mission['title']} 기능은 다음 단계에서 구현합니다.'),
+        content: Text(
+          '${mission['title']} 기능은 다음 단계에서 구현합니다.',
+        ),
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     const backgroundColor = Color(0xFFF5F5F8);

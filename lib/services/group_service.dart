@@ -7,7 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 class GroupService {
   GroupService._();
-
+  static const int maxGroupMembers = 6;
   // Firestore 접근 객체
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
@@ -492,6 +492,12 @@ class GroupService {
         if (memberIds.contains(userId)) {
           throw Exception('이미 참여 중인 그룹입니다.');
         }
+        // 그룹 최대 인원 제한
+        if (memberIds.length >= maxGroupMembers) {
+          throw Exception(
+            '이 그룹은 최대 $maxGroupMembers명까지 참여할 수 있습니다.',
+          );
+        }
 
         transaction.update(
           groupRef,
@@ -516,4 +522,98 @@ class GroupService {
       updatedDocument.data() ?? {},
     );
   }
+
+  // 그룹장이 그룹 이름을 변경하는 메서드
+  Future<void> updateGroupName({
+    required String groupId,
+    required String name,
+  }) async {
+    final String userId = _currentUserId;
+
+    final String trimmedName = name.trim();
+
+    if (trimmedName.isEmpty) {
+      throw Exception('그룹 이름을 입력해 주세요.');
+    }
+
+    final groupRef =
+    _firestore.collection('groups').doc(groupId);
+
+    final groupDocument =
+    await groupRef.get();
+
+    if (!groupDocument.exists) {
+      throw Exception('그룹 정보를 찾을 수 없습니다.');
+    }
+
+    final groupData =
+        groupDocument.data() ?? {};
+
+    final ownerId =
+        groupData['ownerId'] as String? ?? '';
+
+    if (ownerId != userId) {
+      throw Exception(
+        '그룹장만 그룹 이름을 변경할 수 있습니다.',
+      );
+    }
+
+    await groupRef.update({
+      'name': trimmedName,
+      'updatedAt':
+      FieldValue.serverTimestamp(),
+    });
+  }
+
+  // 그룹장이 그룹과 공동지출 데이터를 삭제하는 메서드
+  Future<void> deleteGroup({
+    required String groupId,
+  }) async {
+    final String userId = _currentUserId;
+
+    final groupRef =
+    _firestore.collection('groups').doc(groupId);
+
+    final groupDocument =
+    await groupRef.get();
+
+    if (!groupDocument.exists) {
+      throw Exception('그룹 정보를 찾을 수 없습니다.');
+    }
+
+    final groupData =
+        groupDocument.data() ?? {};
+
+    final ownerId =
+        groupData['ownerId'] as String? ?? '';
+
+    if (ownerId != userId) {
+      throw Exception(
+        '그룹장만 그룹을 삭제할 수 있습니다.',
+      );
+    }
+
+    final expensesSnapshot =
+    await groupRef
+        .collection('sharedExpenses')
+        .get();
+
+    final batch =
+    _firestore.batch();
+
+    for (final expense
+    in expensesSnapshot.docs) {
+      batch.delete(
+        expense.reference,
+      );
+    }
+
+    batch.delete(
+      groupRef,
+    );
+
+    await batch.commit();
+  }
+
+
 }
