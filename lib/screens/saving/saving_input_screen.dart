@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import '../../utils/currency_formatter.dart';
+// import '../../utils/currency_formatter.dart';
+import '../../utils/formatters.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/saving_model.dart';
 import '../../services/saving_service.dart';
@@ -76,6 +77,10 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
     try {
       final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
 
+      // 아이디 확인용
+      // print('1. 파이어베이스 인증 UID: [${FirebaseAuth.instance.currentUser?.uid}]');
+      // print('2. 변수에 담긴 UID: [$userId]');
+
       // 1. 투자 정보 객체 생성 (카테고리가 '투자'일 때만)
       InvestmentDetail? investmentDetail;
       if (_selectedCategory == '투자') {
@@ -94,7 +99,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
         categoryId: _selectedCategory,
         accountName: _accountNameController.text.isNotEmpty ? _accountNameController.text : null,
         amount: _currentAmount,
-        memo: _memoController.text,
+        memo: _memoController.text.isEmpty ? null : _memoController.text,
         investmentDetail: investmentDetail,
       );
 

@@ -68,7 +68,7 @@ class IncomeModel {
   }
 
   Map<String, dynamic> toFirestore() => {
-    'userId': userId,
+    'userId': userId.trim(),
     'amount': amount,
     'incomeSource': incomeSource.code,
     'date': Timestamp.fromDate(date),
@@ -82,6 +82,8 @@ class IncomeModel {
   };
 
   IncomeModel copyWith({
+    String? incomeId, // 새로 발급된 ID를 넣을 수 있도록
+    String? userId,   // 기존 userId 유지 또는 변경
     int? amount,
     IncomeSource? incomeSource,
     DateTime? date,
@@ -91,7 +93,8 @@ class IncomeModel {
     DateTime? deletedAt,
   }) {
     return IncomeModel(
-      incomeId: incomeId,
+      incomeId: incomeId ?? this.incomeId,
+      userId: userId ?? this.userId,
       amount: amount ?? this.amount,
       incomeSource: incomeSource ?? this.incomeSource,
       date: date ?? this.date,
@@ -99,7 +102,7 @@ class IncomeModel {
       recurringIncomeTemplateId: recurringIncomeTemplateId ?? this.recurringIncomeTemplateId,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
-      createdAt: createdAt, userId: '',
+      createdAt: createdAt
     );
   }
 }
@@ -151,7 +154,7 @@ class RecurringIncomeTemplate {
   }
 
   Map<String, dynamic> toFirestore() => {
-    'userId': userId,
+    'userId': userId.trim(),
     'incomeSource': incomeSource.code,
     'amount': amount,
     'payDay': payDay,
@@ -187,7 +190,7 @@ class RecurringIncomeTemplate {
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,
-      userId: userId ?? this.userId
+      userId: userId ?? this.userId.trim(),
     );
   }
 }

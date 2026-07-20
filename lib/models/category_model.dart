@@ -28,6 +28,9 @@ class CategoryModel {
 
   final bool isCustom;
   final String? userId; // isCustom == true 일 때만 사용
+  // 커스텀 카테고리 삭제를 위한 소프트 삭제 필드 추가
+  final bool isDeleted;
+  final DateTime? deletedAt;
   final DateTime? createdAt;
 
   CategoryModel({
@@ -38,6 +41,8 @@ class CategoryModel {
     this.nature,
     this.isCustom = false,
     this.userId,
+    this.isDeleted = false, // 기본값 추가
+    this.deletedAt,         // 필드 추가
     this.createdAt,
   });
 
@@ -51,6 +56,8 @@ class CategoryModel {
       nature: d['nature'] != null ? ExpenseNature.fromCode(d['nature']) : null,
       isCustom: d['isCustom'] ?? false,
       userId: d['userId'] as String?,
+      isDeleted: d['isDeleted'] ?? false,
+      deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
     );
   }
@@ -62,6 +69,8 @@ class CategoryModel {
     'nature': nature?.code,
     'isCustom': isCustom,
     'userId': userId,
+    'isDeleted': isDeleted,
+    'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'createdAt': createdAt != null
         ? Timestamp.fromDate(createdAt!)
         : FieldValue.serverTimestamp(),
@@ -74,6 +83,8 @@ class CategoryModel {
     ExpenseNature? nature,
     bool? isCustom,
     String? userId,
+    bool? isDeleted,
+    DateTime? deletedAt,
   }) {
     return CategoryModel(
       categoryId: categoryId,
@@ -83,6 +94,8 @@ class CategoryModel {
       nature: nature ?? this.nature,
       isCustom: isCustom ?? this.isCustom,
       userId: userId ?? this.userId,
+      isDeleted: isDeleted ?? this.isDeleted,
+      deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,
     );
   }

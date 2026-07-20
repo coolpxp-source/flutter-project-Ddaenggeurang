@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import '../../utils/currency_formatter.dart';
+import '../../utils/formatters.dart';
 import 'package:intl/intl.dart'; // 프리랜서 세전 금액(NumberFormat) 계산용
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/income_model.dart';
