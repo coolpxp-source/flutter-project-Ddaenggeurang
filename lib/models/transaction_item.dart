@@ -9,6 +9,7 @@ class TransactionItem {
   final String? subtitle;   // 메모
   final String? emotionTag; // 지출인 경우만 존재 ('stress', 'impulsive' 등)
   final String? accountName; // 저축인 경우만 존재 (예: '국민은행 청년희망적금')
+  final String? savingStatus; // 저축 상태 확인용 변수 (active, matured, cancelled, sold)
 
   TransactionItem({
     required this.id,
@@ -19,5 +20,6 @@ class TransactionItem {
     this.subtitle,
     this.emotionTag,
     this.accountName,
+    this.savingStatus
   });
 }
