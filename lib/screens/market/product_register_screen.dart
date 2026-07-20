@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../../models/market_product_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -6,7 +7,9 @@ import '../../services/market_service.dart';
 import '../../services/image_service.dart';
 
 class ProductRegisterScreen extends StatefulWidget {
-  const ProductRegisterScreen({super.key});
+  final MarketProduct? existingProduct;
+
+  const ProductRegisterScreen({super.key, this.existingProduct});
 
   @override
   State<ProductRegisterScreen> createState() => _ProductRegisterScreenState();
@@ -18,6 +21,24 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
   final _titleController = TextEditingController();
   final _priceController = TextEditingController();
   final _descController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (widget.existingProduct != null) {
+      final product = widget.existingProduct!;
+      _titleController.text = product.title;
+      _priceController.text = product.price.toString();
+      _descController.text = product.description;
+      _category = product.category;
+      _isUrgent = product.isUrgent;
+      _isNegotiable = product.isNegotiable;
+      _isDirectDeal = product.isDirectDeal;
+      _existingImageUrls = List<String>.from(product.images);
+    }
+  }
+
   String _category = '기타';
   bool _saving = false;
 
@@ -34,6 +55,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
 
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
   final List<File> _selectedImages = [];
+  List<String> _existingImageUrls = [];
 
   IconData _categoryIcon(String cat) {
     switch (cat) {
@@ -95,7 +117,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
   }
 
   Future<void> _pickImage() async {
-    if (_selectedImages.length >= 5) return;
+    if (_existingImageUrls.length + _selectedImages.length >= 5) return;
     final file = await _imageService.pickImage();
     if (file != null) {
       setState(() => _selectedImages.add(file));
@@ -104,6 +126,10 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
 
   void _removeImage(int index) {
     setState(() => _selectedImages.removeAt(index));
+  }
+
+  void _removeExistingImage(int index) {
+    setState(() => _existingImageUrls.removeAt(index));
   }
 
   void _openCategoryPicker() {
@@ -188,7 +214,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('가격을 숫자로 입력해주세요')));
       return;
     }
-    if (_selectedImages.isEmpty) {
+    if (_existingImageUrls.isEmpty && _selectedImages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('사진을 최소 1장 등록해주세요')));
       return;
     }
@@ -197,29 +223,48 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
     try {
       final sellerName = await _getSellerName();
 
-      final List<String> imageUrls = [];
+      // 새로 고른 파일들만 업로드
+      final List<String> newUrls = [];
       for (final file in _selectedImages) {
         final url = await _imageService.uploadImage(file, 'marketProducts');
-        imageUrls.add(url);
+        newUrls.add(url);
       }
 
-      await _service.addProduct(
-        sellerId: _myId,
-        sellerName: sellerName,
-        title: title,
-        price: price,
-        description: desc,
-        images: imageUrls,
-        category: _category,
-        isUrgent: _isUrgent,
-        isNegotiable: _isNegotiable,
-        isDirectDeal: _isDirectDeal,
-      );
+      // 기존에 유지된 URL + 새로 업로드된 URL 합치기
+      final allImageUrls = [..._existingImageUrls, ...newUrls];
+
+      if (widget.existingProduct != null) {
+        // 수정 모드
+        await _service.updateProduct(widget.existingProduct!.productId, {
+          'title': title,
+          'price': price,
+          'description': desc,
+          'images': allImageUrls,
+          'category': _category,
+          'isUrgent': _isUrgent,
+          'isNegotiable': _isNegotiable,
+          'isDirectDeal': _isDirectDeal,
+        });
+      } else {
+        // 신규 등록
+        await _service.addProduct(
+          sellerId: _myId,
+          sellerName: sellerName,
+          title: title,
+          price: price,
+          description: desc,
+          images: allImageUrls,
+          category: _category,
+          isUrgent: _isUrgent,
+          isNegotiable: _isNegotiable,
+          isDirectDeal: _isDirectDeal,
+        );
+      }
 
       if (context.mounted) Navigator.pop(context);
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('등록 실패: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${widget.existingProduct != null ? "수정" : "등록"} 실패: $e')));
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -245,7 +290,10 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
           icon: const Icon(Icons.close, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('상품 등록', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+        title: Text(
+          widget.existingProduct != null ? '상품 수정' : '상품 등록',
+          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -263,7 +311,9 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    _saving ? '등록 중...' : '등록',
+                    _saving
+                        ? (widget.existingProduct != null ? '수정 중...' : '등록 중...')
+                        : (widget.existingProduct != null ? '수정' : '등록'),
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                   ),
                 ),
@@ -288,7 +338,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('사진 (${_selectedImages.length}/5)',
+                Text('사진 (${_existingImageUrls.length + _selectedImages.length}/5)',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 const SizedBox(height: 12),
                 SizedBox(
@@ -297,7 +347,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
                     scrollDirection: Axis.horizontal,
                     children: [
                       GestureDetector(
-                        onTap: _selectedImages.length >= 5 ? null : _pickImage,
+                        onTap: (_existingImageUrls.length + _selectedImages.length) >= 5 ? null : _pickImage,
                         child: Container(
                           width: 90,
                           height: 90,
@@ -309,6 +359,33 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
                           child: Icon(Icons.add_a_photo_outlined, color: _green, size: 24),
                         ),
                       ),
+                      // 기존 업로드된 이미지 (네트워크 이미지)
+                      ..._existingImageUrls.asMap().entries.map((entry) {
+                        return Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.network(entry.value, width: 90, height: 90, fit: BoxFit.cover),
+                              ),
+                              Positioned(
+                                right: 4,
+                                top: 4,
+                                child: GestureDetector(
+                                  onTap: () => _removeExistingImage(entry.key),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                    child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      // 새로 고른 로컬 이미지
                       ..._selectedImages.asMap().entries.map((entry) {
                         return Padding(
                           padding: const EdgeInsets.only(left: 8),

@@ -1,3 +1,4 @@
+import 'product_register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/market_product_model.dart';
@@ -16,6 +17,66 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        titlePadding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
+        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        title: const Text('상품을 삭제할까요?',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
+        content: const Text('삭제하면 되돌릴 수 없어요.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: Color(0xFF8A8A8A))),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF555555),
+                    backgroundColor: const Color(0xFFF7F7F7),
+                    side: const BorderSide(color: Color(0xFFE0E0E0)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('취소', style: TextStyle(fontWeight: FontWeight.w500)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async {
+                    await _marketService.deleteProduct(widget.product.productId, widget.product.images);
+                    if (context.mounted) {
+                      Navigator.pop(context); // 다이얼로그 닫기
+                      Navigator.pop(context); // 상세 화면 닫고 목록으로
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFD9532A),
+                    backgroundColor: const Color(0xFFFFF0E8),
+                    side: const BorderSide(color: Color(0xFFFF9166)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('삭제', style: TextStyle(fontWeight: FontWeight.w500)),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   static const _green = Color(0xFFFF9166);
   static const _greenLight = Color(0xFFFFF0E8);
 
@@ -69,7 +130,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -90,9 +151,73 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Widget _statusSelector(MarketProduct product) {
+    final options = [
+      (ProductStatus.selling, '판매중'),
+      (ProductStatus.reserved, '거래중'),
+      (ProductStatus.sold, '판매완료'),
+    ];
+
+    return Row(
+      children: options.map((opt) {
+        final selected = product.status == opt.$1;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => _updateStatus(opt.$1),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? _green : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                opt.$2,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selected ? Colors.white : Colors.grey[600],
+                  fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  void _updateStatus(ProductStatus newStatus) async {
+    if (newStatus == widget.product.status) return;
+
+    if (newStatus == ProductStatus.sold) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('판매완료로 변경할까요?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('확인')),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    await _marketService.updateProductStatus(widget.product.productId, newStatus);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${_statusLabel(newStatus)}(으)로 변경됐어요')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
+    final isOwner = product.sellerId == FirebaseAuth.instance.currentUser!.uid;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -100,6 +225,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         elevation: 0,
         title: const Text('상품 상세', style: TextStyle(color: Colors.black)),
         actions: [
+          if (isOwner)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: Colors.black87),
+              onSelected: (value) {
+                if (value == 'edit') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProductRegisterScreen(existingProduct: product),
+                    ),
+                  );
+                }else if (value == 'delete') {
+                  _confirmDelete(context);
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(value: 'edit', child: Text('수정')),
+                const PopupMenuItem(value: 'delete', child: Text('삭제')),
+              ],
+            ),
           IconButton(
             icon: const Icon(Icons.home_outlined, color: Colors.black87),
             onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
@@ -119,7 +264,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             width: double.infinity,
             color: _greenLight,
             child: product.images.isEmpty
-                ? Icon(Icons.image_outlined, size: 60, color: _green.withOpacity(0.4))
+                ? Icon(Icons.image_outlined, size: 60, color: _green.withValues(alpha: 0.4))
                 : Image.network(product.images.first, fit: BoxFit.cover),
           ),
 
@@ -157,7 +302,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const SizedBox(height: 12),
+                if (isOwner) ...[
+                  _statusSelector(product),
+                  const SizedBox(height: 12),
+                ],
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
