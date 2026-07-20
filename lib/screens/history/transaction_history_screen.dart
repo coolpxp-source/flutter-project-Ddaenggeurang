@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
+import 'transaction_detail_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -14,13 +16,17 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  CalendarFormat _calendarFormat = CalendarFormat.week;
+  // CalendarFormat _calendarFormat = CalendarFormat.week; 1주 보기
+  CalendarFormat _calendarFormat = CalendarFormat.twoWeeks; // 2주 보기
   String _selectedFilter = '전체';
 
   // 데이터 관리를 위한 변수
   final TransactionService _transactionService = TransactionService();
   List<TransactionItem> _allTransactions = [];
   bool _isLoading = false;
+
+  // 날짜별 스크롤 위치를 기억할 이름표 보관함
+  final Map<DateTime, GlobalKey> _dateKeys = {};
 
   @override
   void initState() {
@@ -37,13 +43,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       final start = DateTime(_focusedDay.year, _focusedDay.month, 1);
       final end = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
 
+      // 현재 로그인한 유저의 정보 가져오기
+      final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
       final data = await _transactionService.getMonthlyTransactions(
-        userId: 'test_user', // 💡 현재 파이어베이스에 있는 실제 데이터의 userId로 바꿔주시면 바로 데이터가 뜹니다!
+        userId: currentUserId, // 실제유저아이디
         start: start,
         end: end,
       );
 
       setState(() {
+        _dateKeys.clear();
         _allTransactions = data;
       });
     } catch (e) {
@@ -70,13 +80,14 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     var sums = <DateTime, Map<String, int>>{};
     for (var item in _filteredTransactions) {
       final date = DateTime(item.date.year, item.date.month, item.date.day);
-      if (sums[date] == null) sums[date] = {'income': 0, 'expense': 0};
+      if (sums[date] == null) sums[date] = {'income': 0, 'expense': 0, 'saving': 0};
 
       if (item.type == 'income') {
         sums[date]!['income'] = sums[date]!['income']! + item.amount;
-      }
-      if (item.type == 'expense') {
+      } else if (item.type == 'expense') {
         sums[date]!['expense'] = sums[date]!['expense']! + item.amount;
+      } else if (item.type == 'saving') {
+        sums[date]!['saving'] = sums[date]!['saving']! + item.amount;
       }
     }
     return sums;
@@ -157,9 +168,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             ),
             onPressed: () {
               setState(() {
-                _calendarFormat = _calendarFormat == CalendarFormat.week
+                _calendarFormat = _calendarFormat == CalendarFormat.twoWeeks
                     ? CalendarFormat.month
-                    : CalendarFormat.week;
+                    : CalendarFormat.twoWeeks;
               });
             },
           ),
@@ -177,6 +188,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildFilterChip('전체'),
                 _buildFilterChip('지출'),
@@ -188,6 +200,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
           // 스와이프 달력
           TableCalendar(
+            locale: 'ko_KR', // 월,화,수 - 한글로
             firstDay: DateTime(2020, 1, 1),
             lastDay: DateTime(2030, 12, 31),
             focusedDay: _focusedDay,
@@ -200,6 +213,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
               });
+              _scrollToDate(selectedDay); // 날짜 선택시 해당 내역으로 이동
             },
             onPageChanged: (focusedDay) {
               _focusedDay = focusedDay;
@@ -215,26 +229,56 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               cellMargin: const EdgeInsets.only(bottom: 20),
             ),
             calendarBuilders: CalendarBuilders(
+              selectedBuilder: (context, date, _) {
+                return Container(
+                  alignment: Alignment.topCenter,
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Container(
+                    width: 28, // 파란 동그라미 너비
+                    height: 28, // 파란 동그라미 높이
+                    alignment: Alignment.center,
+                    decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+                    child: Text('${date.day}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                );
+              },
+              todayBuilder: (context, date, _) {
+                return Container(
+                  alignment: Alignment.topCenter,
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
+                    child: Text('${date.day}', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                  ),
+                );
+              },
               markerBuilder: (context, day, events) {
                 final pureDate = DateTime(day.year, day.month, day.day);
                 final sums = _dailySums[pureDate];
 
                 if (sums == null) return const SizedBox();
 
-                return Positioned(
-                  bottom: 2,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (sums['income']! > 0)
-                      // 💡 CurrencyFormatter 적용
-                        Text('+${CurrencyFormatter.format(sums['income']!)}',
-                            style: const TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.w600)),
-                      if (sums['expense']! > 0)
-                      // 💡 CurrencyFormatter 적용
-                        Text('-${CurrencyFormatter.format(sums['expense']!)}',
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.w600)),
-                    ],
+                return Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 2.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (sums['income']! > 0)
+                          Text('+${CurrencyFormatter.format(sums['income']!)}',
+                              style: const TextStyle(color: Colors.blue, fontSize: 9, fontWeight: FontWeight.w600)),
+                        if (sums['expense']! > 0)
+                          Text('-${CurrencyFormatter.format(sums['expense']!)}',
+                              style: const TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.w600)),
+                        if (sums['saving']! > 0)
+                          Text('${CurrencyFormatter.format(sums['saving']!)}',
+                              style: const TextStyle(color: Colors.teal, fontSize: 9, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -249,28 +293,39 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : groupedData.isEmpty
                 ? const Center(child: Text('내역이 없습니다.', style: TextStyle(color: Colors.grey)))
-                : ListView.builder(
+
+            // ListView.builder 대신 ListView를 사용
+                : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: groupedData.length,
-              itemBuilder: (context, index) {
-                final date = groupedData[index].key;
-                final items = groupedData[index].value;
+              children: groupedData.map((entry) {
+                final date = entry.key;
+                final items = entry.value;
 
-                // 💡 [수정 필요] formatDayAndWeekday 부분에 예림님의 요일 변환 유틸 함수를 넣어주세요!
-                // 예: String dateString = AppDateUtils.formatToKorean(date);
-                String dateString = '${date.day}일'; // 임시 텍스트 (유틸 적용 후 지워주세요)
+                // 해당 날짜의 이름표(Key)가 없으면 새로 발급해서 보관함에 넣습니다.
+                if (!_dateKeys.containsKey(date)) {
+                  _dateKeys[date] = GlobalKey();
+                }
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: Text(dateString, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
-                    ),
-                    ...items.map((item) => _buildTransactionItem(item)),
-                  ],
+                // formatters 안 공통 함수
+                String dateString = DateFormatter.formatDayAndWeekday(date);
+                // 하단은 짧은 요일(예: 15일 (금))
+                // String dateString = DateFormatter.formatDayAndShortWeekday(date);
+
+                // Column을 Container로 감싸고 발급한 이름표(Key)를 달아줍니다!
+                return Container(
+                  key: _dateKeys[date],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16.0),
+                        child: Text(dateString, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                      ),
+                      ...items.map((item) => _buildTransactionItem(item)),
+                    ],
+                  ),
                 );
-              },
+              }).toList(), // map의 결과를 리스트로 변환
             ),
           ),
         ],
@@ -289,6 +344,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         selected: isSelected,
         onSelected: (bool selected) {
           setState(() {
+            _dateKeys.clear();
             _selectedFilter = label;
           });
         },
@@ -309,13 +365,23 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   // 리스트 아이템 UI
   Widget _buildTransactionItem(TransactionItem item) {
     final isExpense = item.type == 'expense';
+    final isSaving = item.type == 'saving'; // 👈 저축인지 확인하는 변수 추가
 
-    // 💡 [수정 필요] formatCurrency 부분에 예림님의 금액 포맷 유틸 함수를 넣어주세요!
-    final amountText = '${isExpense ? '-' : '+'}${CurrencyFormatter.format(item.amount)}원';
+    // 💡 핵심: 지출은 '-', 저축은 ''(빈칸), 수입은 '+' 기호를 주도록 분기 처리합니다.
+    final String sign = isExpense ? '-' : (isSaving ? '' : '+');
+    final amountText = '$sign${CurrencyFormatter.format(item.amount)}원';
 
-    return InkWell( // 💡 터치 이벤트를 위해 InkWell 추가
-      onTap: () {
-        // TODO: 16_내역상세 페이지로 이동하는 Navigator 로직 추가
+    return InkWell(
+      onTap: () async {
+        // 1. 상세 페이지로 이동하면서 현재 클릭한 item 데이터를 넘겨줍니다.
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionDetailScreen(item: item),
+          ),
+        );
+        // 2. 상세 페이지에서 (수정/삭제 후) 뒤로가기를 눌러 돌아오면 데이터를 다시 불러옵니다!
+        _loadMonthlyData();
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 24.0),
@@ -325,10 +391,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isExpense ? Colors.yellow[700] : Colors.blue[300],
+                color: isExpense ? Colors.yellow[700] : (isSaving ? Colors.teal[400] : Colors.blue[300]),
                 shape: BoxShape.circle,
               ),
-              child: Icon(isExpense ? Icons.storefront : Icons.account_balance_wallet, color: Colors.white),
+              child: Icon(
+                  isExpense ? Icons.storefront : (isSaving ? Icons.savings : Icons.account_balance_wallet),
+                  color: Colors.white
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -337,7 +406,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 children: [
                   Text(
                     amountText,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: isExpense ? Colors.black87 : Colors.blueAccent),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isExpense ? Colors.black87 : (isSaving ? Colors.teal[600] : Colors.blueAccent)
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -352,4 +425,23 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       ),
     );
   }
+  // 스크롤 이동 함수 추가
+  void _scrollToDate(DateTime selectedDay) {
+    // 달력에서 누른 날짜의 시/분/초를 잘라내어 Key 보관함과 똑같은 형식으로 맞춥니다.
+    final pureDate = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
+
+    // 해당 날짜의 이름표(Key)를 찾습니다.
+    final key = _dateKeys[pureDate];
+
+    // 이름표가 존재한다면(즉, 해당 날짜에 내역이 있다면) 그 위치로 스크롤!
+    if (key != null && key.currentContext != null) {
+      Scrollable.ensureVisible(
+        key.currentContext!,
+        duration: const Duration(milliseconds: 300), // 스크롤 애니메이션 속도
+        curve: Curves.easeInOut, // 부드러운 애니메이션 효과
+        alignment: 0.0, // 0.0으로 설정하면 해당 내역이 화면 맨 위로 올라옵니다.
+      );
+    }
+  }
 }
+
