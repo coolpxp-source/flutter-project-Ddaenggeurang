@@ -8,18 +8,30 @@ class ConsultationService {
       _db.collection('users').doc(uid).collection('consultations');
 
   /// AI가 답변을 준 상담 1건을 기록한다 (에러/레이트리밋 응답은 저장 안 함).
-  Future<void> save({
+  /// 반환하는 문서 id는 화면에서 "도움됐어요/별로예요" 피드백을 같은 문서에
+  /// 이어서 기록할 때 쓴다.
+  Future<String> save({
     required String uid,
     required String question,
     required String answer,
     required String? verdictCode,
-  }) {
-    return _col(uid).add({
+  }) async {
+    final doc = await _col(uid).add({
       'question': question,
       'answer': answer,
       'verdictCode': verdictCode,
       'createdAt': FieldValue.serverTimestamp(),
     });
+    return doc.id;
+  }
+
+  /// 상담 답변에 대한 사용자 피드백 — null을 넘기면 평가를 취소(재탭)한다.
+  Future<void> setFeedback({
+    required String uid,
+    required String consultationId,
+    required String? feedback,
+  }) {
+    return _col(uid).doc(consultationId).update({'feedback': feedback});
   }
 
   Stream<List<ConsultationEntry>> watchHistory(String uid) {

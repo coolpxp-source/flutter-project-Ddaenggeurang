@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/notification_entry_model.dart';
 import '../../services/notification_history_service.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 
 const _accent = Color(0xFFF5A623);
 const _ink = Color(0xFF221A16);
@@ -42,10 +43,29 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
     return '${d.year}.${d.month.toString().padLeft(2, '0')}.${d.day.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _clearAll() async {
+    final ok = await DdaengModal.confirm(
+      context,
+      title: '알림을 전부 삭제할까요?',
+      message: '삭제하면 되돌릴 수 없어요',
+      type: ModalType.danger,
+      confirmText: '전체 삭제',
+    );
+    if (ok) await _service.deleteAll(_uid);
+  }
+
   (IconData, Color, Color) _visualFor(String type) {
     switch (type) {
       case 'nagging':
         return (Icons.record_voice_over_rounded, _purple, _purpleSoft);
+      case 'resolution':
+        return (Icons.wb_sunny_rounded, const Color(0xFF00C2A8), const Color(0xFFDBF7F3));
+      case 'streak':
+        return (Icons.local_fire_department_rounded, const Color(0xFFF04438),
+            const Color(0xFFFEE4E2));
+      case 'levelup':
+        return (Icons.military_tech_rounded, const Color(0xFFFFB300),
+            const Color(0xFFFFF3D6));
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
     }
@@ -61,6 +81,13 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('알림함', style: TextStyle(fontWeight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            onPressed: _clearAll,
+            icon: const Icon(Icons.delete_sweep_outlined, size: 22),
+            tooltip: '전체 삭제',
+          ),
+        ],
       ),
       body: Stack(
         children: [

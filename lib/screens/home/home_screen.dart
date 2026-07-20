@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:shimmer/shimmer.dart';
@@ -14,16 +16,21 @@ import '../../services/ai_service.dart';
 import '../../services/budget_service.dart';
 import '../../services/category_summary_service.dart';
 import '../../services/emotion_summary_service.dart';
+import '../../services/home_refresh_service.dart';
 import '../../services/notification_history_service.dart';
 import '../../services/psychology_test_service.dart';
 import '../../services/spending_challenge_service.dart';
 import '../../models/spending_challenge_model.dart';
 import '../../services/user_service.dart';
+import '../../services/weekly_emotion_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
+import '../../widgets/common/attendance_roulette_dialog.dart';
+import '../../widgets/expense/category_icon_map.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
 import '../../widgets/common/placeholder_screen.dart';
+import '../../widgets/common/spotlight_tour.dart';
 import '../record/record_type_select_screen.dart';
 import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
@@ -83,6 +90,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   NavTab _currentTab = NavTab.home;
 
+  // 홈 대시보드는 데이터를 FutureBuilder로 한 번만 읽어오므로, 지출 입력 등
+  // 다른 화면에서 돌아왔을 때 HomeRefreshService 신호를 받으면 이 값을 올려서
+  // _HomeDashboard에 새 key를 줘 통째로 다시 만든다(모든 FutureBuilder 재실행).
+  int _dashboardVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    HomeRefreshService.signal.addListener(_onHomeRefreshRequested);
+    // 홈 화면(탭 전환이 아니라 앱 진입 시 한 번만 새로 만들어지는 최상위
+    // 위젯)에 처음 들어왔을 때 하루 한 번 출석 룰렛을 띄운다.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowRoulette());
+  }
+
+  @override
+  void dispose() {
+    HomeRefreshService.signal.removeListener(_onHomeRefreshRequested);
+    super.dispose();
+  }
+
+  void _onHomeRefreshRequested() {
+    if (mounted) setState(() => _dashboardVersion++);
+  }
+
+  Future<void> _maybeShowRoulette() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null || !mounted) return;
+    final should = await shouldShowAttendanceRoulette(uid);
+    if (!should || !mounted) return;
+    await showAttendanceRoulette(context, uid: uid);
+  }
+
   @override
   Widget build(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -110,28 +149,33 @@ class _HomeScreenState extends State<HomeScreen> {
               stream: NotificationHistoryService().watchUnreadCount(uid),
               builder: (context, snap) {
                 final unread = snap.data ?? 0;
+                // 다른 헤더 아이콘(햄버거 메뉴)처럼 배경 없이 아이콘 자체만 두고,
+                // 안 읽은 알림이 있을 때만 우상단에 작은 개수 배지를 얹는다.
                 return Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(color: _C.amberSoft, shape: BoxShape.circle),
-                      alignment: Alignment.center,
-                      child:
-                          const Icon(Icons.notifications_none_rounded, size: 18, color: _C.amberDeep),
+                    Icon(
+                      unread > 0 ? Icons.notifications_rounded : Icons.notifications_none_rounded,
+                      size: 24,
+                      color: _C.ink,
                     ),
                     if (unread > 0)
                       Positioned(
-                        top: -2,
-                        right: -2,
+                        top: -4,
+                        right: -4,
                         child: Container(
-                          width: 10,
-                          height: 10,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                           decoration: BoxDecoration(
                             color: _C.pink,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 1.5),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white, width: 1.4),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            unread > 9 ? '9+' : '$unread',
+                            style: const TextStyle(
+                                fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2),
                           ),
                         ),
                       ),
@@ -168,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBody(String uid) {
     switch (_currentTab) {
       case NavTab.home:
-        return _HomeDashboard(uid: uid);
+        return _HomeDashboard(key: ValueKey(_dashboardVersion), uid: uid);
       case NavTab.expense:
         return const _TabPlaceholder(title: '지출');
       case NavTab.aiConsult:
@@ -211,7 +255,7 @@ class _TabPlaceholder extends StatelessWidget {
 
 class _HomeDashboard extends StatefulWidget {
   final String uid;
-  const _HomeDashboard({required this.uid});
+  const _HomeDashboard({super.key, required this.uid});
 
   @override
   State<_HomeDashboard> createState() => _HomeDashboardState();
@@ -307,6 +351,46 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   DateTime _month = DateTime.now();
   late DateTime _selectedDay = DateTime.now();
 
+  // 첫 방문자 전용 스팟라이트 투어 — 대상 위젯 3곳의 위치만 알면 되므로
+  // GlobalKey만 붙이고, 하이라이트/툴팁은 별도 오버레이(spotlight_tour.dart)가 그린다.
+  final _budgetHeroKey = GlobalKey();
+  final _quickActionsKey = GlobalKey();
+  final _categoryCardKey = GlobalKey();
+  final _tourController = SpotlightTourController();
+  bool _tourChecked = false;
+
+  @override
+  void dispose() {
+    _tourController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _maybeStartTour() async {
+    if (_tourChecked) return;
+    _tourChecked = true;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('homeTourShown') == true) return;
+    await prefs.setBool('homeTourShown', true);
+    if (!mounted) return;
+    _tourController.start(context, [
+      SpotlightStep(
+        targetKey: _budgetHeroKey,
+        title: '이번 달 예산 확인',
+        description: '여기서 남은 예산과 사용률을 한눈에 볼 수 있어요',
+      ),
+      SpotlightStep(
+        targetKey: _quickActionsKey,
+        title: '빠르게 기록하기',
+        description: '지출·수입·저축을 여기서 바로 입력할 수 있어요',
+      ),
+      SpotlightStep(
+        targetKey: _categoryCardKey,
+        title: '카테고리별 지출',
+        description: '어디에 얼마나 썼는지 도넛 차트로 확인해보세요',
+      ),
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<UserModel?>(
@@ -316,6 +400,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
           return const _DashboardSkeleton();
         }
         final user = snapshot.data!;
+        unawaited(_maybeStartTour());
 
         return Stack(
           children: [
@@ -350,18 +435,24 @@ class _HomeDashboardState extends State<_HomeDashboard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _LiveBudgetSection(
-                    uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+                KeyedSubtree(
+                  key: _budgetHeroKey,
+                  child: _LiveBudgetSection(
+                      uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+                ),
 
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const _QuickActionsGrid(),
+                      KeyedSubtree(key: _quickActionsKey, child: const _QuickActionsGrid()),
                       const SizedBox(height: 24),
 
-                      _CategorySpendingSection(uid: widget.uid, month: _month),
+                      KeyedSubtree(
+                        key: _categoryCardKey,
+                        child: _CategorySpendingSection(uid: widget.uid, month: _month),
+                      ),
                       const SizedBox(height: 28),
 
                       _MonthHeader(
@@ -397,6 +488,9 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                       const SizedBox(height: 24),
 
                       _RecentExpensesSection(uid: widget.uid),
+                      const SizedBox(height: 20),
+
+                      _WeeklyEmotionGaugeSection(uid: widget.uid),
                       const SizedBox(height: 20),
 
                       _LiveSpendingInsightSection(
@@ -850,7 +944,8 @@ class _QuickActionsGrid extends StatelessWidget {
         bg: _C.amberSoft,
         fg: _C.amberDeep,
         onTap: (context) => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const RecordTypeSelectScreen())),
+            .push(MaterialPageRoute(builder: (_) => const RecordTypeSelectScreen()))
+            .then((_) => HomeRefreshService.requestRefresh()),
       ),
       _QuickActionButton(
         label: '영수증',
@@ -1297,30 +1392,54 @@ class _CoachBubbleState extends State<_CoachBubble> {
     }
   }
 
-  /// 이번 달 카테고리별 실제 지출(CategorySummaryService)을 요약해서
-  /// 땡코치 AI(은동 PC 로컬 Ollama)에게 잔소리 문구를 생성시킨다.
-  /// AI 서버가 꺼져 있어도 실제 집계 숫자로 만든 문구는 그대로 보여준다.
+  /// 이번 달 카테고리별 실제 지출(CategorySummaryService) + 감정 태그 집계
+  /// (EmotionSummaryService)를 요약해서 땡코치 AI(은동 PC 로컬 Ollama)에게
+  /// 잔소리 문구를 생성시킨다. AI 서버가 꺼져 있어도 실제 집계 숫자로 만든
+  /// 문구는 그대로 보여준다.
   Future<String> _buildMessage() async {
     final now = DateTime.now();
-    final summaries = await CategorySummaryService().getCategorySummary(
-      userId: widget.uid,
-      year: now.year,
-      month: now.month,
-    );
+    final results = await Future.wait([
+      CategorySummaryService().getCategorySummary(
+        userId: widget.uid,
+        year: now.year,
+        month: now.month,
+      ),
+      EmotionSummaryService().getEmotionSummary(
+        userId: widget.uid,
+        year: now.year,
+        month: now.month,
+      ),
+    ]);
+    final summaries = results[0] as List<CategorySummaryModel>;
+    final emotions = results[1] as List<EmotionSummaryModel>;
 
     if (summaries.isEmpty) {
       return '이번 달 지출 기록이 아직 없어요. 첫 기록을 남겨서 저와 함께 시작해볼까요?';
     }
 
     final top = summaries.first;
+
+    // _LiveSpendingInsightSection과 같은 기준(30% 이상)일 때만 감정 정보를
+    // 얹는다 — 신호가 약할 땐 굳이 언급하지 않아 잔소리가 산만해지지 않게.
+    EmotionSummaryModel? stress;
+    for (final e in emotions) {
+      if (e.emotionKey == 'stress') {
+        stress = e;
+        break;
+      }
+    }
+    final emotionNote = (stress != null && stress.percentage >= 30)
+        ? ' 그리고 이번 달 지출의 ${stress.percentage.round()}%는 스트레스로 인한 소비였어요.'
+        : '';
+
     final dataSummary =
         '이번 달 최다 지출 카테고리: ${top.categoryName} ${_won(top.totalAmount)} '
-        '(전체 지출의 ${top.percentage.round()}%)';
+        '(전체 지출의 ${top.percentage.round()}%).$emotionNote';
 
     try {
       return await AiService().generateNagging(widget.tone, dataSummary);
     } on AiServerException {
-      return '$dataSummary. (AI 코치가 잠깐 자리를 비웠어요 — 은동 PC 연결을 확인해주세요)';
+      return '$dataSummary (AI 코치가 잠깐 자리를 비웠어요 — 은동 PC 연결을 확인해주세요)';
     } catch (_) {
       return dataSummary;
     }
@@ -1445,25 +1564,35 @@ class _CategorySlice {
   const _CategorySlice(this.label, this.amount, this.color);
 }
 
-/// 카테고리 키(food/transport/shopping/culture/housing/etc) → 브랜드 색상.
-/// CategorySummaryService.categoryNames와 1:1로 맞춰 아이덴티티를 고정 배정.
-const _categoryColors = <String, Color>{
-  'food': _C.amber,
-  'transport': _C.blue,
-  'shopping': _C.pink,
-  'culture': _C.mint,
-  'housing': _C.purple,
-  'etc': Color(0xFFC7C3D1),
-};
+/// 카테고리 색상 팔레트.
+///
+/// 원래는 food/transport/shopping/culture/housing/etc 6개 대분류 키로 고정
+/// 매핑돼 있었는데, 실제 categories 컬렉션(임예림 파트)은 "차량정비"·"생필품"·
+/// "병원" 같은 훨씬 세분화된 소분류 키/이름을 그대로 쓰고 있어서 6개 키 어디에도
+/// 걸리지 않는 카테고리는 전부 회색 폴백으로만 보이는 문제가 있었다.
+/// 매핑 테이블을 계속 늘리는 대신, 이름을 해시해서 팔레트에서 안정적으로 색을
+/// 골라 쓴다 — 같은 카테고리는 항상 같은 색이 나오고, 카테고리가 새로 늘어나도
+/// 이 파일을 다시 손댈 필요가 없다.
+const _categoryPalette = <Color>[
+  _C.amber,
+  _C.blue,
+  _C.pink,
+  _C.mint,
+  _C.purple,
+  Color(0xFFE07A5F),
+  Color(0xFF3D9970),
+  Color(0xFF9B6B9E),
+  Color(0xFFD4A017),
+  Color(0xFF5B8DB8),
+];
 
-const _categoryIcons = <String, IconData>{
-  'food': Icons.restaurant_rounded,
-  'transport': Icons.directions_subway_rounded,
-  'shopping': Icons.shopping_bag_rounded,
-  'culture': Icons.movie_outlined,
-  'housing': Icons.home_outlined,
-  'etc': Icons.category_outlined,
-};
+Color _colorForCategory(String key) =>
+    _categoryPalette[key.hashCode.abs() % _categoryPalette.length];
+
+/// 아이콘은 이 화면에서 따로 매핑을 관리하지 않고, 소분류 이름(예: "차량정비")
+/// 기준으로 이미 있는 공용 매핑(CategoryIconMap, 지출 입력 화면과 동일)을 그대로
+/// 재사용한다 — categoryKey가 아니라 categoryName으로 조회해야 매칭된다.
+IconData _iconForCategory(String name) => CategoryIconMap.iconFor(name);
 
 class _CategorySpendingSection extends StatefulWidget {
   final String uid;
@@ -1507,7 +1636,7 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
         final summaries = snap.data ?? const [];
         final slices = summaries
             .map((s) => _CategorySlice(
-                s.categoryName, s.totalAmount, _categoryColors[s.categoryKey] ?? const Color(0xFFC7C3D1)))
+                s.categoryName, s.totalAmount, _colorForCategory(s.categoryKey)))
             .toList();
         return _CategorySpendingCard(slices: slices);
       },
@@ -1811,8 +1940,8 @@ class _ExpenseRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _categoryColors[item.categoryKey] ?? const Color(0xFFC7C3D1);
-    final icon = _categoryIcons[item.categoryKey] ?? Icons.category_outlined;
+    final color = _colorForCategory(item.categoryKey);
+    final icon = _iconForCategory(item.categoryName);
     final date = '${item.date.month.toString().padLeft(2, '0')}.${item.date.day.toString().padLeft(2, '0')}';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1884,6 +2013,182 @@ String _spendingTypeLabel(String? resultType) {
       return '계획 소비형';
     default:
       return '테스트 전';
+  }
+}
+
+// ─────────────────────── 이번 주 감정 온도계 ───────────────────────
+
+/// 이번 주 지출에 붙은 감정 태그(WeeklyEmotionService, 읽기 전용)를 모아
+/// "충동/스트레스" 대 "계획/사교" 비율을 하나의 온도 게이지로 보여준다.
+/// _LiveSpendingInsightSection(월 단위, 스트레스 전용)과 달리 주 단위로 더
+/// 자주 갱신되고, 감정 태그 전반의 균형을 온도라는 은유로 직관적으로 보여준다.
+class _WeeklyEmotionGaugeSection extends StatefulWidget {
+  final String uid;
+  const _WeeklyEmotionGaugeSection({required this.uid});
+
+  @override
+  State<_WeeklyEmotionGaugeSection> createState() => _WeeklyEmotionGaugeSectionState();
+}
+
+class _WeeklyEmotionGaugeSectionState extends State<_WeeklyEmotionGaugeSection> {
+  late Future<Map<String, int>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday % 7));
+    _future = WeeklyEmotionService()
+        .getWeeklyEmotionTotals(userId: widget.uid, weekStart: weekStart);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, int>>(
+      future: _future,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const _ShimmerBlock(height: 150, radius: 20);
+        }
+        return _EmotionGaugeCard(totals: snap.data ?? const {});
+      },
+    );
+  }
+}
+
+class _EmotionGaugeCard extends StatelessWidget {
+  final Map<String, int> totals;
+  const _EmotionGaugeCard({required this.totals});
+
+  static const _hotKeys = {'impulsive', 'stress'};
+  static const _coolKeys = {'planned', 'social'};
+
+  @override
+  Widget build(BuildContext context) {
+    final hot = totals.entries
+        .where((e) => _hotKeys.contains(e.key))
+        .fold<int>(0, (sum, e) => sum + e.value);
+    final cool = totals.entries
+        .where((e) => _coolKeys.contains(e.key))
+        .fold<int>(0, (sum, e) => sum + e.value);
+    final tagged = hot + cool;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: _C.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('이번 주 감정 온도',
+              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+          const SizedBox(height: 4),
+          Text(
+            tagged == 0
+                ? '이번 주엔 감정 태그가 달린 지출이 아직 없어요'
+                : '충동·스트레스 소비와 계획·사교 소비의 균형을 온도로 보여드려요',
+            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub),
+          ),
+          const SizedBox(height: 18),
+          if (tagged == 0)
+            Row(
+              children: [
+                Icon(Icons.thermostat_outlined, size: 20, color: _C.inkSub.withValues(alpha: 0.5)),
+                const SizedBox(width: 8),
+                Text('지출에 감정 태그를 남기면 온도가 나타나요',
+                    style: TextStyle(fontSize: 12, color: _C.inkSub.withValues(alpha: 0.8))),
+              ],
+            )
+          else
+            _TemperatureGauge(hotRatio: hot / tagged),
+        ],
+      ),
+    );
+  }
+}
+
+/// hotRatio(0.0~1.0)를 파랑(차분)→빨강(뜨거움) 그라데이션 바 위의 마커 위치로 그린다.
+class _TemperatureGauge extends StatelessWidget {
+  final double hotRatio;
+  const _TemperatureGauge({required this.hotRatio});
+
+  (String, String) get _label {
+    if (hotRatio < 0.3) return ('시원함', '😌');
+    if (hotRatio < 0.6) return ('미지근함', '🙂');
+    return ('뜨거움', '🔥');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, emoji) = _label;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Text('$label · 충동·스트레스 ${(hotRatio * 100).round()}%',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _C.ink)),
+          ],
+        ),
+        const SizedBox(height: 14),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final markerX = (constraints.maxWidth - 16) * hotRatio.clamp(0.0, 1.0);
+            return SizedBox(
+              height: 22,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    height: 10,
+                    margin: const EdgeInsets.only(top: 6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: const LinearGradient(
+                        colors: [_C.blue, _C.purple, _C.pink, Color(0xFFFF5C5C)],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: markerX,
+                    top: 0,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: _C.ink, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                              color: _C.ink.withValues(alpha: 0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('계획·사교', style: TextStyle(fontSize: 10.5, color: _C.inkSub)),
+            Text('충동·스트레스', style: TextStyle(fontSize: 10.5, color: _C.inkSub)),
+          ],
+        ),
+      ],
+    );
   }
 }
 

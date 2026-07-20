@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'app_badge_service.dart';
 import 'consultation_service.dart';
+import 'login_history_service.dart';
 import 'notification_history_service.dart';
 import 'notification_service.dart';
 
@@ -108,6 +110,7 @@ class AuthService {
   }
 
   Future<void> signOut() async {
+    await AppBadgeService.instance.clear();
     await GoogleSignIn().signOut();
     await _auth.signOut();
   }
@@ -119,9 +122,11 @@ class AuthService {
     // 지워지므로 먼저 직접 정리한다 — 그래야 탈퇴 후 고아 데이터가 안 남는다.
     await ConsultationService().deleteAll(uid);
     await NotificationHistoryService().deleteAll(uid);
+    await LoginHistoryService().deleteAll(uid);
     await _db.collection('users').doc(uid).delete();
     await _auth.currentUser?.delete();
     await GoogleSignIn().signOut();
     await NotificationService.instance.cancelAll();
+    await AppBadgeService.instance.clear();
   }
 }

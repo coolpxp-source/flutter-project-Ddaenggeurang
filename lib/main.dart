@@ -5,12 +5,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'models/emotion_summary_model.dart';
 import 'models/user_model.dart';
 import 'firebase_options.dart';
+import 'services/activity_calendar_service.dart';
 import 'services/ai_service.dart';
+import 'services/app_badge_service.dart';
 import 'services/category_summary_service.dart';
+import 'services/emotion_summary_service.dart';
 import 'services/notification_history_service.dart';
 import 'services/notification_service.dart';
+import 'services/recurring_payment_service.dart';
 import 'services/subscription_service.dart';
 import 'services/user_service.dart';
 import 'screens/auth/login_screen.dart';
@@ -18,6 +23,7 @@ import 'screens/auth/signup_extra_screen.dart';
 import 'screens/auth/email_verification_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/auth/splash_screen.dart'; // 방금 만든 스플래시 파일 import
+import 'widgets/common/app_lock_gate.dart';
 import 'widgets/common/brand_loading_dots.dart';
 
 Future<void> main() async {
@@ -62,7 +68,7 @@ class _DdaengAppState extends State<DdaengApp> {
                 key: const ValueKey('splash'),
                 onFinished: () => setState(() => _showSplash = false),
               )
-            : const AppGate(key: ValueKey('gate')),
+            : const AppLockGate(key: ValueKey('gate'), child: AppGate()),
       ),
     );
   }
@@ -85,6 +91,7 @@ class AppGate extends StatelessWidget {
 
         // ── 비로그인 ──
         if (user == null) {
+          _cancelAppBadgeSync();
           // 이제 온보딩 여부를 확인하지 않고 항상 로그인 화면으로 보냅니다.
           return const LoginScreen();
         }
@@ -114,10 +121,15 @@ class AppGate extends StatelessWidget {
                   email: user.email ?? '',
                   onboardingData: PendingOnboarding.data);
             }
-            unawaited(UserService().touchLoginStreak(user.uid, profile));
-            unawaited(_maybeShowConsultReminder(user.uid));
+            unawaited(_maybeCelebrateStreakMilestone(user.uid, profile));
+            unawaited(_maybeBackfillActivityCalendar(user.uid, profile));
+            unawaited(_maybeShowConsultReminder(user.uid, profile));
             unawaited(_maybeSyncSubscriptionReminders(user.uid, profile));
+            unawaited(_maybeSyncFixedExpenseReminders(user.uid, profile));
             unawaited(_maybeShowDailyNagging(user.uid, profile));
+            unawaited(_maybeShowDailyResolution(user.uid));
+            unawaited(_maybeCelebrateLevelUp(user.uid, profile));
+            _syncAppBadgeForUser(user.uid);
             return const HomeScreen();
           },
         );
@@ -126,19 +138,149 @@ class AppGate extends StatelessWidget {
   }
 }
 
+// 로그인 세션 동안 딱 한 번만 구독을 걸어두기 위한 전역 상태.
+// AppGate.build()는 프로필 스트림이 갱신될 때마다 다시 호출되므로, uid가
+// 그대로면 재구독하지 않고 넘어간다.
+StreamSubscription<int>? _badgeSub;
+String? _badgeSubUid;
+
+/// 앱 아이콘 배지(안 읽은 알림 개수)를 로그인 세션 내내 실시간으로 동기화한다.
+void _syncAppBadgeForUser(String uid) {
+  if (_badgeSubUid == uid) return;
+  _badgeSub?.cancel();
+  _badgeSubUid = uid;
+  _badgeSub = NotificationHistoryService()
+      .watchUnreadCount(uid)
+      .listen((count) => AppBadgeService.instance.setCount(count));
+}
+
+void _cancelAppBadgeSync() {
+  _badgeSub?.cancel();
+  _badgeSub = null;
+  _badgeSubUid = null;
+  unawaited(AppBadgeService.instance.clear());
+}
+
+/// 로그인 스트릭(users.loginStreak)을 갱신하고, 7/30/100일 마일스톤을
+/// 처음 달성한 순간에만 축하 알림을 띄운다. 이미 축하한 마일스톤은
+/// SharedPreferences에 남겨서 같은 스트릭 값으로는 다시 뜨지 않게 한다.
+Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  if (profile.lastLoginDate != today) {
+    unawaited(ActivityCalendarService().markActive(uid, today));
+  }
+
+  final newStreak = await UserService().touchLoginStreak(uid, profile);
+
+  const milestones = {7, 30, 100};
+  if (!milestones.contains(newStreak)) return;
+
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'celebratedStreak_$newStreak';
+  if (prefs.getBool(key) == true) return;
+  await prefs.setBool(key, true);
+
+  final title = '연속 접속 $newStreak일 달성! 🔥';
+  final body = '$newStreak일 동안 매일 와줬어요. 정말 대단해요!';
+  await NotificationService.instance.showStreakMilestone(title: title, body: body);
+  await NotificationHistoryService()
+      .record(uid: uid, title: title, body: body, type: 'streak');
+}
+
+/// 접속 캘린더(activityDays)는 이 기능을 배포한 날부터만 기록되기 시작해서,
+/// 그전부터 쌓여 있던 users.loginStreak과 화면에 보이는 숫자가 서로 안 맞는
+/// 문제가 있었다. 기기당 한 번만 loginStreak 기준으로 과거 날짜를 역산해서
+/// activityDays를 채워 넣어 두 값을 맞춘다.
+Future<void> _maybeBackfillActivityCalendar(String uid, UserModel profile) async {
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'activityBackfillDone_$uid';
+  if (prefs.getBool(key) == true) return;
+  await prefs.setBool(key, true);
+
+  final lastLoginDate = profile.lastLoginDate;
+  if (lastLoginDate == null) return;
+  await ActivityCalendarService().backfillFromStreak(
+    uid,
+    lastLoginDate: lastLoginDate,
+    loginStreak: profile.loginStreak,
+  );
+}
+
+/// 포인트가 쌓여 레벨이 오른 순간을 감지해서 축하 알림을 띄운다. 미션 보상
+/// 등 포인트가 어디서 지급되든(addPoints 호출부는 다른 파트 소관) users 문서의
+/// level 필드 변화만 지켜보면 되므로, 마지막으로 확인한 레벨을 SharedPreferences에
+/// uid별로 남겨서 그보다 올랐을 때만 반응한다. 처음 관찰하는 기기(첫 로그인 등)는
+/// 기준값만 저장하고 축하하지 않는다 — 안 그러면 가입 직후 Lv.1도 "레벨업"으로 오인한다.
+Future<void> _maybeCelebrateLevelUp(String uid, UserModel profile) async {
+  final prefs = await SharedPreferences.getInstance();
+  final key = 'lastKnownLevel_$uid';
+  final lastKnown = prefs.getInt(key);
+  if (lastKnown == null) {
+    await prefs.setInt(key, profile.level);
+    return;
+  }
+  if (profile.level <= lastKnown) return;
+  await prefs.setInt(key, profile.level);
+
+  final title = '레벨 업! Lv.${profile.level} 달성 🎉';
+  final body = '포인트를 모아서 레벨이 올랐어요. 계속 이 기세로!';
+  await NotificationService.instance.showLevelUp(title: title, body: body);
+  await NotificationHistoryService()
+      .record(uid: uid, title: title, body: body, type: 'levelup');
+}
+
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.
 /// SharedPreferences에 오늘 날짜를 남겨서 같은 날 재실행/재빌드로 중복 발송되지 않게 한다.
-Future<void> _maybeShowConsultReminder(String uid) async {
+Future<void> _maybeShowConsultReminder(String uid, UserModel profile) async {
   final today = DateTime.now().toIso8601String().substring(0, 10);
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getString('lastConsultReminderDate') == today) return;
   await prefs.setString('lastConsultReminderDate', today);
 
-  final shown = await NotificationService.instance
-      .showConsultReminder(AiService().consultRemaining);
+  final shown = await NotificationService.instance.showConsultReminder(
+    AiService().consultRemaining,
+    coachEmoji: profile.coachTone.emoji,
+    coachName: profile.coachDisplayName,
+  );
   if (shown == null) return;
   await NotificationHistoryService()
       .record(uid: uid, title: shown.title, body: shown.body, type: 'consult');
+}
+
+/// 아침마다 하나씩 순서대로 보여줄 짧은 소비 습관 다짐 문구.
+/// 잔소리(오늘의 잔소리)는 실제 지출 집계를 분석한 결과라 데이터가 있어야
+/// 의미가 있지만, 이건 데이터 없이도 매일 가볍게 띄울 수 있는 고정 문구다.
+const _dailyResolutions = <String>[
+  '오늘은 커피 대신 물 한 잔 어때요?',
+  '지출하기 전에 3초만 생각해봐요',
+  '오늘 하루, 무지출 챌린지 어때요?',
+  '갖고 싶은 게 있으면 장바구니에 담아두고 하루 지나서 다시 생각해봐요',
+  '오늘 번 돈, 얼마나 저축할지 미리 정해볼까요?',
+  '택시 대신 대중교통은 어때요?',
+  '이번 주 예산, 한 번 확인해볼까요?',
+  '작은 습관이 큰 저축을 만들어요',
+  '오늘 지출은 미리 계획해두면 더 스마트해요',
+  '필요한 것과 원하는 것을 구분해봐요',
+  '오늘 하루도 현명한 소비 응원할게요!',
+  '커피 한 잔 아끼면 한 달에 얼마일지 계산해볼까요?',
+];
+
+/// 하루 1번, 앱을 열었을 때 "오늘의 다짐" 문구를 로컬 알림으로 보여준다.
+/// 날짜(연중 일수) 기준으로 목록을 순환시켜서 매일 다른 문구가 뜨게 한다.
+Future<void> _maybeShowDailyResolution(String uid) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString('lastResolutionDate') == today) return;
+  await prefs.setString('lastResolutionDate', today);
+
+  final now = DateTime.now();
+  final dayOfYear =
+      DateTime(now.year, now.month, now.day).difference(DateTime(now.year, 1, 1)).inDays;
+  final message = _dailyResolutions[dayOfYear % _dailyResolutions.length];
+
+  await NotificationService.instance.showDailyResolution(message);
+  await NotificationHistoryService()
+      .record(uid: uid, title: '오늘의 다짐 ☀️', body: message, type: 'resolution');
 }
 
 /// 하루 1번, 활성 구독 목록 기준으로 결제일 알림을 다시 걸어준다(설정 꺼져 있으면 취소).
@@ -156,6 +298,25 @@ Future<void> _maybeSyncSubscriptionReminders(String uid, UserModel profile) asyn
   );
 }
 
+/// 하루 1번, 활성 고정비(월세·공과금 등) 목록 기준으로 결제일 알림을 다시 걸어준다
+/// (설정 꺼져 있으면 취소). _maybeSyncSubscriptionReminders와 동일한 패턴.
+Future<void> _maybeSyncFixedExpenseReminders(String uid, UserModel profile) async {
+  final today = DateTime.now().toIso8601String().substring(0, 10);
+  final prefs = await SharedPreferences.getInstance();
+  if (prefs.getString('lastFixedExpenseSyncDate') == today) return;
+  await prefs.setString('lastFixedExpenseSyncDate', today);
+
+  try {
+    final payments = await RecurringPaymentService().getRecurringPayments(uid).first;
+    await NotificationService.instance.syncFixedExpenseReminders(
+      enabled: profile.notificationSettings.fixedExpenseAlert,
+      activePayments: payments,
+    );
+  } catch (_) {
+    // 고정비 목록 조회 실패(권한/네트워크 등) — 알림 없이 조용히 넘어간다.
+  }
+}
+
 /// 하루 1번, 이번 달 최다 지출 카테고리를 계산해서(코드로) 코치 톤으로 문장을
 /// 만든 뒤(AI) 로컬 알림으로 보여준다 — 홈 화면 코치 말풍선과 같은 데이터/캐시를
 /// 재사용한다. AI 서버(은동 PC)가 꺼져 있으면 오늘 날짜를 저장하지 않고 조용히
@@ -171,12 +332,33 @@ Future<void> _maybeShowDailyNagging(String uid, UserModel profile) async {
   if (summaries.isEmpty) return;
 
   final top = summaries.first;
+
+  // 홈 화면 코치 말풍선(_CoachBubble)과 같은 기준(스트레스 30% 이상일 때만)으로
+  // 감정 태그 정보를 덧붙인다.
+  String emotionNote = '';
+  try {
+    final emotions = await EmotionSummaryService()
+        .getEmotionSummary(userId: uid, year: now.year, month: now.month);
+    EmotionSummaryModel? stress;
+    for (final e in emotions) {
+      if (e.emotionKey == 'stress') {
+        stress = e;
+        break;
+      }
+    }
+    if (stress != null && stress.percentage >= 30) {
+      emotionNote = ' 그리고 이번 달 지출의 ${stress.percentage.round()}%는 스트레스로 인한 소비였어요.';
+    }
+  } catch (_) {
+    // 감정 태그 집계 실패 — 카테고리 정보만으로 잔소리를 만든다.
+  }
+
   final dataSummary = '이번 달 최다 지출 카테고리: ${top.categoryName} ${_won(top.totalAmount)} '
-      '(전체 지출의 ${top.percentage.round()}%)';
+      '(전체 지출의 ${top.percentage.round()}%).$emotionNote';
 
   try {
     final text = await AiService().generateNagging(profile.coachTone, dataSummary);
-    final title = '${profile.coachTone.emoji} ${profile.coachTone.label}가 한마디';
+    final title = '${profile.coachTone.emoji} ${profile.coachDisplayName}가 한마디';
     await prefs.setString('lastNaggingDate', today);
     await NotificationService.instance.showDailyNagging(text, title: title);
     await NotificationHistoryService()

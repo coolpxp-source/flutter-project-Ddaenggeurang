@@ -52,6 +52,8 @@ class UserModel {
   final NotificationSettings notificationSettings;
   final String? lastLoginDate; // "yyyy-MM-dd" — 연속 접속 스트릭 계산용
   final int loginStreak;
+  final int coachAffection; // AI상담 이용할 때마다 쌓이는 코치와의 친밀도
+  final String coachNickname; // 내가 코치에게 지어준 애칭 — 비어있으면 coachTone.label 사용
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -72,9 +74,14 @@ class UserModel {
     this.notificationSettings = const NotificationSettings(),
     this.lastLoginDate,
     this.loginStreak = 0,
+    this.coachAffection = 0,
+    this.coachNickname = '',
     this.createdAt,
     this.updatedAt,
   });
+
+  /// 화면에 코치를 부를 때 쓰는 이름 — 애칭을 지어줬으면 그걸, 아니면 톤 기본 이름.
+  String get coachDisplayName => coachNickname.trim().isEmpty ? coachTone.label : coachNickname.trim();
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -95,6 +102,8 @@ class UserModel {
       NotificationSettings.fromMap(d['notificationSettings']),
       lastLoginDate: d['lastLoginDate'] as String?,
       loginStreak: (d['loginStreak'] ?? 0).toInt(),
+      coachAffection: (d['coachAffection'] ?? 0).toInt(),
+      coachNickname: d['coachNickname'] as String? ?? '',
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (d['updatedAt'] as Timestamp?)?.toDate(),
     );

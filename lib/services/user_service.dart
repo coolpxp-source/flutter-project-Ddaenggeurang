@@ -57,11 +57,13 @@ class UserService {
     });
   }
 
-  /// 연속 접속 스트릭 갱신 — 오늘 이미 접속 처리됐으면 아무 것도 하지 않는다.
-  /// 어제 접속한 상태로 오늘 다시 열면 스트릭 +1, 하루 이상 건너뛰었으면 1로 리셋.
-  Future<void> touchLoginStreak(String uid, UserModel current) async {
+  /// 연속 접속 스트릭 갱신 — 오늘 이미 접속 처리됐으면 아무 것도 안 하고 현재
+  /// 값을 그대로 반환한다. 어제 접속한 상태로 오늘 다시 열면 스트릭 +1, 하루
+  /// 이상 건너뛰었으면 1로 리셋. 반환값은 호출부(main.dart)가 마일스톤(7/30/100일)
+  /// 달성 여부를 판단하는 데 쓴다.
+  Future<int> touchLoginStreak(String uid, UserModel current) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
-    if (current.lastLoginDate == today) return;
+    if (current.lastLoginDate == today) return current.loginStreak;
 
     final yesterday = DateTime.now()
         .subtract(const Duration(days: 1))
@@ -74,6 +76,22 @@ class UserService {
       'lastLoginDate': today,
       'loginStreak': newStreak,
     });
+    return newStreak;
+  }
+
+  /// 코치에게 지어준 애칭 — 빈 문자열로 저장하면 기본 이름(coachTone.label)으로 되돌아간다.
+  Future<void> updateCoachNickname(String uid, String nickname) {
+    return _users.doc(uid).update({
+      'coachNickname': nickname.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// AI상담을 이용할 때마다 코치와의 친밀도를 조금씩 쌓는다.
+  /// 포인트처럼 레벨을 서버에 미리 계산해서 저장하지 않고, 원점수만 늘려두고
+  /// 화면(coach_tone_setting_screen.dart)에서 그때그때 레벨을 계산해 보여준다.
+  Future<void> addCoachAffection(String uid, int amount) {
+    return _users.doc(uid).update({'coachAffection': FieldValue.increment(amount)});
   }
 
   /// 닉네임 중복 검사
