@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import '../../models/expense_model.dart';
 import '../../services/category_service.dart';
 import '../../services/expense_service.dart';
-import '../../utils/currency_formatter.dart';
+import '../../utils/formatters.dart';
 
 class ExpenseInputScreen extends StatefulWidget {
   const ExpenseInputScreen({

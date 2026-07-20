@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
-import '../../utils/currency_formatter.dart';
+import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
 

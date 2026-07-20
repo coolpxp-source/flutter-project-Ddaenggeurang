@@ -95,7 +95,7 @@ class SavingModel {
   }
 
   Map<String, dynamic> toFirestore() => {
-    'userId': userId,
+    'userId': userId.trim(),
     'date': Timestamp.fromDate(date),
     'categoryId': categoryId,
     'accountName': accountName,
@@ -131,7 +131,7 @@ class SavingModel {
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,
-      userId: userId ?? this.userId
+      userId: userId ?? this.userId.trim(),
     );
   }
 }
