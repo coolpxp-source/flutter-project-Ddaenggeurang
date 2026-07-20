@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/group_model.dart';
 import '../../services/group_service.dart';
 import 'group_permission_screen.dart';
+import 'package:flutter/services.dart';
 
 class GroupCreateJoinScreen extends StatefulWidget {
   const GroupCreateJoinScreen({super.key});
@@ -183,14 +184,42 @@ class _GroupCreateJoinScreenState
                       ),
                     ),
                     const SizedBox(height: 6),
-                    SelectableText(
-                      group.inviteCode,
-                      style: const TextStyle(
-                        color: Color(0xFFE66A9F),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SelectableText(
+                          group.inviteCode,
+                          style: const TextStyle(
+                            color: Color(0xFFE66A9F),
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+
+                        const SizedBox(width: 8),
+
+                        IconButton(
+                          onPressed: () async {
+                            await Clipboard.setData(
+                              ClipboardData(
+                                text: group.inviteCode,
+                              ),
+                            );
+
+                            if (!mounted) {
+                              return;
+                            }
+
+                            _showMessage('초대 코드를 복사했습니다.');
+                          },
+                          icon: const Icon(
+                            Icons.copy_rounded,
+                            color: Color(0xFF8566FF),
+                          ),
+                          tooltip: '초대 코드 복사',
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -474,8 +503,8 @@ class _GroupCreateJoinScreenState
 
   Widget _buildGroupCard(GroupModel group) {
     return InkWell(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => GroupPermissionScreen(
@@ -483,6 +512,10 @@ class _GroupCreateJoinScreenState
             ),
           ),
         );
+
+        if (result == true) {
+          await _loadGroups();
+        }
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
@@ -565,13 +598,42 @@ class _GroupCreateJoinScreenState
                         color: Color(0xFF999CA7),
                         size: 15,
                       ),
+
                       const SizedBox(width: 4),
+
                       Text(
                         group.inviteCode,
                         style: const TextStyle(
                           color: Color(0xFF777A86),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
+                        ),
+                      ),
+
+                      const SizedBox(width: 5),
+
+                      InkWell(
+                        onTap: () async {
+                          await Clipboard.setData(
+                            ClipboardData(
+                              text: group.inviteCode,
+                            ),
+                          );
+
+                          if (!mounted) {
+                            return;
+                          }
+
+                          _showMessage('초대 코드를 복사했습니다.');
+                        },
+                        borderRadius: BorderRadius.circular(8),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4),
+                          child: Icon(
+                            Icons.copy_rounded,
+                            color: Color(0xFF8566FF),
+                            size: 16,
+                          ),
                         ),
                       ),
                     ],

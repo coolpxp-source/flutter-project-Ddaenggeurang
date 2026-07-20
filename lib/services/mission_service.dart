@@ -5,12 +5,19 @@ import '../models/mission_definition_model.dart';
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import 'budget_service.dart';
+import 'expense_service.dart';
 
 class MissionService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
   final FirebaseStorage _storage =
       FirebaseStorage.instance;
+  final BudgetService _budgetService =
+  BudgetService();
+
+  final ExpenseService _expenseService =
+  ExpenseService();
 
   String get _currentUserId {
     final user = FirebaseAuth.instance.currentUser;
@@ -208,6 +215,218 @@ class MissionService {
         .get();
 
     return snapshot.data();
+  }
+
+  // 현재 월 카테고리별 예산 성공 여부를 확인하는 메서드
+  Future<bool> isCurrentMonthBudgetSuccess() async {
+    final now = DateTime.now();
+
+    final lastDay =
+        DateTime(
+          now.year,
+          now.month + 1,
+          0,
+        ).day;
+
+    // 월말이 아니면 아직 미션을 완료하지 않음
+    if (now.day != lastDay) {
+      return false;
+    }
+
+    final month =
+        '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}';
+
+    final budget = await _budgetService.getBudget(
+      userId: _currentUserId,
+      month: month,
+    );
+
+    if (budget == null) {
+      return false;
+    }
+
+    if (budget.categoryBudgets.isEmpty) {
+      return false;
+    }
+
+    final startDate = DateTime(
+      now.year,
+      now.month,
+      1,
+    );
+
+    final endDate = DateTime(
+      now.year,
+      now.month + 1,
+      1,
+    ).subtract(
+      const Duration(milliseconds: 1),
+    );
+
+    final expenses =
+    await _expenseService.getExpensesByDateRangeOnce(
+      userId: _currentUserId,
+      start: startDate,
+      end: endDate,
+    );
+
+    // // 이번 달 지출이 없으면 예산 성공 미션을 완료하지 않음
+    if (expenses.isEmpty) {
+      return false;
+    }
+
+    final Map<String, int> spentByCategory = {};
+
+    for (final expense in expenses) {
+      spentByCategory.update(
+        expense.categoryId,
+            (current) => current + expense.amount,
+        ifAbsent: () => expense.amount,
+      );
+    }
+
+    for (final entry in budget.categoryBudgets.entries) {
+      final categoryId = entry.key;
+      final categoryBudget = entry.value;
+
+      final spentAmount =
+          spentByCategory[categoryId] ?? 0;
+
+      if (spentAmount > categoryBudget) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  // 현재 월 예산 성공 미션을 완료하고 포인트를 지급하는 메서드
+  Future<bool> completeBudgetSuccessMission() async {
+    try {
+      final isSuccess =
+      await isCurrentMonthBudgetSuccess();
+
+      if (!isSuccess) {
+        return false;
+      }
+
+      final now = DateTime.now();
+
+      final monthId =
+          '${now.year}-'
+          '${now.month.toString().padLeft(2, '0')}';
+
+      final userRef = _firestore
+          .collection('users')
+          .doc(_currentUserId);
+
+      final missionRef = _firestore
+          .collection('missionDefinitions')
+          .doc('budget_success');
+
+      final progressRef = userRef
+          .collection('missionProgress')
+          .doc('budget_success');
+
+      final monthlyRecordRef = userRef
+          .collection('budgetMissionRecords')
+          .doc(monthId);
+
+      bool rewardGranted = false;
+
+      await _firestore.runTransaction(
+            (transaction) async {
+          final userSnapshot =
+          await transaction.get(userRef);
+
+          final missionSnapshot =
+          await transaction.get(missionRef);
+
+          final monthlyRecordSnapshot =
+          await transaction.get(monthlyRecordRef);
+
+          if (!userSnapshot.exists ||
+              !missionSnapshot.exists) {
+            throw StateError(
+              '사용자 또는 예산 미션 정보가 없습니다.',
+            );
+          }
+
+          // 이번 달에 이미 보상을 받았다면 중복 지급하지 않음
+          if (monthlyRecordSnapshot.exists) {
+            return;
+          }
+
+          final userData =
+          userSnapshot.data()!;
+
+          final missionData =
+          missionSnapshot.data()!;
+
+          final currentPoints =
+              (userData['points'] as num?)
+                  ?.toInt() ??
+                  0;
+
+          final rewardPoints =
+              (missionData['points'] as num?)
+                  ?.toInt() ??
+                  0;
+
+          final newPoints =
+              currentPoints + rewardPoints;
+
+          transaction.set(
+            monthlyRecordRef,
+            {
+              'missionDefId': 'budget_success',
+              'month': monthId,
+              'completedAt':
+              FieldValue.serverTimestamp(),
+              'pointsEarned': rewardPoints,
+            },
+          );
+
+          transaction.set(
+            progressRef,
+            {
+              'status': 'completed',
+              'completedAt':
+              FieldValue.serverTimestamp(),
+              'pointsEarned': rewardPoints,
+              'approvalStatus': null,
+              'proofImageUrl': null,
+              'month': monthId,
+            },
+            SetOptions(
+              merge: true,
+            ),
+          );
+
+          transaction.update(
+            userRef,
+            {
+              'points': newPoints,
+              'level':
+              1 + (newPoints ~/ 100),
+              'updatedAt':
+              FieldValue.serverTimestamp(),
+            },
+          );
+
+          rewardGranted = true;
+        },
+      );
+
+      return rewardGranted;
+    } catch (e) {
+      debugPrint(
+        '예산 성공 미션 완료 실패: $e',
+      );
+
+      return false;
+    }
   }
 
   Future<bool> rejectMissionVerification({
