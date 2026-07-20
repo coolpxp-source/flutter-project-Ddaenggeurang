@@ -1,3 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ddaenggeurang/screens/profile/neighborhood_verify_screen.dart';
+import 'package:ddaenggeurang/widgets/common/ddaeng_modal.dart';
+
 import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +16,7 @@ import 'product_register_screen.dart';
 import 'my_products_screen.dart';
 import 'my_favorites_screen.dart';
 import '../../widgets/market/tappable_product_image.dart';
+import 'package:intl/intl.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -31,6 +36,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   Set<String> _favoriteIds = {};
+  String _statusFilter = '전체';
 
   @override
   void initState() {
@@ -45,11 +51,22 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     _service.toggleFavorite(_myId, productId, !isFav);
   }
 
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  String _categoryFilter = '전체';
+
+  static const _categories = ['전체', '전자기기', '의류', '도서', '가구', '생활용품', '기타'];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      // 플리마켓 탭일 때만 원형 메뉴로 감싸고, 땡그랑마켓 탭이면 메뉴 없이 그대로 표시
       body: _tabIndex == 1
           ? CircularMenu(
         alignment: Alignment.bottomRight,
@@ -71,11 +88,31 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             icon: Icons.add,
             color: _green,
             iconColor: Colors.white,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ProductRegisterScreen()),
-              );
+            onTap: () async {
+              final uid = FirebaseAuth.instance.currentUser!.uid;
+              final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+              final verifiedDong = userDoc.data()?['verifiedDong'] as String?;
+
+              if (verifiedDong == null) {
+                final confirmed = await DdaengModal.confirm(
+                  context,
+                  title: '동네 인증이 필요해요',
+                  message: '직거래 상품 등록을 위해 동네 인증을 먼저 해주세요.',
+                  type: ModalType.warning,
+                  confirmText: '인증하기',
+                );
+                if (confirmed && context.mounted) {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NeighborhoodVerifyScreen()));
+                }
+                return;
+              }
+
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ProductRegisterScreen()),
+                );
+              }
             },
           ),
           CircularMenuItem(
@@ -221,25 +258,43 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
           // 검색바
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
+                BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
               ],
             ),
             child: Row(
               children: [
                 Icon(Icons.search, color: Colors.grey[500], size: 20),
                 const SizedBox(width: 8),
-                Text('상품명 또는 카테고리를 검색하세요',
-                    style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (value) => setState(() => _searchQuery = value.trim()),
+                    decoration: InputDecoration(
+                      hintText: '상품명 또는 카테고리를 검색하세요',
+                      hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: Icon(Icons.close, size: 16, color: Colors.grey[400]),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 20),
-
           if (_tabIndex == 0) ..._buildDdaengMarketTab(),
           if (_tabIndex == 1) ..._buildFleaMarketTab(),
         ],
@@ -286,38 +341,72 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     );
   }
 
-  List<Widget> _buildDdaengMarketTab() {
-    final dummyItems = [
-      {
-        'id': 'ddaeng_1',
-        'name': '무선 블루투스 이어폰',
-        'price': '39,900원',
-        'tag': '최저가',
-        'url': 'https://www.coupang.com/np/search?q=무선+블루투스+이어폰',
-      },
-      {
-        'id': 'ddaeng_2',
-        'name': '캡슐 커피 세트',
-        'price': '24,500원',
-        'tag': '23% 할인',
-        'url': 'https://www.coupang.com/np/search?q=캡슐+커피',
-      },
-      {
-        'id': 'ddaeng_3',
-        'name': '무선 키보드',
-        'price': '31,800원',
-        'tag': '가격 비교',
-        'url': 'https://www.coupang.com/np/search?q=무선+키보드',
-      },
-      {
-        'id': 'ddaeng_4',
-        'name': '생활용품 묶음',
-        'price': '19,900원',
-        'tag': '추천',
-        'url': 'https://www.coupang.com/np/search?q=생활용품',
-      },
-    ];
+  Widget _statusFilterBar() {
+    final filters = ['전체', '판매중', '예약중', '판매완료'];
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: filters.map((label) {
+          final selected = _statusFilter == label;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _statusFilter = label),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: selected ? _green : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: selected ? _green : Colors.grey[300]!),
+                ),
+                child: Text(label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                      color: selected ? Colors.white : Colors.grey[600],
+                    )),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
 
+  Widget _categoryFilterBar() {
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: _categories.map((label) {
+          final selected = _categoryFilter == label;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _categoryFilter = label),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                decoration: BoxDecoration(
+                  color: selected ? _greenLight : Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: selected ? _green : Colors.grey[300]!),
+                ),
+                child: Text(label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                      color: selected ? _green : Colors.grey[600],
+                    )),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  List<Widget> _buildDdaengMarketTab() {
     return [
       Container(
         padding: const EdgeInsets.all(16),
@@ -341,42 +430,71 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         ),
       ),
       const SizedBox(height: 20),
+      _categoryFilterBar(),
+      const SizedBox(height: 16),
       const Text('지금 최저가 상품', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
       const SizedBox(height: 12),
-      GridView.count(
-        crossAxisCount: 2,
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.85,
-        children: dummyItems.map((item) => _dummyPriceCard(item)).toList(),
+      StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('ddaengMarketItems')
+            .orderBy('order')
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()));
+          }
+
+          final filteredDocs = snapshot.data!.docs.where((doc) {
+            final data = doc.data() as Map<String, dynamic>;
+            final matchesCategory = _categoryFilter == '전체' || data['category'] == _categoryFilter;
+            final matchesSearch = _searchQuery.isEmpty ||
+                (data['name'] as String).toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                (data['category'] as String).toLowerCase().contains(_searchQuery.toLowerCase());
+            return matchesCategory && matchesSearch;
+          }).toList();
+
+          if (filteredDocs.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.all(40),
+              child: Center(child: Text('조건에 맞는 상품이 없어요', style: TextStyle(color: Colors.grey[500]))),
+            );
+          }
+
+          return GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.85,
+            children: filteredDocs.map((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              return _dummyPriceCard(doc.id, data);
+            }).toList(),
+          );
+        },
       ),
     ];
   }
 
-  Widget _dummyPriceCard(Map<String, String> item) {
-    final itemId = item['id']!;
+  Widget _dummyPriceCard(String itemId, Map<String, dynamic> item) {
     final isFav = _favoriteIds.contains(itemId);
+    final comparisons = (item['priceComparisons'] as List<dynamic>? ?? [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList()
+      ..sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
+
+    final lowestPrice = comparisons.isNotEmpty ? comparisons.first['price'] as num : 0;
 
     return GestureDetector(
-      onTap: () async {
-        final url = Uri.parse(item['url']!);
-        if (await canLaunchUrl(url)) {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        }
-      },
+      onTap: () => _showPriceComparisonSheet(context, item['name'] as String, comparisons),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -390,7 +508,14 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                     height: 80,
                     width: double.infinity,
                     color: _greenLight,
-                    child: Icon(Icons.image_outlined, color: _green.withOpacity(0.35), size: 28),
+                    child: item['image'] != null
+                        ? Image.network(
+                      item['image'] as String,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(Icons.image_outlined, color: _green.withValues(alpha: 0.35), size: 28),
+                    )
+                        : Icon(Icons.image_outlined, color: _green.withValues(alpha: 0.35), size: 28),
                   ),
                 ),
                 Positioned(
@@ -404,7 +529,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4),
+                          BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4),
                         ],
                       ),
                       child: Icon(
@@ -415,7 +540,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                     ),
                   ),
                 ),
-                Positioned(
+                const Positioned(
                   left: 6,
                   bottom: 6,
                   child: Icon(Icons.open_in_new, size: 14, color: Colors.white70),
@@ -423,17 +548,17 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
               ],
             ),
             const SizedBox(height: 10),
-            Text(item['name']!,
+            Text(item['name'] as String,
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text(item['price']!,
+            Text('${NumberFormat('#,###').format(lowestPrice)}원',
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
               decoration: BoxDecoration(color: _greenLight, borderRadius: BorderRadius.circular(6)),
-              child: Text(item['tag']!,
+              child: Text('${comparisons.length}개 쇼핑몰 비교',
                   style: TextStyle(fontSize: 10, color: _green, fontWeight: FontWeight.w600)),
             ),
           ],
@@ -442,24 +567,126 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     );
   }
 
+  void _showPriceComparisonSheet(
+      BuildContext context, String productName, List<Map<String, dynamic>> comparisons) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(productName,
+                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('${comparisons.length}개 쇼핑몰 가격 비교',
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+              const SizedBox(height: 16),
+              ...comparisons.asMap().entries.map((entry) {
+                final isLowest = entry.key == 0; // 이미 가격순 정렬되어 있음
+                final item = entry.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: GestureDetector(
+                    onTap: () async {
+                      final url = Uri.parse(item['url'] as String);
+                      if (await canLaunchUrl(url)) {
+                        await launchUrl(url, mode: LaunchMode.externalApplication);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isLowest ? _greenLight : Colors.grey[50],
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: isLowest ? _green : Colors.grey[200]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(item['source'] as String,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    if (isLowest) ...[
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: _green, borderRadius: BorderRadius.circular(4)),
+                                        child: const Text('최저가',
+                                            style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text('${NumberFormat('#,###').format(item['price'])}원',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isLowest ? _green : Colors.black87,
+                                    )),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right, color: Colors.grey[400]),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+
   List<Widget> _buildFleaMarketTab() {
     return [
+      _statusFilterBar(),
+      const SizedBox(height: 8),
+      _categoryFilterBar(),
+      const SizedBox(height: 12),
       StreamBuilder<List<MarketProduct>>(
         stream: _service.getProducts(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Padding(
-              padding: EdgeInsets.all(40),
-              child: Center(child: CircularProgressIndicator()),
-            );
+            return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator()));
           }
-          final products = snapshot.data!;
+          final products = snapshot.data!.where((p) {
+            final matchesStatus = _statusFilter == '전체'
+                ? true
+                : _statusFilter == '판매중'
+                ? p.status == ProductStatus.selling
+                : _statusFilter == '예약중'
+                ? p.status == ProductStatus.reserved
+                : p.status == ProductStatus.sold;
+
+            final matchesCategory = _categoryFilter == '전체' || p.category == _categoryFilter;
+
+            final matchesSearch = _searchQuery.isEmpty ||
+                p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                p.category.toLowerCase().contains(_searchQuery.toLowerCase());
+
+            return matchesStatus && matchesCategory && matchesSearch;
+          }).toList();
+
           if (products.isEmpty) {
             return Padding(
               padding: const EdgeInsets.all(40),
-              child: Center(
-                child: Text('등록된 상품이 없어요', style: TextStyle(color: Colors.grey[500])),
-              ),
+              child: Center(child: Text('조건에 맞는 상품이 없어요', style: TextStyle(color: Colors.grey[500]))),
             );
           }
           return GridView.count(
@@ -579,7 +806,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             Text(product.title,
                 style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Text('${product.price}원',
+            Text('${NumberFormat('#,###').format(product.price)}원',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
 
             // 급처/네고가능/직거래 태그

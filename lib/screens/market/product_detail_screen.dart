@@ -1,12 +1,14 @@
-import 'product_register_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../models/market_product_model.dart';
 import '../../services/market_service.dart';
 import '../../services/chat_service.dart';
 import '../../models/chat_model.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 import '../chat/chat_room_screen.dart';
 import 'price_comparison_screen.dart';
+import 'product_register_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final MarketProduct product;
@@ -17,66 +19,6 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        titlePadding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
-        contentPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        title: const Text('상품을 삭제할까요?',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A))),
-        content: const Text('삭제하면 되돌릴 수 없어요.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Color(0xFF8A8A8A))),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF555555),
-                    backgroundColor: const Color(0xFFF7F7F7),
-                    side: const BorderSide(color: Color(0xFFE0E0E0)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('취소', style: TextStyle(fontWeight: FontWeight.w500)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    await _marketService.deleteProduct(widget.product.productId, widget.product.images);
-                    if (context.mounted) {
-                      Navigator.pop(context); // 다이얼로그 닫기
-                      Navigator.pop(context); // 상세 화면 닫고 목록으로
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFD9532A),
-                    backgroundColor: const Color(0xFFFFF0E8),
-                    side: const BorderSide(color: Color(0xFFFF9166)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                  child: const Text('삭제', style: TextStyle(fontWeight: FontWeight.w500)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   static const _green = Color(0xFFFF9166);
   static const _greenLight = Color(0xFFFFF0E8);
 
@@ -85,6 +27,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   final _marketService = MarketService();
   bool _isFavorite = false;
+  int _currentImageIndex = 0;
 
   @override
   void initState() {
@@ -100,8 +43,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _marketService.toggleFavorite(_myId, widget.product.productId, !_isFavorite);
   }
 
-  Future<void> _startChat(BuildContext context) async {
-    final product = widget.product;
+  Future<void> _startChat(BuildContext context, MarketProduct product) async {
     if (product.sellerId == _myId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('본인 상품에는 채팅을 시작할 수 없어요')),
@@ -119,10 +61,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
 
     if (context.mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ChatRoomScreen(chatId: chatId)),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatRoomScreen(chatId: chatId)));
     }
   }
 
@@ -133,10 +72,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        label,
-        style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold),
-      ),
+      child: Text(label, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)),
     );
   }
 
@@ -163,7 +99,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         final selected = product.status == opt.$1;
         return Expanded(
           child: GestureDetector(
-            onTap: () => _updateStatus(opt.$1),
+            onTap: () => _updateStatus(product, opt.$1),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 2),
               padding: const EdgeInsets.symmetric(vertical: 8),
@@ -187,236 +123,257 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  void _updateStatus(ProductStatus newStatus) async {
-    if (newStatus == widget.product.status) return;
+  void _updateStatus(MarketProduct product, ProductStatus newStatus) async {
+    if (newStatus == product.status) return;
 
-    if (newStatus == ProductStatus.sold) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('판매완료로 변경할까요?'),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('확인')),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
-    }
+    final confirmed = await DdaengModal.confirm(
+      context,
+      title: '${_statusLabel(newStatus)}(으)로 변경할까요?',
+      type: newStatus == ProductStatus.sold ? ModalType.danger : ModalType.warning,
+      confirmText: '변경',
+    );
+    if (!confirmed) return;
 
-    await _marketService.updateProductStatus(widget.product.productId, newStatus);
+    await _marketService.updateProductStatus(product.productId, newStatus);
+  }
 
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${_statusLabel(newStatus)}(으)로 변경됐어요')),
-      );
+  Future<void> _confirmDelete(BuildContext context, MarketProduct product) async {
+    final confirmed = await DdaengModal.confirm(
+      context,
+      title: '상품을 삭제할까요?',
+      message: '삭제하면 되돌릴 수 없어요.',
+      type: ModalType.danger,
+      confirmText: '삭제',
+    );
+    if (confirmed && context.mounted) {
+      await _marketService.deleteProduct(product.productId, product.images);
+      if (context.mounted) Navigator.pop(context);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final product = widget.product;
-    final isOwner = product.sellerId == FirebaseAuth.instance.currentUser!.uid;
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('marketProducts')
+          .doc(widget.product.productId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        final product = (snapshot.hasData && snapshot.data!.exists)
+            ? MarketProduct.fromFirestore(snapshot.data!)
+            : widget.product;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text('상품 상세', style: TextStyle(color: Colors.black)),
-        actions: [
-          if (isOwner)
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: Colors.black87),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProductRegisterScreen(existingProduct: product),
-                    ),
-                  );
-                }else if (value == 'delete') {
-                  _confirmDelete(context);
-                }
-              },
-              itemBuilder: (_) => [
-                const PopupMenuItem(value: 'edit', child: Text('수정')),
-                const PopupMenuItem(value: 'delete', child: Text('삭제')),
-              ],
-            ),
-          IconButton(
-            icon: const Icon(Icons.home_outlined, color: Colors.black87),
-            onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
-          ),
-          IconButton(
-            icon: const Icon(Icons.search, color: Colors.black87),
-            onPressed: () {
-              // TODO: 마켓 검색 화면 연결
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        children: [
-          Container(
-            height: 260,
-            width: double.infinity,
-            color: _greenLight,
-            child: product.images.isEmpty
-                ? Icon(Icons.image_outlined, size: 60, color: _green.withValues(alpha: 0.4))
-                : Image.network(product.images.first, fit: BoxFit.cover),
-          ),
+        final isOwner = product.sellerId == FirebaseAuth.instance.currentUser!.uid;
 
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: product.status == ProductStatus.selling
-                            ? _greenLight
-                            : Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        _statusLabel(product.status),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: product.status == ProductStatus.selling
-                              ? _green
-                              : Colors.grey[600],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    if (product.isUrgent) _tagBadge('급처', Colors.redAccent),
-                    if (product.isNegotiable) _tagBadge('네고가능', const Color(0xFF5B9BD5)),
-                    if (product.isDirectDeal) _tagBadge('직거래', const Color(0xFF4CAF87)),
+        return Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            title: const Text('상품 상세', style: TextStyle(color: Colors.black)),
+            actions: [
+              if (isOwner)
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.black87),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => ProductRegisterScreen(existingProduct: product)),
+                      );
+                    } else if (value == 'delete') {
+                      _confirmDelete(context, product);
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'edit', child: Text('수정')),
+                    const PopupMenuItem(value: 'delete', child: Text('삭제')),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (isOwner) ...[
-                  _statusSelector(product),
-                  const SizedBox(height: 12),
-                ],
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(product.title,
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    ),
-                    GestureDetector(
-                      onTap: _toggleFavorite,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.grey[300]!,
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Icon(
-                          _isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: _isFavorite ? Colors.redAccent : Colors.grey[400],
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text('${product.price}원',
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: _green,
-                      backgroundImage: product.sellerAvatarUrl.isNotEmpty
-                          ? NetworkImage(product.sellerAvatarUrl)
-                          : null,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(product.sellerName, style: const TextStyle(fontSize: 13)),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Divider(height: 1, color: Colors.grey[200]),
-                const SizedBox(height: 16),
-
-                Text(product.description, style: const TextStyle(fontSize: 14, height: 1.6)),
-                const SizedBox(height: 16),
-
-                Text('#${product.category}',
-                    style: TextStyle(fontSize: 12, color: _green)),
-
-                if (product.priceComparisons.isNotEmpty) ...[
-                  const Divider(height: 32),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => PriceComparisonScreen(product: product),
-                      ),
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.compare_arrows, size: 18, color: _green),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text('다른 쇼핑몰 가격 비교 보기', style: TextStyle(fontSize: 13)),
-                          ),
-                          Icon(Icons.chevron_right, color: Colors.grey[400]),
-                        ],
-                      ),
+              IconButton(
+                icon: const Icon(Icons.home_outlined, color: Colors.black87),
+                onPressed: () => Navigator.popUntil(context, (route) => route.isFirst),
+              ),
+              IconButton(icon: const Icon(Icons.search, color: Colors.black87), onPressed: () {}),
+            ],
+          ),
+          body: ListView(
+            children: [
+              // 이미지 슬라이드
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 260,
+                    width: double.infinity,
+                    child: product.images.isEmpty
+                        ? Container(
+                      color: _greenLight,
+                      child: Icon(Icons.image_outlined, size: 60, color: _green.withValues(alpha: 0.4)),
+                    )
+                        : PageView.builder(
+                      itemCount: product.images.length,
+                      onPageChanged: (i) => setState(() => _currentImageIndex = i),
+                      itemBuilder: (context, i) =>
+                          Image.network(product.images[i], fit: BoxFit.cover, width: double.infinity),
                     ),
                   ),
+                  if (product.images.length > 1)
+                    Positioned(
+                      bottom: 12,
+                      left: 0,
+                      right: 0,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: product.images.asMap().entries.map((entry) {
+                          return Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _currentImageIndex == entry.key
+                                  ? _green
+                                  : Colors.white.withValues(alpha: 0.6),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
                 ],
-              ],
+              ),
+
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: product.status == ProductStatus.selling ? _greenLight : Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _statusLabel(product.status),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: product.status == ProductStatus.selling ? _green : Colors.grey[600],
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (product.isUrgent) _tagBadge('급처', Colors.redAccent),
+                        if (product.isNegotiable) _tagBadge('네고가능', const Color(0xFF5B9BD5)),
+                        if (product.isDirectDeal) _tagBadge('직거래', const Color(0xFF4CAF87)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (isOwner) ...[
+                      _statusSelector(product),
+                      const SizedBox(height: 12),
+                    ],
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(product.title,
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        ),
+                        GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.grey[300]!, width: 1.2),
+                            ),
+                            child: Icon(
+                              _isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavorite ? Colors.redAccent : Colors.grey[400],
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${product.price}원', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: _green,
+                          backgroundImage:
+                          product.sellerAvatarUrl.isNotEmpty ? NetworkImage(product.sellerAvatarUrl) : null,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(product.sellerName, style: const TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Divider(height: 1, color: Colors.grey[200]),
+                    const SizedBox(height: 16),
+
+                    Text(product.description, style: const TextStyle(fontSize: 14, height: 1.6)),
+                    const SizedBox(height: 16),
+
+                    Text('#${product.category}', style: TextStyle(fontSize: 12, color: _green)),
+
+                    if (product.priceComparisons.isNotEmpty) ...[
+                      const Divider(height: 32),
+                      GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => PriceComparisonScreen(product: product)),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey[300]!),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.compare_arrows, size: 18, color: _green),
+                              const SizedBox(width: 8),
+                              const Expanded(child: Text('다른 쇼핑몰 가격 비교 보기', style: TextStyle(fontSize: 13))),
+                              Icon(Icons.chevron_right, color: Colors.grey[400]),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: product.status == ProductStatus.selling ? () => _startChat(context, product) : null,
+                  icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
+                  label: Text(
+                    product.status == ProductStatus.selling ? '채팅하기' : _statusLabel(product.status),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: _green, padding: const EdgeInsets.symmetric(vertical: 14)),
+                ),
+              ),
             ),
           ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: product.status == ProductStatus.selling
-                  ? () => _startChat(context)
-                  : null,
-              icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-              label: Text(
-                product.status == ProductStatus.selling ? '채팅하기' : _statusLabel(product.status),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _green,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
