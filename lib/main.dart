@@ -27,11 +27,13 @@ import 'screens/auth/splash_screen.dart'; // 방금 만든 스플래시 파일 i
 import 'widgets/common/app_lock_gate.dart';
 import 'widgets/common/brand_loading_dots.dart';
 import 'package:intl/date_symbol_data_local.dart'; // TableCalendar 한글번역팩
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await initializeDateFormatting('ko_KR', null); // TableCalendar 한글번역팩
+  await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,

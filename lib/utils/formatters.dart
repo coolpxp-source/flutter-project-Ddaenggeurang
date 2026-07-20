@@ -1,5 +1,6 @@
 // lib/utils/formatters.dart
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 /// 금액 입력창용 천단위 콤마 자동 포맷터
 /// (기존 currency_formatter.dart의 CurrencyFormatter를 여기로 통합)
@@ -49,4 +50,16 @@ String koreanAmount(int n) {
     return restMan == 0 ? '$eok억원' : '$eok억 ${comma(restMan)}만원';
   }
   return rest == 0 ? '$man만원' : '$man만 ${comma(rest)}원';
+}
+
+class DateFormatter {
+  // 예: "15일 금요일" 형태로 반환
+  static String formatDayAndWeekday(DateTime date) {
+    return DateFormat('d일 EEEE', 'ko_KR').format(date);
+  }
+
+  // 예: "15일 (금)" 형태로 짧게 반환하고 싶다면 아래 함수를 쓰시면 됩니다.
+  static String formatDayAndShortWeekday(DateTime date) {
+    return DateFormat('d일 (E)', 'ko_KR').format(date);
+  }
 }
