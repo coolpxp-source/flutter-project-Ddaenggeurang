@@ -36,6 +36,8 @@ import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
 import '../mypage/mypage_home_screen.dart';
 import '../avatar/my_avatar_screen.dart';
+import '../briefing/mothly_briefing.dart';
+import '../budget/budget_setting_screen.dart';
 import '../psychology/psychology_test_start_screen.dart';
 import '../group/group_create_join_screen.dart';
 import '../notification/notification_history_screen.dart';
@@ -636,7 +638,13 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
         return Column(
           children: [
             _BudgetHero(
-                    user: widget.user, remaining: remaining, total: stats.total, progress: progress)
+                    user: widget.user,
+                    remaining: remaining,
+                    total: stats.total,
+                    progress: progress,
+                    onBudgetChanged: () => setState(() {
+                          _future = _load();
+                        }))
                 .animate()
                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                 .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
@@ -664,12 +672,14 @@ class _BudgetHero extends StatelessWidget {
   final int remaining;
   final int total;
   final double progress;
+  final VoidCallback onBudgetChanged;
 
   const _BudgetHero({
     required this.user,
     required this.remaining,
     required this.total,
     required this.progress,
+    required this.onBudgetChanged,
   });
 
   @override
@@ -776,11 +786,42 @@ class _BudgetHero extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('이번 달 남은 예산',
-                              style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white.withValues(alpha: 0.92))),
+                          Row(
+                            children: [
+                              Text('이번 달 남은 예산',
+                                  style: TextStyle(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white.withValues(alpha: 0.92))),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(20),
+                                onTap: () => Navigator.of(context)
+                                    .push(MaterialPageRoute(
+                                        builder: (_) => BudgetSettingScreen(userId: user.userId)))
+                                    .then((_) => onBudgetChanged()),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.22),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.settings_outlined, size: 14, color: Colors.white),
+                                      SizedBox(width: 3),
+                                      Text('설정',
+                                          style: TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 8),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1375,29 +1416,32 @@ class _CoachBubble extends StatefulWidget {
   State<_CoachBubble> createState() => _CoachBubbleState();
 }
 
+enum _CoachMood { happy, neutral, concerned }
+
 class _CoachBubbleState extends State<_CoachBubble> {
-  late Future<String> _messageFuture;
+  late Future<(String, _CoachMood)> _stateFuture;
 
   @override
   void initState() {
     super.initState();
-    _messageFuture = _buildMessage();
+    _stateFuture = _load();
   }
 
   @override
   void didUpdateWidget(covariant _CoachBubble old) {
     super.didUpdateWidget(old);
     if (old.uid != widget.uid || old.tone != widget.tone) {
-      _messageFuture = _buildMessage();
+      _stateFuture = _load();
     }
   }
 
   /// 이번 달 카테고리별 실제 지출(CategorySummaryService) + 감정 태그 집계
-  /// (EmotionSummaryService)를 요약해서 땡코치 AI(은동 PC 로컬 Ollama)에게
-  /// 잔소리 문구를 생성시킨다. AI 서버가 꺼져 있어도 실제 집계 숫자로 만든
-  /// 문구는 그대로 보여준다.
-  Future<String> _buildMessage() async {
+  /// (EmotionSummaryService) + 예산 사용률(BudgetService)을 함께 불러와서,
+  /// 땡코치 AI(은동 PC 로컬 Ollama) 잔소리 문구와 캐릭터 기분을 같이 계산한다.
+  /// 기분은 예산 사용률 기준(새 그림 없이 이모지 배지+애니메이션으로만 표현).
+  Future<(String, _CoachMood)> _load() async {
     final now = DateTime.now();
+    final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
     final results = await Future.wait([
       CategorySummaryService().getCategorySummary(
         userId: widget.uid,
@@ -1409,12 +1453,27 @@ class _CoachBubbleState extends State<_CoachBubble> {
         year: now.year,
         month: now.month,
       ),
+      BudgetService().getBudget(userId: widget.uid, month: monthStr),
     ]);
     final summaries = results[0] as List<CategorySummaryModel>;
     final emotions = results[1] as List<EmotionSummaryModel>;
+    final budget = results[2] as BudgetModel?;
+
+    _CoachMood mood;
+    if (budget != null && budget.availableBudget > 0) {
+      final spent = summaries.fold<int>(0, (sum, s) => sum + s.totalAmount);
+      final usedPercent = spent / budget.availableBudget * 100;
+      mood = usedPercent >= 100
+          ? _CoachMood.concerned
+          : usedPercent >= 70
+              ? _CoachMood.neutral
+              : _CoachMood.happy;
+    } else {
+      mood = _CoachMood.neutral;
+    }
 
     if (summaries.isEmpty) {
-      return '이번 달 지출 기록이 아직 없어요. 첫 기록을 남겨서 저와 함께 시작해볼까요?';
+      return ('이번 달 지출 기록이 아직 없어요. 첫 기록을 남겨서 저와 함께 시작해볼까요?', mood);
     }
 
     final top = summaries.first;
@@ -1436,13 +1495,15 @@ class _CoachBubbleState extends State<_CoachBubble> {
         '이번 달 최다 지출 카테고리: ${top.categoryName} ${_won(top.totalAmount)} '
         '(전체 지출의 ${top.percentage.round()}%).$emotionNote';
 
+    String message;
     try {
-      return await AiService().generateNagging(widget.tone, dataSummary);
+      message = await AiService().generateNagging(widget.tone, dataSummary);
     } on AiServerException {
-      return '$dataSummary (AI 코치가 잠깐 자리를 비웠어요 — 은동 PC 연결을 확인해주세요)';
+      message = '$dataSummary (AI 코치가 잠깐 자리를 비웠어요 — 은동 PC 연결을 확인해주세요)';
     } catch (_) {
-      return dataSummary;
+      message = dataSummary;
     }
+    return (message, mood);
   }
 
   static String _won(int n) {
@@ -1487,46 +1548,99 @@ class _CoachBubbleState extends State<_CoachBubble> {
               ),
             ),
           ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.24),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
-                ),
-                alignment: Alignment.center,
-                child: CoachAvatar(imagePath: widget.tone.imagePath, size: 30),
-              )
-                  .animate(onPlay: (c) => c.repeat(reverse: true))
-                  .scaleXY(begin: 1.0, end: 1.05, duration: 1800.ms, curve: Curves.easeInOut),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FutureBuilder<String>(
-                  future: _messageFuture,
-                  builder: (context, snap) {
-                    if (snap.connectionState != ConnectionState.done) {
-                      return const _CoachBubbleLoading();
-                    }
-                    return Text(
-                      snap.data ?? '오늘도 현명한 소비 하고 계신가요?',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        height: 1.45,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+          FutureBuilder<(String, _CoachMood)>(
+            future: _stateFuture,
+            builder: (context, snap) {
+              final mood = snap.data?.$2 ?? _CoachMood.neutral;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _CoachAvatarWithMood(imagePath: widget.tone.imagePath, mood: mood),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: snap.connectionState != ConnectionState.done
+                        ? const _CoachBubbleLoading()
+                        : Text(
+                            snap.data?.$1 ?? '오늘도 현명한 소비 하고 계신가요?',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              height: 1.45,
+                            ),
+                          ),
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 예산 사용률에 따른 코치 캐릭터 기분 표현 — 새 그림 에셋 없이 기존 아바타
+/// 이미지 위에 작은 이모지 배지를 얹고, 애니메이션(평소엔 은은한 pulse, 예산
+/// 초과 임박이면 살짝 흔들리는 shake)만으로 반응하는 느낌을 낸다.
+class _CoachAvatarWithMood extends StatelessWidget {
+  final String imagePath;
+  final _CoachMood mood;
+  const _CoachAvatarWithMood({required this.imagePath, required this.mood});
+
+  String get _emoji {
+    switch (mood) {
+      case _CoachMood.happy:
+        return '😊';
+      case _CoachMood.neutral:
+        return '😐';
+      case _CoachMood.concerned:
+        return '😰';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.24),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+      ),
+      alignment: Alignment.center,
+      child: CoachAvatar(imagePath: imagePath, size: 30),
+    );
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        mood == _CoachMood.concerned
+            ? avatar.animate(onPlay: (c) => c.repeat(reverse: true)).shake(
+                hz: 2.5, duration: 900.ms, curve: Curves.easeInOut, offset: const Offset(1.5, 0))
+            : avatar
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scaleXY(begin: 1.0, end: 1.05, duration: 1800.ms, curve: Curves.easeInOut),
+        Positioned(
+          bottom: -4,
+          right: -4,
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0xFFFF5C8A), width: 1.5),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withValues(alpha: 0.15), blurRadius: 3, offset: const Offset(0, 1)),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Text(_emoji, style: const TextStyle(fontSize: 13, height: 1)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2879,6 +2993,25 @@ class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> 
                     child: Text(data.aiMessage,
                         style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white, height: 1.4)),
+                  ),
+                  const SizedBox(height: 10),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const MonthlyBriefingScreen())),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text('월간 브리핑 더보기',
+                              style: TextStyle(
+                                  fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white)),
+                          SizedBox(width: 2),
+                          Icon(Icons.chevron_right_rounded, size: 15, color: Colors.white),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),
