@@ -88,6 +88,7 @@ class _ActivityHeatmapScreenState extends State<ActivityHeatmapScreen> {
                         ],
                       ),
                       child: TableCalendar(
+                        locale: 'ko_KR', // 월,화,수 - 한글로
                         firstDay: DateTime(2024, 1, 1),
                         lastDay: DateTime.now().add(const Duration(days: 1)),
                         focusedDay: _focusedMonth,
