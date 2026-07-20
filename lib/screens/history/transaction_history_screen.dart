@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
+import 'transaction_detail_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -370,9 +371,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     final String sign = isExpense ? '-' : (isSaving ? '' : '+');
     final amountText = '$sign${CurrencyFormatter.format(item.amount)}원';
 
-    return InkWell( // 터치 이벤트 InkWell
-      onTap: () {
-        // TODO: 16_내역상세 페이지로 이동하는 Navigator 로직 추가
+    return InkWell(
+      onTap: () async {
+        // 1. 상세 페이지로 이동하면서 현재 클릭한 item 데이터를 넘겨줍니다.
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TransactionDetailScreen(item: item),
+          ),
+        );
+        // 2. 상세 페이지에서 (수정/삭제 후) 뒤로가기를 눌러 돌아오면 데이터를 다시 불러옵니다!
+        _loadMonthlyData();
       },
       child: Padding(
         padding: const EdgeInsets.only(bottom: 24.0),

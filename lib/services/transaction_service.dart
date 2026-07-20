@@ -105,4 +105,29 @@ class TransactionService {
 
     return allTransactions;
   }
+  /// 내역 삭제 (Soft Delete: isDeleted 상태를 true로 변경)
+  Future<void> deleteTransaction(String type, String id) async {
+    String collectionName;
+
+    // type에 따라 어떤 파이어베이스 컬렉션을 찌를지 결정합니다.
+    if (type == 'expense') {
+      collectionName = 'expenses';
+    } else if (type == 'income') {
+      collectionName = 'incomes';
+    } else if (type == 'saving') {
+      collectionName = 'savings';
+    } else {
+      return;
+    }
+
+    try {
+      await _db.collection(collectionName).doc(id).update({
+        'isDeleted': true, // 👈 완전히 지우지 않고 상태만 변경 (기존 로직과 호환)
+      });
+      print('✅ 삭제 완료: $collectionName 의 $id');
+    } catch (e) {
+      print('⚠️ 삭제 에러: $e');
+    }
+  }
 }
+
