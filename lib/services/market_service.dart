@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/market_product_model.dart';
 
 class MarketService {
@@ -8,7 +9,6 @@ class MarketService {
   Stream<List<MarketProduct>> getProducts({String? category}) {
     Query query = _db
         .collection('marketProducts')
-        .where('status', isEqualTo: 'selling')
         .orderBy('createdAt', descending: true);
 
     if (category != null && category != '전체') {
@@ -33,17 +33,14 @@ class MarketService {
     await _db.collection('marketProducts').doc(productId).update(updates);
   }
 
-  // 상품 상태 변경 (판매중/예약중/판매완료)
-  Future<void> updateStatus(String productId, String status) async {
-    await _db.collection('marketProducts').doc(productId).update({
-      'status': status,
-      'updatedAt': Timestamp.now(),
-    });
-  }
-
   // 상품 삭제
-  Future<void> deleteProduct(String productId) async {
-    await _db.collection('marketProducts').doc(productId).delete();
+  Future<void> deleteProduct(String productId, List<String> imageUrls) async {
+    for (final url in imageUrls) {
+      try {
+        await FirebaseStorage.instance.refFromURL(url).delete();
+      } catch (e) {}
+    }
+    await FirebaseFirestore.instance.collection('marketProducts').doc(productId).delete();
   }
 
   // 판매자 기준 본인 상품 목록
@@ -119,5 +116,16 @@ class MarketService {
         .where(FieldPath.documentId, whereIn: realIds)
         .get();
     return snap.docs.map((d) => MarketProduct.fromFirestore(d)).toList();
+  }
+
+  // 판매 중, 거래 중, 판매 완료 뱃지
+  Future<void> updateProductStatus(String productId, ProductStatus status) {
+    return FirebaseFirestore.instance
+        .collection('marketProducts')
+        .doc(productId)
+        .update({
+      'status': status.value,
+      'updatedAt': Timestamp.now(),
+    });
   }
 }

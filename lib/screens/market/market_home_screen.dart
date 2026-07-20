@@ -1,4 +1,4 @@
-import 'package:ddaenggeurang/services/chat_service.dart';
+import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +11,7 @@ import 'product_detail_screen.dart';
 import 'product_register_screen.dart';
 import 'my_products_screen.dart';
 import 'my_favorites_screen.dart';
+import '../../widgets/market/tappable_product_image.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -478,7 +479,28 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Widget _productCard(MarketProduct product) {
     final isFav = _favoriteIds.contains(product.productId);
-    final hasImage = product.images.isNotEmpty;
+
+    String statusLabel(ProductStatus status) {
+      switch (status) {
+        case ProductStatus.selling:
+          return '판매중';
+        case ProductStatus.reserved:
+          return '예약중';
+        case ProductStatus.sold:
+          return '판매완료';
+      }
+    }
+
+    Color statusColor(ProductStatus status) {
+      switch (status) {
+        case ProductStatus.selling:
+          return _green;
+        case ProductStatus.reserved:
+          return Colors.orange;
+        case ProductStatus.sold:
+          return Colors.grey;
+      }
+    }
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -489,48 +511,49 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: Colors.grey[200]!),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: hasImage
-                      ? Image.network(
-                    product.images.first,
-                    height: 90,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      height: 90,
-                      width: double.infinity,
-                      color: _greenLight,
-                      child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
+                Container(
+                  height: 70,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: _greenLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: product.images.isEmpty
+                      ? Icon(Icons.image_outlined, color: _green.withOpacity(0.4))
+                      : TappableProductImage(
+                    imageUrl: product.images.first,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
                     ),
-                  )
-                      : Container(
-                    height: 90,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: _greenLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
                   ),
                 ),
                 Positioned(
-                  right: 8,
-                  top: 8,
+                  left: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: statusColor(product.status),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      statusLabel(product.status),
+                      style: const TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 4,
+                  top: 4,
                   child: GestureDetector(
                     onTap: () => _toggleFavorite(product.productId),
                     child: Container(
@@ -539,10 +562,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                         color: Colors.white,
                         shape: BoxShape.circle,
                         boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                          ),
+                          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4),
                         ],
                       ),
                       child: Icon(
@@ -556,29 +576,76 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            // 거래 옵션 뱃지 — 새로 추가
-            if (product.isUrgent || product.isNegotiable || product.isDirectDeal)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Wrap(
-                  spacing: 4,
-                  runSpacing: 4,
-                  children: [
-                    if (product.isUrgent) _tagBadge('급처', Colors.redAccent),
-                    if (product.isNegotiable) _tagBadge('네고가능', const Color(0xFF5B9BD5)),
-                    if (product.isDirectDeal) _tagBadge('직거래', const Color(0xFF4CAF87)),
-                  ],
-                ),
-              ),
-
             Text(product.title,
                 style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text('${product.price}원',
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+
+            // 급처/네고가능/직거래 태그
+            if (product.isUrgent || product.isNegotiable || product.isDirectDeal) ...[
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  if (product.isUrgent) _tagChip('급처', Colors.redAccent),
+                  if (product.isNegotiable) _tagChip('네고가능', _green),
+                  if (product.isDirectDeal) _tagChip('직거래', Colors.blueGrey),
+                ],
+              ),
+            ],
+            const SizedBox(height: 6),
+            // 판매자 닉네임 + 아바타
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 7,
+                  backgroundColor: Colors.grey[200],
+                  backgroundImage: product.sellerAvatarUrl.isNotEmpty
+                      ? NetworkImage(product.sellerAvatarUrl)
+                      : null,
+                  child: product.sellerAvatarUrl.isEmpty
+                      ? Icon(Icons.person_outline, size: 9, color: Colors.grey[400])
+                      : null,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(product.sellerName,
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _timeAgo(product.createdAt),
+              style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return '방금 전';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    if (diff.inDays < 7) return '${diff.inDays}일 전';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}주 전';
+    return '${dateTime.year}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
+  Widget _tagChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w500)),
     );
   }
 }
