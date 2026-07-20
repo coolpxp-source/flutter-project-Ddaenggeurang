@@ -592,13 +592,34 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                                     : const Color(0xFFFFF0F6),
                                 borderRadius: BorderRadius.circular(15),
                               ),
-                              child: Icon(
-                                isLocked
-                                    ? Icons.lock_outline
-                                    : _slotIcon(item.slot),
-                                color: isLocked
-                                    ? const Color(0xFFAEB0B8)
-                                    : pinkColor,
+                              child: isLocked
+                                  ? const Icon(
+                                Icons.lock_outline,
+                                color: Color(0xFFAEB0B8),
+                              )
+                                  : item.imageUrl.isNotEmpty
+                                  ? ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.network(
+                                  item.imageUrl,
+                                  width: 58,
+                                  height: 58,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (
+                                      context,
+                                      error,
+                                      stackTrace,
+                                      ) {
+                                    return Icon(
+                                      _slotIcon(item.slot),
+                                      color: pinkColor,
+                                    );
+                                  },
+                                ),
+                              )
+                                  : Icon(
+                                _slotIcon(item.slot),
+                                color: pinkColor,
                               ),
                             ),
                             if (item.isOwned)
