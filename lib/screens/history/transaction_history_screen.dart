@@ -14,7 +14,8 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  CalendarFormat _calendarFormat = CalendarFormat.week;
+  // CalendarFormat _calendarFormat = CalendarFormat.week; 1주 보기
+  CalendarFormat _calendarFormat = CalendarFormat.twoWeeks; // 2주 보기
   String _selectedFilter = '전체';
 
   // 데이터 관리를 위한 변수
@@ -157,9 +158,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             ),
             onPressed: () {
               setState(() {
-                _calendarFormat = _calendarFormat == CalendarFormat.week
+                _calendarFormat = _calendarFormat == CalendarFormat.twoWeeks
                     ? CalendarFormat.month
-                    : CalendarFormat.week;
+                    : CalendarFormat.twoWeeks;
               });
             },
           ),
@@ -177,6 +178,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _buildFilterChip('전체'),
                 _buildFilterChip('지출'),
@@ -188,6 +190,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
           // 스와이프 달력
           TableCalendar(
+            locale: 'ko_KR', // 월,화,수 - 한글로
             firstDay: DateTime(2020, 1, 1),
             lastDay: DateTime(2030, 12, 31),
             focusedDay: _focusedDay,
@@ -221,20 +224,21 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
                 if (sums == null) return const SizedBox();
 
-                return Positioned(
-                  bottom: 2,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (sums['income']! > 0)
-                      // 💡 CurrencyFormatter 적용
-                        Text('+${CurrencyFormatter.format(sums['income']!)}',
-                            style: const TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.w600)),
-                      if (sums['expense']! > 0)
-                      // 💡 CurrencyFormatter 적용
-                        Text('-${CurrencyFormatter.format(sums['expense']!)}',
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.w600)),
-                    ],
+                return Align(
+                  alignment: Alignment.bottomCenter, // 캘린더 칸의 하단 중앙으로 정렬
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0), // 하단 여백 살짝 띄우기
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min, // 내용물 크기만큼만 공간 차지
+                      children: [
+                        if (sums['income']! > 0)
+                          Text('+${CurrencyFormatter.format(sums['income']!)}',
+                              style: const TextStyle(color: Colors.blue, fontSize: 10, fontWeight: FontWeight.w600)), // 색상/크기 미세조정
+                        if (sums['expense']! > 0)
+                          Text('-${CurrencyFormatter.format(sums['expense']!)}',
+                              style: const TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.w600)), // 색상/크기 미세조정
+                      ],
+                    ),
                   ),
                 );
               },
