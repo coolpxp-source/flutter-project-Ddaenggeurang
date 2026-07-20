@@ -11,6 +11,7 @@ import 'firebase_options.dart';
 import 'services/activity_calendar_service.dart';
 import 'services/ai_service.dart';
 import 'services/app_badge_service.dart';
+import 'services/budget_service.dart';
 import 'services/category_summary_service.dart';
 import 'services/emotion_summary_service.dart';
 import 'services/notification_history_service.dart';
@@ -129,6 +130,7 @@ class AppGate extends StatelessWidget {
             unawaited(_maybeShowDailyNagging(user.uid, profile));
             unawaited(_maybeShowDailyResolution(user.uid));
             unawaited(_maybeCelebrateLevelUp(user.uid, profile));
+            unawaited(_maybeWarnBudgetOverage(user.uid, profile));
             _syncAppBadgeForUser(user.uid);
             return const HomeScreen();
           },
@@ -227,6 +229,40 @@ Future<void> _maybeCelebrateLevelUp(String uid, UserModel profile) async {
   await NotificationService.instance.showLevelUp(title: title, body: body);
   await NotificationHistoryService()
       .record(uid: uid, title: title, body: body, type: 'levelup');
+}
+
+/// 이번 달 예산 사용률이 80%/100%에 도달하면 각각 한 번씩만 경고 알림을 띄운다.
+/// budgets(성기필)/expenses(임예림) 컬렉션은 공개 서비스 메서드로만 읽는다.
+Future<void> _maybeWarnBudgetOverage(String uid, UserModel profile) async {
+  final now = DateTime.now();
+  final monthStr = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+
+  final budget = await BudgetService().getBudget(userId: uid, month: monthStr);
+  if (budget == null || budget.availableBudget <= 0) return;
+
+  final summaries =
+      await CategorySummaryService().getCategorySummary(userId: uid, year: now.year, month: now.month);
+  final spent = summaries.fold<int>(0, (sum, s) => sum + s.totalAmount);
+  final usedPercent = (spent / budget.availableBudget * 100).round();
+
+  final prefs = await SharedPreferences.getInstance();
+
+  Future<void> warnOnce(int threshold, String title, String body) async {
+    final key = 'budgetWarned${threshold}_${uid}_$monthStr';
+    if (prefs.getBool(key) == true) return;
+    await prefs.setBool(key, true);
+    await NotificationService.instance.showBudgetWarning(title: title, body: body);
+    await NotificationHistoryService()
+        .record(uid: uid, title: title, body: body, type: 'budget_warning');
+  }
+
+  if (usedPercent >= 100) {
+    await warnOnce(100, '이번 달 예산을 다 썼어요 😮',
+        '이번 달 지출이 예산 $usedPercent%에 도달했어요. 남은 기간 지출을 조절해보세요.');
+  } else if (usedPercent >= 80) {
+    await warnOnce(80, '이번 달 예산의 80%를 썼어요',
+        '지출이 예산의 $usedPercent%에 도달했어요. 조금만 더 신경 써볼까요?');
+  }
 }
 
 /// 하루 1번, 앱을 열었을 때 오늘 남은 AI상담 횟수를 로컬 알림으로 알려준다.

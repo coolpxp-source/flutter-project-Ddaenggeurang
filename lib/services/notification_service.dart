@@ -134,6 +134,22 @@ class NotificationService {
     await _plugin.show(id: 3, title: title, body: body, notificationDetails: details);
   }
 
+  /// 이번 달 예산 사용률이 임계치(80%/100%)에 도달했을 때의 경고 알림.
+  Future<void> showBudgetWarning({required String title, required String body}) async {
+    if (await _isQuietHours()) return;
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'budget_warning',
+        '예산 경고',
+        channelDescription: '이번 달 예산 사용률이 높아지면 알려드려요',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    );
+    await _plugin.show(id: 5, title: title, body: body, notificationDetails: details);
+  }
+
   /// 포인트가 쌓여 레벨이 오른 순간의 축하 알림.
   Future<void> showLevelUp({required String title, required String body}) async {
     if (await _isQuietHours()) return;
