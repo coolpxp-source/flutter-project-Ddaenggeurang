@@ -36,7 +36,7 @@ import '../community/community_home_screen.dart';
 import '../ai_chat/ai_consult_screen.dart';
 import '../mypage/mypage_home_screen.dart';
 import '../avatar/my_avatar_screen.dart';
-import '../briefing/mothly_briefing.dart';
+import '../briefing/mothly_briefing_screen.dart';
 import '../budget/budget_setting_screen.dart';
 import '../psychology/psychology_test_start_screen.dart';
 import '../group/group_create_join_screen.dart';
