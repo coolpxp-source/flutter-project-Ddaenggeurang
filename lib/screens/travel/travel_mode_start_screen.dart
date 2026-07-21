@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 import '../../models/travel_model.dart';
 import '../../services/travel_service.dart';
+import 'travel_expense_input_screen.dart';
 
 class TravelModeStartScreen extends StatefulWidget {
   const TravelModeStartScreen({
@@ -16,19 +17,27 @@ class TravelModeStartScreen extends StatefulWidget {
 }
 
 class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
+  // 입력값 유효성 검사용 FormKey
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // 여행 이름 입력 컨트롤러
   final TextEditingController _titleController =
   TextEditingController();
 
+  // 여행 예산 입력 컨트롤러
   final TextEditingController _budgetController =
   TextEditingController();
 
+  // 여행 정보 Firestore 저장 서비스
   final TravelService _travelService = TravelService();
 
+  // 여행 시작일
   DateTime? _startDate;
+
+  // 여행 종료일
   DateTime? _endDate;
 
+  // 저장 버튼 중복 클릭 방지
   bool _isSaving = false;
 
   @override
@@ -38,6 +47,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     super.dispose();
   }
 
+  /// 여행 시작일 선택
   Future<void> _selectStartDate() async {
     final DateTime now = DateTime.now();
 
@@ -51,13 +61,16 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       confirmText: '선택',
     );
 
+    // 날짜를 선택하지 않고 창을 닫은 경우
     if (selectedDate == null) {
       return;
     }
 
     setState(() {
+      // 시간 정보를 제외한 날짜만 저장
       _startDate = _dateOnly(selectedDate);
 
+      // 종료일이 새 시작일보다 빠르면 종료일 초기화
       if (_endDate != null &&
           _endDate!.isBefore(_startDate!)) {
         _endDate = null;
@@ -65,7 +78,9 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     });
   }
 
+  /// 여행 종료일 선택
   Future<void> _selectEndDate() async {
+    // 시작일을 먼저 선택해야 함
     if (_startDate == null) {
       _showMessage('여행 시작일을 먼저 선택해 주세요.');
       return;
@@ -81,6 +96,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       confirmText: '선택',
     );
 
+    // 날짜를 선택하지 않고 창을 닫은 경우
     if (selectedDate == null) {
       return;
     }
@@ -90,13 +106,17 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     });
   }
 
+  /// 여행 정보를 Firestore에 저장
   Future<void> _saveTravel() async {
+    // 키보드 닫기
     FocusScope.of(context).unfocus();
 
+    // 이미 저장 중이라면 중복 실행 방지
     if (_isSaving) {
       return;
     }
 
+    // 여행 이름과 예산 유효성 검사
     final bool isFormValid =
         _formKey.currentState?.validate() ?? false;
 
@@ -104,21 +124,25 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       return;
     }
 
+    // 시작일 확인
     if (_startDate == null) {
       _showMessage('여행 시작일을 선택해 주세요.');
       return;
     }
 
+    // 종료일 확인
     if (_endDate == null) {
       _showMessage('여행 종료일을 선택해 주세요.');
       return;
     }
 
+    // 날짜 순서 확인
     if (_endDate!.isBefore(_startDate!)) {
       _showMessage('종료일은 시작일보다 빠를 수 없습니다.');
       return;
     }
 
+    // Firebase 로그인 사용자 확인
     final User? user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
@@ -126,6 +150,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       return;
     }
 
+    // 예산 문자열을 int로 변환
     final int? budgetAmount = _parseBudget(
       _budgetController.text,
     );
@@ -135,9 +160,14 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     });
 
     try {
+      // 화면에서 입력받은 내용으로 여행 모델 생성
       final TravelModel travel = TravelModel(
+        // 실제 문서 ID는 TravelService에서 생성
         travelId: '',
+
+        // 현재 로그인 사용자의 Firebase UID
         userId: user.uid,
+
         title: _titleController.text.trim(),
         startDate: _startDate!,
         endDate: _endDate!,
@@ -146,13 +176,17 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
         isDeleted: false,
       );
 
+      // Firestore에 저장한 뒤 생성된 여행 문서 ID 반환
       final String travelId =
       await _travelService.addTravel(travel);
+
+      debugPrint('저장 완료된 여행 ID: $travelId');
 
       if (!mounted) {
         return;
       }
 
+      // 여행 저장 성공 메시지
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
@@ -161,23 +195,29 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
           ),
         );
 
-      /*
-      다음 여행 지출 입력 화면을 만든 뒤 아래처럼 연결하면 됨.
+      // 저장 상태를 먼저 해제
+      setState(() {
+        _isSaving = false;
+      });
 
-      Navigator.pushReplacement(
-        context,
+      // 현재 화면은 유지하고 경비 입력 화면을 위에 추가
+      //
+      // pushReplacement를 사용하지 않으므로
+      // Navigator history가 비는 오류를 방지할 수 있음
+      Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) {
+          builder: (BuildContext context) {
             return TravelExpenseInputScreen(
               travelId: travelId,
             );
           },
         ),
       );
-      */
+    } on FirebaseException catch (error, stackTrace) {
+      debugPrint('Firebase 여행 생성 오류 코드: ${error.code}');
+      debugPrint('Firebase 여행 생성 오류 내용: ${error.message}');
+      debugPrintStack(stackTrace: stackTrace);
 
-      Navigator.pop(context, travelId);
-    } on FirebaseException catch (error) {
       if (!mounted) {
         return;
       }
@@ -185,15 +225,18 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       _showMessage(
         error.message ?? '여행 정보를 저장하지 못했습니다.',
       );
-    } catch (error) {
+    } catch (error, stackTrace) {
+      debugPrint('여행 생성 중 일반 오류: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) {
         return;
       }
 
       _showMessage('여행 시작 중 오류가 발생했습니다.');
-      debugPrint('여행 생성 오류: $error');
     } finally {
-      if (mounted) {
+      // 오류가 발생했을 때도 저장 상태 해제
+      if (mounted && _isSaving) {
         setState(() {
           _isSaving = false;
         });
@@ -201,6 +244,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     }
   }
 
+  /// DateTime에서 시간 정보를 제거하고 날짜만 반환
   DateTime _dateOnly(DateTime value) {
     return DateTime(
       value.year,
@@ -209,6 +253,9 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 예산 입력값을 int로 변환
+  ///
+  /// 예산을 입력하지 않았다면 null 반환
   int? _parseBudget(String value) {
     final String normalized =
     value.replaceAll(',', '').trim();
@@ -220,6 +267,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return int.tryParse(normalized);
   }
 
+  /// 날짜를 yyyy.MM.dd 형식으로 표시
   String _formatDate(DateTime? date) {
     if (date == null) {
       return '날짜 선택';
@@ -234,6 +282,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return '${date.year}.$month.$day';
   }
 
+  /// 금액을 천 단위 쉼표 형식으로 표시
   String _formatMoney(int amount) {
     final String value = amount.toString();
     final StringBuffer result = StringBuffer();
@@ -250,6 +299,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return result.toString();
   }
 
+  /// 시작일과 종료일을 포함한 총 여행 일수
   int get _travelDays {
     if (_startDate == null || _endDate == null) {
       return 0;
@@ -258,6 +308,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return _endDate!.difference(_startDate!).inDays + 1;
   }
 
+  /// 하루 권장 예산 계산
   int? get _dailyBudget {
     final int? budget = _parseBudget(
       _budgetController.text,
@@ -272,6 +323,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return budget ~/ _travelDays;
   }
 
+  /// SnackBar 메시지 표시
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -315,13 +367,16 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
             children: [
               _buildHeaderCard(),
               const SizedBox(height: 26),
+
               _buildSectionTitle('여행 이름'),
               const SizedBox(height: 10),
               _buildTitleField(),
               const SizedBox(height: 24),
+
               _buildSectionTitle('여행 기간'),
               const SizedBox(height: 10),
               _buildDateFields(),
+
               if (_travelDays > 0) ...[
                 const SizedBox(height: 10),
                 Text(
@@ -333,7 +388,9 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
                   ),
                 ),
               ],
+
               const SizedBox(height: 24),
+
               _buildSectionTitle(
                 '여행 예산',
                 description: '예산은 입력하지 않아도 됩니다.',
@@ -341,8 +398,10 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
               const SizedBox(height: 10),
               _buildBudgetField(),
               const SizedBox(height: 20),
+
               _buildSummaryCard(),
               const SizedBox(height: 30),
+
               _buildStartButton(),
             ],
           ),
@@ -351,6 +410,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 화면 상단 안내 카드
   Widget _buildHeaderCard() {
     return Container(
       width: double.infinity,
@@ -382,7 +442,8 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
           ),
           SizedBox(height: 8),
           Text(
-            '설정한 기간에 등록되는 변동 지출은\n여행 지출로 자동 분류됩니다.',
+            '설정한 기간에 등록되는 변동 지출은\n'
+                '여행 지출로 자동 분류됩니다.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF777777),
@@ -395,6 +456,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 입력 영역 제목
   Widget _buildSectionTitle(
       String title, {
         String? description,
@@ -427,6 +489,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 여행 이름 입력창
   Widget _buildTitleField() {
     return TextFormField(
       controller: _titleController,
@@ -454,6 +517,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 시작일과 종료일 선택 영역
   Widget _buildDateFields() {
     return Row(
       children: [
@@ -485,6 +549,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 날짜 선택 버튼
   Widget _buildDateButton({
     required String label,
     required DateTime? selectedDate,
@@ -550,6 +615,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 여행 예산 입력창
   Widget _buildBudgetField() {
     return TextFormField(
       controller: _budgetController,
@@ -559,6 +625,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
         FilteringTextInputFormatter.digitsOnly,
       ],
       onChanged: (_) {
+        // 예산이 변경되면 요약 카드 갱신
         setState(() {});
       },
       onFieldSubmitted: (_) {
@@ -572,6 +639,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       validator: (String? value) {
         final String input = value?.trim() ?? '';
 
+        // 예산은 선택 사항
         if (input.isEmpty) {
           return null;
         }
@@ -587,6 +655,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 여행 정보 요약 카드
   Widget _buildSummaryCard() {
     final int? budget = _parseBudget(
       _budgetController.text,
@@ -642,6 +711,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 요약 카드 내부 한 줄
   Widget _buildSummaryRow({
     required String title,
     required String value,
@@ -669,6 +739,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 여행 모드 시작 버튼
   Widget _buildStartButton() {
     return SizedBox(
       width: double.infinity,
@@ -707,6 +778,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     );
   }
 
+  /// 공통 입력창 디자인
   InputDecoration _inputDecoration({
     required String hintText,
     required IconData prefixIcon,
