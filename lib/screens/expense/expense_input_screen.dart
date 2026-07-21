@@ -2,15 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import '../../models/expense_model.dart';
 import '../../services/category_service.dart';
 import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
+import '../../models/transaction_item.dart';
 
 class ExpenseInputScreen extends StatefulWidget {
+  final TransactionItem? editItem; // 수정 모드일 때 넘어올 데이터 (새로 기록할 땐 null)
+
   const ExpenseInputScreen({
     super.key,
+    this.editItem,
   });
 
   @override
@@ -18,7 +21,6 @@ class ExpenseInputScreen extends StatefulWidget {
     return _ExpenseInputScreenState();
   }
 }
-
 
 class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _expenseService = ExpenseService();
@@ -76,7 +78,59 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategoriesFromDB();
+
+    // 1. 수정시 기본 데이터 (금액, 날짜, 메모) 먼저 세팅
+    if (widget.editItem != null) {
+      final item = widget.editItem!;
+      // 금액
+      _amountController.text = item.amount.toString();
+      // 날짜
+      _selectedDate = item.date;
+      // 메모
+      if (item.subtitle != null) {
+        _memoController.text = item.subtitle!;
+      }
+      // 감정 태그
+      _selectedEmotion = item.emotionTag;
+    }
+
+    // 2. 카테고리를 전부 다 불러온 다음(then) -> 기존 지출 내역을 불러와서 매칭합니다!
+    _loadCategoriesFromDB().then((_) {
+      if (widget.editItem != null) {
+        _fetchOriginalExpense(widget.editItem!.id);
+      }
+    });
+  }
+
+  // initState 밖으로 꺼낸 함수! (대분류 자동 찾기 로직 포함)
+  Future<void> _fetchOriginalExpense(String docId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('expenses').doc(docId).get();
+      if (doc.exists && mounted) {
+        final originalExpense = ExpenseModel.fromFirestore(doc);
+
+        setState(() {
+          _selectedNature = originalExpense.nature;
+          _selectedCategoryId = originalExpense.categoryId;
+
+          // 전체 카테고리에서 내 소분류 ID와 일치하는 항목을 찾아 대분류(parent)를 세팅합니다.
+          try {
+            final matchedCategory = _allCategories.firstWhere(
+                  (cat) => cat['id'] == originalExpense.categoryId,
+            );
+            _selectedParentCategory = matchedCategory['parentName']?.toString() ?? matchedCategory['parent']?.toString();
+          } catch (e) {
+            debugPrint('카테고리 매칭 실패: $e');
+          }
+          // 부가 기능 옵션
+          _isInstallment = originalExpense.installmentPlanId != null && originalExpense.installmentPlanId!.isNotEmpty;
+          _isRecurring = originalExpense.recurringPaymentId != null && originalExpense.recurringPaymentId!.isNotEmpty;
+          _isTravel = originalExpense.travelId != null && originalExpense.travelId!.isNotEmpty;
+        });
+      }
+    } catch (e) {
+      debugPrint('원본 지출 내역 로드 실패: $e');
+    }
   }
 
   /// Firestore categories 컬렉션 조회
@@ -250,89 +304,43 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
       /// 지출 모델 생성
       final newExpense = ExpenseModel(
-        /// Firestore에서 자동 문서 ID 생성
-        expenseId: '',
-
-        // ==================================================
-        // ✅ 수정 핵심 4:
-        // expenses 문서의 userId에 실제 UID가 저장됨
-        // ==================================================
+        expenseId: widget.editItem != null ? widget.editItem!.id : '',
         userId: userId,
-
         amount: amount,
         categoryId: _selectedCategoryId!,
         date: _selectedDate,
         memo: _memoController.text.trim(),
         nature: _selectedNature,
-
-        emotionTag:
-        _selectedNature ==
-            ExpenseNature.variable
-            ? _selectedEmotion
-            : null,
-
-        installmentPlanId:
-        tempInstallmentPlanId,
-
-        recurringPaymentId:
-        tempRecurringPaymentId,
-
-        travelId:
-        tempTravelId,
+        emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+        installmentPlanId: tempInstallmentPlanId,
+        recurringPaymentId: tempRecurringPaymentId,
+        travelId: tempTravelId,
       );
 
-      /// expenses 컬렉션에 저장
-      final String expenseId =
-      await _expenseService.addExpense(
-        newExpense,
-      );
-
-      debugPrint(
-        '================================',
-      );
-
-      debugPrint(
-        '[지출 저장 완료]',
-      );
-
-      debugPrint(
-        'expenseId: $expenseId',
-      );
+      // 분기 처리 (add vs update)
+      if (widget.editItem == null) {
+        // [생성 모드]
+        final String expenseId = await _expenseService.addExpense(newExpense);
+        debugPrint('✅ [지출 저장 완료] expenseId: $expenseId');
+      } else {
+        // [수정 모드] 서비스 파일에 이미 정의된 updateExpense 호출!
+        // 주의: 파라미터를 (문서ID, Map데이터) 형태로 넘겨주어야 합니다.
+        await _expenseService.updateExpense(
+          widget.editItem!.id,
+          newExpense.toFirestore(),
+        );
+        debugPrint('✅ [지출 수정 완료] expenseId: ${widget.editItem!.id}');
+      }
 
       // ==================================================
-      // ✅ 수정: 실제 저장된 UID를 콘솔에서 확인
+      // ✅ 디버그 콘솔 출력
       // ==================================================
-      debugPrint(
-        'userId: $userId',
-      );
-
-      debugPrint(
-        'amount: $amount',
-      );
-
-      debugPrint(
-        'date: $_selectedDate',
-      );
-
-      debugPrint(
-        'categoryId: $_selectedCategoryId',
-      );
-
-      debugPrint(
-        '할부 연결: $tempInstallmentPlanId',
-      );
-
-      debugPrint(
-        '구독 연결: $tempRecurringPaymentId',
-      );
-
-      debugPrint(
-        '여행 연결: $tempTravelId',
-      );
-
-      debugPrint(
-        '================================',
-      );
+      debugPrint('================================');
+      debugPrint('userId: $userId');
+      debugPrint('amount: $amount');
+      debugPrint('date: $_selectedDate');
+      debugPrint('categoryId: $_selectedCategoryId');
+      debugPrint('================================');
 
       if (!mounted) {
         return;
@@ -430,9 +438,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          '지출 기록',
-        ),
+        title: Text(widget.editItem == null ? '지출 기록' : '지출 수정'),
       ),
       body: _isLoadingCategories
           ? const Center(
@@ -781,20 +787,20 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               title: const Text(
                 '매월 반복되는 정기결제/구독인가요?',
               ),
-              subtitle: const Text(
+              subtitle: _isTravel
+                  ? const Text(
+                '여행 지출은 정기결제로 설정할 수 없습니다.',
+                style: TextStyle(color: Colors.red),
+              )
+                  : const Text(
                 '다음 달부터 자동으로 내역이 생성됩니다.',
               ),
               value: _isRecurring,
-              onChanged: _isSaving
-                  ? null
-                  : (value) {
+              onChanged: _isSaving || _isTravel ? null : (value) {
                 setState(() {
-                  _isRecurring =
-                      value;
-
+                  _isRecurring = value;
                   if (value) {
-                    _isInstallment =
-                    false;
+                    _isInstallment = false;
                   }
                 });
               },
@@ -802,28 +808,23 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
             /// 여행 지출 선택
             SwitchListTile(
-              title: const Text(
-                '현재 진행 중인 여행 지출인가요?',
-              ),
-              subtitle: _selectedNature ==
-                  ExpenseNature.fixed
-                  ? const Text(
-                '고정비는 여행 지출로 태깅할 수 없습니다.',
-                style: TextStyle(
-                  color: Colors.red,
-                ),
-              )
-                  : const Text(
-                '진행 중인 여행 예산에 포함됩니다.',
-              ),
+              title: const Text('현재 진행 중인 여행 지출인가요?'),
+              // 정기결제가 켜져있을 때의 경고 문구 추가!
+              subtitle: _isRecurring
+                  ? const Text('정기결제는 여행 지출로 설정할 수 없습니다.', style: TextStyle(color: Colors.red))
+                  : (_selectedNature == ExpenseNature.fixed
+                  ? const Text('고정비는 여행 지출로 태깅할 수 없습니다.', style: TextStyle(color: Colors.red))
+                  : const Text('진행 중인 여행 예산에 포함됩니다.')),
               value: _isTravel,
-              onChanged: _isSaving ||
-                  _selectedNature ==
-                      ExpenseNature.fixed
+              // _isRecurring이 true면 onChanged를 null로 만들어서 터치 차단!
+              onChanged: _isSaving || _isRecurring || _selectedNature == ExpenseNature.fixed
                   ? null
                   : (value) {
                 setState(() {
                   _isTravel = value;
+                  if (value) {
+                    _isRecurring = false;
+                  }
                 });
               },
             ),

@@ -1,5 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// 저축은 수정할때 상태를 전환 시키도록 함
+enum SavingStatus {
+  active('active', '진행중'),      // 현재 유지 중 (기본값)
+  matured('matured', '만기됨'),     // 적금/예금 만기
+  cancelled('cancelled', '해지함'), // 중도 해지
+  sold('sold', '매도완료');         // 주식/ETF 등 매도
+
+  final String code;
+  final String label;
+  const SavingStatus(this.code, this.label);
+
+  static SavingStatus fromCode(String? code) => SavingStatus.values.firstWhere(
+        (e) => e.code == code,
+    orElse: () => SavingStatus.active,
+  );
+}
+
 /// 투자(주식/ETF 등) 카테고리를 선택했을 때만 채우는 선택 정보
 class InvestmentDetail {
   final String brokerage; // 증권사명 (예: "토스증권", "미래에셋")
@@ -42,7 +59,6 @@ class InvestmentDetail {
   }
 }
 
-/// 저축/투자 — 만기·중도해지·이자율은 관리하지 않고
 /// "언제, 어떤 항목에, 얼마 넣었는지"만 기록
 class SavingModel {
   final String savingId;
@@ -52,9 +68,12 @@ class SavingModel {
   final String? accountName; // 계좌명 (예: "국민은행 청년희망적금")
   final int amount; // 원 단위 정수
   final String? memo;
-
   /// 카테고리가 투자 계열일 때만 값 있음
   final InvestmentDetail? investmentDetail;
+
+  // 상태 관리 필드 2개
+  final SavingStatus status;
+  final int? returnedAmount; // 만기/해지/매도 시 돌려받은 최종 금액 (이익/손실 포함)
 
   final bool isDeleted;
   final DateTime? deletedAt;
@@ -69,6 +88,9 @@ class SavingModel {
     required this.amount,
     this.memo,
     this.investmentDetail,
+    // 저축 상태 기본값은 '진행중(active)'으로 설정
+    this.status = SavingStatus.active,
+    this.returnedAmount,
     this.isDeleted = false,
     this.deletedAt,
     this.createdAt,
@@ -88,6 +110,9 @@ class SavingModel {
           ? InvestmentDetail.fromMap(
           Map<String, dynamic>.from(d['investmentDetail']))
           : null,
+      // 저축 상태와 최종 금액 불러오기
+      status: SavingStatus.fromCode(d['status']),
+      returnedAmount: (d['returnedAmount'] as num?)?.toInt(),
       isDeleted: d['isDeleted'] ?? false,
       deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
@@ -102,6 +127,9 @@ class SavingModel {
     'amount': amount,
     'memo': memo,
     'investmentDetail': investmentDetail?.toMap(),
+    // 저축 상태와 최종 금액 저장하기
+    'status': status.code,
+    'returnedAmount': returnedAmount,
     'isDeleted': isDeleted,
     'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'createdAt': createdAt != null
@@ -117,6 +145,8 @@ class SavingModel {
     int? amount,
     String? memo,
     InvestmentDetail? investmentDetail,
+    SavingStatus? status,
+    int? returnedAmount,
     bool? isDeleted,
     DateTime? deletedAt,
   }) {
@@ -128,6 +158,8 @@ class SavingModel {
       amount: amount ?? this.amount,
       memo: memo ?? this.memo,
       investmentDetail: investmentDetail ?? this.investmentDetail,
+      status: status ?? this.status,
+      returnedAmount: returnedAmount ?? this.returnedAmount,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,

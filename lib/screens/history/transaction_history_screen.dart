@@ -362,14 +362,29 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  // 리스트 아이템 UI
+// 리스트 아이템 UI
   Widget _buildTransactionItem(TransactionItem item) {
     final isExpense = item.type == 'expense';
-    final isSaving = item.type == 'saving'; // 👈 저축인지 확인하는 변수 추가
+    final isSaving = item.type == 'saving';
 
-    // 💡 핵심: 지출은 '-', 저축은 ''(빈칸), 수입은 '+' 기호를 주도록 분기 처리합니다.
+    // 1. 완료/해지/매도된 저축인지 확인 (active가 아니면 true)
+    final bool isCompletedSaving = isSaving &&
+        item.savingStatus != null &&
+        item.savingStatus != 'active';
+
+    // 기호 처리
     final String sign = isExpense ? '-' : (isSaving ? '' : '+');
     final amountText = '$sign${CurrencyFormatter.format(item.amount)}원';
+
+    // 2. 아이콘 배경색 (완료된 저축이면 회색, 아니면 기존 색상)
+    final Color iconColor = isCompletedSaving
+        ? Colors.grey[400]!
+        : (isExpense ? Colors.yellow[700]! : (isSaving ? Colors.teal[400]! : Colors.blue[300]!));
+
+    // 3. 금액 글씨색 (완료된 저축이면 회색, 아니면 기존 색상)
+    final Color amountColor = isCompletedSaving
+        ? Colors.grey
+        : (isExpense ? Colors.black87 : (isSaving ? Colors.teal[600]! : Colors.blueAccent));
 
     return InkWell(
       onTap: () async {
@@ -391,7 +406,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: isExpense ? Colors.yellow[700] : (isSaving ? Colors.teal[400] : Colors.blue[300]),
+                color: iconColor,
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -407,15 +422,22 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   Text(
                     amountText,
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isExpense ? Colors.black87 : (isSaving ? Colors.teal[600] : Colors.blueAccent)
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: amountColor,
+                      // 💡 4. 완료된 저축이면 금액에 취소선 긋기
+                      decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${item.title} ${item.subtitle != null ? '· ${item.subtitle}' : ''}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    style: TextStyle(
+                      // 💡 5. 완료된 저축이면 카테고리/메모 글씨도 더 연한 회색으로 변경 & 취소선
+                      color: isCompletedSaving ? Colors.grey[400] : Colors.grey[600],
+                      fontSize: 13,
+                      decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
+                    ),
                   ),
                 ],
               ),

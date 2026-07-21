@@ -6,9 +6,11 @@ import 'package:intl/intl.dart'; // 프리랜서 세전 금액(NumberFormat) 계
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/income_model.dart';
 import '../../services/income_service.dart';
+import '../../models/transaction_item.dart';
 
 class IncomeInputScreen extends StatefulWidget {
-  const IncomeInputScreen({super.key});
+  final TransactionItem? editItem;
+  const IncomeInputScreen({super.key, this.editItem});
 
   @override
   State<IncomeInputScreen> createState() => _IncomeInputScreenState();
@@ -22,7 +24,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   DateTime _selectedDate = DateTime.now();
   IncomeSource _selectedSource = IncomeSource.salary; // 기본값: 월급
 
-  // 🚀 부가 자동화 상태 변수
+  // 부가 자동화 상태 변수
   bool _isRecurring = false;
   int _payDay = 1;
 
@@ -31,7 +33,23 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   @override
   void initState() {
     super.initState();
-    // 금액 입력 시 실시간 세전 계산을 위한 리스너
+
+    // 수정모드
+    if (widget.editItem != null) {
+      final item = widget.editItem!;
+      _amountController.text = item.amount.toString();
+      _selectedDate = item.date;
+      if (item.subtitle != null) {
+        _memoController.text = item.subtitle!;
+      }
+
+      // 수입 출처(한글 라벨)를 기반으로 IncomeSource 매칭
+      _selectedSource = IncomeSource.values.firstWhere(
+            (source) => source.label == item.title,
+        orElse: () => IncomeSource.etc,
+      );
+    }
+
     _amountController.addListener(() {
       final text = _amountController.text.replaceAll(',', '');
       setState(() {
@@ -60,7 +78,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       final String? recurringTemplateId = _isRecurring ? 'temp_recurring_income_id' : null;
 
       final newIncome = IncomeModel(
-        incomeId: '',
+        incomeId: widget.editItem != null ? widget.editItem!.id : '',
         userId: userId,
         amount: _currentAmount,
         incomeSource: _selectedSource,
@@ -69,7 +87,17 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         recurringIncomeTemplateId: recurringTemplateId,
       );
 
-      await _incomeService.addIncome(newIncome);
+      // 분기처리
+      if (widget.editItem == null) {
+        // [생성 모드]
+        await _incomeService.addIncome(newIncome);
+      } else {
+        // [수정 모드] 서비스에 이미 있는 updateIncome 호출[cite: 10]
+        await _incomeService.updateIncome(
+          widget.editItem!.id,
+          newIncome.toFirestore(),
+        );
+      }
 
       debugPrint('✅ 수입 저장 시도: 금액=$_currentAmount, 출처=${_selectedSource.label}');
 
