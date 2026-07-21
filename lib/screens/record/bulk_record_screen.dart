@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/category_model.dart' show TransactionType;
 import '../../models/expense_model.dart';
 import '../../models/income_model.dart';
@@ -6,6 +7,7 @@ import '../../models/saving_model.dart';
 import '../../services/expense_service.dart';
 import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
+import '../../services/ai_service.dart';
 import 'parsed_record_draft.dart';
 
 class BulkRecordScreen extends StatefulWidget {
@@ -20,6 +22,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   final _expenseService = ExpenseService();
   final _incomeService = IncomeService();
   final _savingService = SavingService();
+  final _aiService = AiService();
 
   List<ParsedRecordDraft> _drafts = [];
   bool _isParsing = false;
@@ -36,6 +39,14 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   }
 
   Future<void> _onTapParse() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인 후 이용 가능합니다.')),
+      );
+      return;
+    }
+
     if (_textController.text.trim().isEmpty && _attachedPhotoCount == 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('텍스트를 입력하거나 사진을 첨부해주세요')),
@@ -45,84 +56,144 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
     setState(() => _isParsing = true);
 
-    await Future.delayed(const Duration(milliseconds: 600));
-    final now = DateTime.now();
-    final stubResult = [
-      ParsedRecordDraft.expense(
-        date: now.subtract(const Duration(days: 1)),
-        label: '스타벅스 · 카페',
-        amount: 4500,
-      ),
-      ParsedRecordDraft.expense(
-        date: now,
-        label: '편의점 · 식비',
-        amount: 3200,
-      ),
-      ParsedRecordDraft.income(
-        date: now.subtract(const Duration(days: 2)),
-        label: '용돈',
-        amount: 50000,
-        categoryId: 'allowance_stub',
-      ),
-      ParsedRecordDraft.saving(
-        date: now,
-        label: '정기적금',
-        amount: 300000,
-        categoryId: 'installment_saving',
-      ),
-    ];
+    try {
+      final text = _textController.text.trim();
+      final parsedList = await _aiService.parseBulkText(text);
 
-    setState(() {
-      _drafts = stubResult;
-      _isParsing = false;
-    });
+      final now = DateTime.now();
+      final drafts = parsedList.map((item) {
+
+        DateTime itemDate = now;
+        if (item.date != null && item.date!.isNotEmpty) {
+          try { itemDate = DateTime.parse(item.date!); } catch (_) {}
+        }
+
+        // 💡 라벨로 뭉치지 않고 memo와 categoryName을 따로따로 넘겨줍니다!
+        if (item.transactionType == '수입') {
+          return ParsedRecordDraft.income(
+            date: itemDate,
+            memo: item.merchant,
+            categoryName: item.category,
+            amount: item.amount,
+            categoryId: 'etc',
+          );
+        } else if (item.transactionType == '저축') {
+          return ParsedRecordDraft.saving(
+            date: itemDate,
+            memo: item.merchant,
+            categoryName: item.category,
+            amount: item.amount,
+            categoryId: 'deposit',
+          );
+        } else {
+          return ParsedRecordDraft.expense(
+            date: itemDate,
+            memo: item.merchant,
+            categoryName: item.category,
+            amount: item.amount,
+            nature: item.type == '고정비' ? ExpenseNature.fixed : ExpenseNature.variable,
+          );
+        }
+      }).toList();
+
+      setState(() {
+        _drafts = drafts;
+        _isParsing = false;
+      });
+    } catch (e) {
+      debugPrint('AI 파싱 에러: $e');
+      setState(() => _isParsing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('AI 분석 실패: $e')),
+        );
+      }
+    }
   }
 
   int get _selectedCount => _drafts.where((d) => d.isSelected).length;
 
   Future<void> _saveAll() async {
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인된 사용자가 없습니다.')),
+      );
+      return;
+    }
+
     final selected = _drafts.where((d) => d.isSelected).toList();
     if (selected.isEmpty) return;
 
-    const userId = 'TODO_USER_ID';
+    final String userId = currentUser.uid;
 
-    for (final draft in selected) {
-      switch (draft.type) {
-        case TransactionType.expense:
-          await _expenseService.addExpense(ExpenseModel(
-            expenseId: '',
-            userId: userId,
-            amount: draft.amount,
-            date: draft.date,
-            categoryId: draft.categoryId ?? 'uncategorized',
-            nature: draft.nature ?? ExpenseNature.variable,
-            emotionTag: draft.emotionTag,
-            isQuickInput: true,
-          ));
-          break;
-        case TransactionType.income:
-          await _incomeService.addIncome(IncomeModel(
-            incomeId: '',
-            userId: userId,
-            amount: draft.amount,
-            categoryId: draft.categoryId ?? 'uncategorized',
-            date: draft.date,
-          ));
-          break;
-        case TransactionType.saving:
-          await _savingService.addSaving(SavingModel(
-            savingId: '',
-            userId: userId,
-            date: draft.date,
-            categoryId: draft.categoryId ?? 'deposit',
-            accountName: draft.accountName,
-            amount: draft.amount,
-          ));
-          break;
+    try {
+      for (final draft in selected) {
+
+        // 💡 콘솔에서 어떻게 저장되는지 테스트용으로 확인!
+        debugPrint('==== 저장 테스트 ====');
+        debugPrint('타입: ${draft.type}');
+        debugPrint('메모(내용): ${draft.memo}');
+        debugPrint('금액: ${draft.amount}');
+        debugPrint('카테고리ID: ${draft.categoryId}');
+        debugPrint('====================');
+
+        // 🚨 실제 파이어베이스 DB에 저장하는 로직은 테스트를 위해 차단(주석 처리)했습니다.
+        /*
+        switch (draft.type) {
+          case TransactionType.expense:
+            await _expenseService.addExpense(ExpenseModel(
+              expenseId: '',
+              userId: userId,
+              amount: draft.amount,
+              date: draft.date,
+              categoryId: draft.categoryId ?? 'uncategorized',
+              nature: draft.nature ?? ExpenseNature.variable,
+              emotionTag: draft.emotionTag,
+              memo: draft.memo,
+              isQuickInput: true,
+            ));
+            break;
+          case TransactionType.income:
+            await _incomeService.addIncome(IncomeModel(
+              incomeId: '',
+              userId: userId,
+              amount: draft.amount,
+              categoryId: draft.categoryId ?? 'uncategorized',
+              date: draft.date,
+              memo: draft.memo,
+            ));
+            break;
+          case TransactionType.saving:
+            await _savingService.addSaving(SavingModel(
+              savingId: '',
+              userId: userId,
+              date: draft.date,
+              categoryId: draft.categoryId ?? 'deposit',
+              accountName: draft.accountName,
+              amount: draft.amount,
+              memo: draft.memo,
+            ));
+            break;
+        }
+        */
+      }
+
+      if (mounted) {
+        // 💡 테스트 후 결과만 확인할 수 있게 화면은 닫지 않음
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('테스트 완료! DB 저장은 차단되었으니 콘솔(Run) 창을 확인하세요.')),
+        );
+        // Navigator.pop(context, true);
+      }
+    } catch (e) {
+      debugPrint('🔥 일괄 저장 에러: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e'), backgroundColor: Colors.red),
+        );
       }
     }
-
-    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -276,7 +347,8 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
               child: Text(typeLabel, style: TextStyle(fontSize: 11, color: typeColor)),
             ),
             const SizedBox(width: 6),
-            Expanded(child: Text(draft.label, overflow: TextOverflow.ellipsis)),
+            // 💡 화면에 띄울 때만 memo와 categoryName을 가운데 점(·)으로 이어붙여 줍니다!
+            Expanded(child: Text('${draft.memo} · ${draft.categoryName}', overflow: TextOverflow.ellipsis)),
           ],
         ),
         subtitle: Text(_formatDate(draft.date), style: const TextStyle(fontSize: 12)),
@@ -301,7 +373,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
           }).toList(),
         );
       case TransactionType.income:
-      // AI 파싱용 수입 임시 옵션 (나중에 서버 연동으로 고도화 가능)
         const incomeOptions = [
           ('salary', '월급'),
           ('freelance', '프리랜서'),

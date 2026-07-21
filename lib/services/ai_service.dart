@@ -63,14 +63,18 @@ class ParsedExpense {
   final String merchant;
   final String category;
   final String type; // 고정비 | 변동비
+  final String? date;
+  final String? transactionType; // 지출, 수입, 저축 구분용
   ParsedExpense({
     required this.amount,
     required this.merchant,
     required this.category,
     required this.type,
+    this.date,
+    this.transactionType
   });
   @override
-  String toString() => '$merchant / $amount원 / $category / $type';
+  String toString() => '$date / $transactionType / $merchant / $amount원 / $category / $type';
 }
 
 /// 파싱된 수입
@@ -397,6 +401,46 @@ class AiService {
     final man = n ~/ 10000;
     final rest = n % 10000;
     return rest == 0 ? '$man만원' : '$man만 ${rest ~/ 1000}천원';
+  }
+
+  // ═══════════════ 8) 대량 텍스트 일괄 파싱 (퉁치기 / 한번에 기록하기용) ═══════════════
+  Future<List<ParsedExpense>> parseBulkText(String bulkText) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    final prompt = '''[작업: 대량지출파싱] 오늘 날짜는 $today야. 다음 텍스트를 분석해서 항목별로 분리해줘.
+      1. 텍스트의 문맥(샀다, 들어왔다, 이체했다 등)을 파악해서 '지출', '수입', '저축' 중 하나로 분류해.
+      2. 카테고리(category)는 내용에 맞게 '식비', '월급', '중고거래', '교통비', '모임/회비' 등으로 자유롭게 적어.
+      3. 지출일 경우 성격(type)을 '고정비' 또는 '변동비'로 적고, 수입이나 저축이면 "기타"로 둬.
+      4. 텍스트에 '오늘', '어제' 같은 말이 있으면 $today 를 기준으로 계산해.
+      
+      반드시 아래의 JSON 배열 형식으로만 출력해 (다른 말은 절대 금지):
+      [{"date": "YYYY-MM-DD", "transactionType": "지출/수입/저축", "amount": 숫자, "merchant": "상호명 또는 내용", "category": "카테고리명", "type": "고정비/변동비"}]
+      
+      입력텍스트: $bulkText''';
+
+    final raw = await _callOllama(prompt);
+    try {
+      final start = raw.indexOf('[');
+      final end = raw.lastIndexOf(']');
+      if (start == -1 || end == -1) return [];
+
+      final List decoded = jsonDecode(raw.substring(start, end + 1));
+      return decoded.map((j) {
+        final amount = (j['amount'] as num?)?.toInt() ?? 0;
+        final merchant = j['merchant'] as String? ?? '기타';
+        return ParsedExpense(
+          amount: amount,
+          merchant: merchant,
+          // 대량 파싱에서는 AI가 유추한 카테고리를 그대로 라벨로 씁니다
+          category: j['category'] as String? ?? '미분류',
+          type: j['type'] as String? ?? '변동비',
+          date: j['date'] as String?,
+          transactionType: j['transactionType'] as String? ?? '지출',
+        );
+      }).toList();
+    } catch (_) {
+      return [] ;
+    }
   }
 }
 
