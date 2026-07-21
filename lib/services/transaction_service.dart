@@ -61,7 +61,7 @@ class TransactionService {
 
     // 3. 지출(Expense) 파싱 및 매핑
     for (var doc in results[0].docs) {
-      final expense = ExpenseModel.fromFirestore(doc); // 👈 공유해주신 모델 사용
+      final expense = ExpenseModel.fromFirestore(doc);
       allTransactions.add(TransactionItem(
         id: expense.expenseId,
         type: 'expense',
@@ -75,20 +75,20 @@ class TransactionService {
 
     // 4. 수입(Income) 파싱 및 매핑
     for (var doc in results[1].docs) {
-      final income = IncomeModel.fromFirestore(doc); // 👈 공유해주신 모델 사용
+      final income = IncomeModel.fromFirestore(doc);
       allTransactions.add(TransactionItem(
         id: income.incomeId,
         type: 'income',
         date: income.date,
         amount: income.amount,
-        title: income.incomeSource.label, // 👈 Enum 내 정의된 '정기급여', '용돈' 등의 한글 라벨 매핑!
+        title: income.categoryId,
         subtitle: income.memo,
       ));
     }
 
     // 5. 저축(Saving) 파싱 및 매핑
     for (var doc in results[2].docs) {
-      final saving = SavingModel.fromFirestore(doc); // 👈 공유해주신 모델 사용
+      final saving = SavingModel.fromFirestore(doc);
       allTransactions.add(TransactionItem(
         id: saving.savingId,
         type: 'saving',
@@ -97,6 +97,7 @@ class TransactionService {
         title: saving.categoryId, // '적금', '투자' 등 카테고리명
         subtitle: saving.memo,
         accountName: saving.accountName, // 구체적인 계좌명 적용
+        savingStatus: saving.status.code
       ));
     }
 
