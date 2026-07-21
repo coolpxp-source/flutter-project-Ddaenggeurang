@@ -1,9 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 여행 기간을 설정하면 그 기간의 지출이 자동으로 travelId 태깅됨.
-/// 단, EXPENSE.nature == fixed 이거나 installmentPlanId/recurringPaymentId가 있는 지출은
-/// 여행 지출이 아니라 원래 성격의 지출이므로 자동 태깅 대상에서 제외해야 함.
-/// 한 번에 하나의 여행만 isActive == true 가 되도록 서비스 레이어에서 제어.
+/// 여행 기간을 설정하면 해당 기간의 지출에 travelId를 자동 태깅한다.
+///
+/// 고정비, 할부, 정기결제 지출은 여행 지출 자동 태깅 대상에서 제외한다.
+/// 동시에 하나의 여행만 isActive == true가 되도록 서비스 계층에서 제어한다.
 class TravelModel {
   final String travelId;
   final String userId;
@@ -17,7 +17,7 @@ class TravelModel {
   final DateTime? deletedAt;
   final DateTime? createdAt;
 
-  TravelModel({
+  const TravelModel({
     required this.travelId,
     required this.userId,
     required this.title,
@@ -30,51 +30,91 @@ class TravelModel {
     this.createdAt,
   });
 
-  /// 이 지출을 여행 지출로 자동 태깅해도 되는지 판단
-  /// (호출 쪽에서 ExpenseNature, installmentPlanId, recurringPaymentId를 넘겨줌)
+  /// 해당 지출을 현재 여행의 지출로 자동 태깅할 수 있는지 판단한다.
   bool shouldAutoTag({
     required DateTime expenseDate,
     required bool isFixedNature,
     required bool hasInstallmentPlan,
     required bool hasRecurringPayment,
   }) {
-    if (!isActive) return false;
-    if (expenseDate.isBefore(startDate) || expenseDate.isAfter(endDate)) {
+    if (!isActive || isDeleted) {
       return false;
     }
-    if (isFixedNature || hasInstallmentPlan || hasRecurringPayment) return false;
+
+    final expenseDay = DateTime(
+      expenseDate.year,
+      expenseDate.month,
+      expenseDate.day,
+    );
+
+    final travelStartDay = DateTime(
+      startDate.year,
+      startDate.month,
+      startDate.day,
+    );
+
+    final travelEndDay = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+    );
+
+    final isOutsideTravelPeriod =
+        expenseDay.isBefore(travelStartDay) ||
+            expenseDay.isAfter(travelEndDay);
+
+    if (isOutsideTravelPeriod) {
+      return false;
+    }
+
+    if (isFixedNature ||
+        hasInstallmentPlan ||
+        hasRecurringPayment) {
+      return false;
+    }
+
     return true;
   }
 
   factory TravelModel.fromFirestore(DocumentSnapshot doc) {
-    final d = doc.data() as Map<String, dynamic>;
+    final data = doc.data();
+
+    if (data == null || data is! Map<String, dynamic>) {
+      throw StateError('여행 문서 데이터가 존재하지 않습니다: ${doc.id}');
+    }
+
     return TravelModel(
       travelId: doc.id,
-      userId: d['userId'] ?? '',
-      title: d['title'] ?? '',
-      startDate: (d['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      endDate: (d['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      budgetAmount: (d['budgetAmount'] as num?)?.toInt(),
-      isActive: d['isActive'] ?? true,
-      isDeleted: d['isDeleted'] ?? false,
-      deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
-      createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      userId: data['userId'] as String? ?? '',
+      title: data['title'] as String? ?? '',
+      startDate:
+      (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      endDate:
+      (data['endDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      budgetAmount: (data['budgetAmount'] as num?)?.toInt(),
+      isActive: data['isActive'] as bool? ?? true,
+      isDeleted: data['isDeleted'] as bool? ?? false,
+      deletedAt: (data['deletedAt'] as Timestamp?)?.toDate(),
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
     );
   }
 
-  Map<String, dynamic> toFirestore() => {
-    'userId': userId,
-    'title': title,
-    'startDate': Timestamp.fromDate(startDate),
-    'endDate': Timestamp.fromDate(endDate),
-    'budgetAmount': budgetAmount,
-    'isActive': isActive,
-    'isDeleted': isDeleted,
-    'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
-    'createdAt': createdAt != null
-        ? Timestamp.fromDate(createdAt!)
-        : FieldValue.serverTimestamp(),
-  };
+  Map<String, dynamic> toFirestore() {
+    return {
+      'userId': userId,
+      'title': title.trim(),
+      'startDate': Timestamp.fromDate(startDate),
+      'endDate': Timestamp.fromDate(endDate),
+      'budgetAmount': budgetAmount,
+      'isActive': isActive,
+      'isDeleted': isDeleted,
+      'deletedAt':
+      deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
+      'createdAt': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+    };
+  }
 
   TravelModel copyWith({
     String? userId,
@@ -88,6 +128,7 @@ class TravelModel {
   }) {
     return TravelModel(
       travelId: travelId,
+      userId: userId ?? this.userId,
       title: title ?? this.title,
       startDate: startDate ?? this.startDate,
       endDate: endDate ?? this.endDate,
@@ -96,7 +137,6 @@ class TravelModel {
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt,
-      userId: userId ?? this.userId
     );
   }
 }
