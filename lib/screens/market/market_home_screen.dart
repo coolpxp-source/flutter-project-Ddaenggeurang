@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:ddaenggeurang/screens/profile/neighborhood_verify_screen.dart';
+import 'package:ddaenggeurang/widgets/common/app_drawer.dart';
+import 'package:ddaenggeurang/widgets/common/app_header.dart';
 import 'package:ddaenggeurang/widgets/common/ddaeng_modal.dart';
 
 import '../../services/chat_service.dart';
@@ -17,6 +19,7 @@ import 'my_products_screen.dart';
 import 'my_favorites_screen.dart';
 import '../../widgets/market/tappable_product_image.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -38,12 +41,53 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   Set<String> _favoriteIds = {};
   String _statusFilter = '전체';
 
+  String? _myVerifiedDong;
+  bool _myDongOnly = false;
+
   @override
   void initState() {
     super.initState();
     _service.getFavoriteIds(_myId).listen((ids) {
       if (mounted) setState(() => _favoriteIds = ids);
     });
+    _loadMyDong();
+  }
+
+  Future<void> _loadMyDong() async {
+    final doc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
+    if (mounted) {
+      setState(() => _myVerifiedDong = doc.data()?['verifiedDong'] as String?);
+    }
+  }
+
+  Widget _myDongBanner() {
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NeighborhoodVerifyScreen()),
+        );
+        _loadMyDong(); // 인증 화면 다녀온 뒤 새로고침
+      },
+      child: Row(
+        children: [
+          Icon(Icons.location_on, size: 14, color: _myVerifiedDong != null ? _green : Colors.grey[400]),
+          const SizedBox(width: 4),
+          Text(
+            _myVerifiedDong ?? '동네 인증하기',
+            style: TextStyle(
+              fontSize: 12,
+              color: _myVerifiedDong != null ? _green : Colors.grey[500],
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (_myVerifiedDong != null) ...[
+            const SizedBox(width: 2),
+            Icon(Icons.chevron_right, size: 14, color: Colors.grey[400]),
+          ],
+        ],
+      ),
+    );
   }
 
   void _toggleFavorite(String productId) {
@@ -67,6 +111,8 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      drawer: const AppDrawer(),
+      appBar: buildDdaengHeader(context, _myId, inkColor: Colors.black87),
       body: _tabIndex == 1
           ? CircularMenu(
         alignment: Alignment.bottomRight,
@@ -161,28 +207,6 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 4),
-                      child: Icon(Icons.arrow_back, color: Colors.black87),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('땡그랑 마켓',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 4),
-                      Text('가격 비교부터 알뜰한 상품 추천까지',
-                          style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    ],
-                  ),
-                ],
-              ),
               if (_tabIndex == 1)
                 StreamBuilder<int>(
                   stream: ChatService().getTotalUnreadCount(_myId),
@@ -402,6 +426,28 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _myDongToggle() {
+    if (_myVerifiedDong == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _myDongOnly = !_myDongOnly),
+        child: Row(
+          children: [
+            Icon(
+              _myDongOnly ? Icons.check_box : Icons.check_box_outline_blank,
+              size: 18,
+              color: _myDongOnly ? _green : Colors.grey[400],
+            ),
+            const SizedBox(width: 6),
+            Text('내 동네만 보기 ($_myVerifiedDong)',
+                style: TextStyle(fontSize: 12, color: _myDongOnly ? _green : Colors.grey[600])),
+          ],
+        ),
       ),
     );
   }
@@ -655,6 +701,10 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   List<Widget> _buildFleaMarketTab() {
     return [
+      _myDongBanner(),
+      const SizedBox(height: 6),
+      _myDongToggle(),
+      const SizedBox(height: 8),
       _statusFilterBar(),
       const SizedBox(height: 8),
       _categoryFilterBar(),
@@ -680,7 +730,9 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                 p.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 p.category.toLowerCase().contains(_searchQuery.toLowerCase());
 
-            return matchesStatus && matchesCategory && matchesSearch;
+            final matchesDong = !_myDongOnly || p.verifiedDong == _myVerifiedDong;
+
+            return matchesStatus && matchesCategory && matchesSearch && matchesDong;
           }).toList();
 
           if (products.isEmpty) {
