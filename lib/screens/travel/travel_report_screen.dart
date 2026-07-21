@@ -15,8 +15,9 @@ class TravelReportScreen extends StatefulWidget {
   final String travelId;
 
   @override
-  State<TravelReportScreen> createState() =>
-      _TravelReportScreenState();
+  State<TravelReportScreen> createState() {
+    return _TravelReportScreenState();
+  }
 }
 
 class _TravelReportScreenState extends State<TravelReportScreen> {
@@ -36,18 +37,24 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
   @override
   void initState() {
     super.initState();
+
     _loadReport();
   }
 
-  /// 여행 정보와 지출 목록 조회
+  /// 여행 정보와 여행 지출 목록을 함께 조회한다.
   Future<void> _loadReport() async {
     final String travelId = widget.travelId.trim();
 
     if (travelId.isEmpty) {
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _isLoading = false;
         _errorMessage = '여행 ID가 없습니다.';
       });
+
       return;
     }
 
@@ -70,13 +77,15 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         results[1] as List<TravelExpenseModel>,
       );
 
-      // 최신 지출 순서로 정렬
+      // 최신 지출이 위에 표시되도록 정렬한다.
       expenses.sort(
             (
-            TravelExpenseModel a,
-            TravelExpenseModel b,
+            TravelExpenseModel first,
+            TravelExpenseModel second,
             ) {
-          return b.expenseDate.compareTo(a.expenseDate);
+          return second.expenseDate.compareTo(
+            first.expenseDate,
+          );
         },
       );
 
@@ -105,7 +114,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     }
   }
 
-  /// 전체 지출
+  /// 여행에 등록된 전체 지출 금액
   int get _totalExpenseAmount {
     return _expenses.fold<int>(
       0,
@@ -118,19 +127,22 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     );
   }
 
-  /// 여행 예산
+  /// 여행에 설정된 총예산
   int get _budgetAmount {
     return _travel?.budgetAmount ?? 0;
   }
 
   /// 남은 예산
   ///
-  /// 예산을 초과하면 음수가 반환된다.
+  /// 지출이 예산보다 많으면 음수가 반환된다.
   int get _remainingBudget {
     return _budgetAmount - _totalExpenseAmount;
   }
 
   /// 예산 사용률
+  ///
+  /// 예:
+  /// 총예산 500,000원 / 총지출 250,000원 = 0.5
   double get _budgetUsageRate {
     if (_budgetAmount <= 0) {
       return 0;
@@ -139,9 +151,14 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     return _totalExpenseAmount / _budgetAmount;
   }
 
-  /// ProgressIndicator에 사용할 값
+  /// LinearProgressIndicator에 표시할 값
+  ///
+  /// ProgressIndicator는 0.0부터 1.0까지만 표시할 수 있기 때문에
+  /// 예산을 초과해도 최대 1.0으로 제한한다.
   double get _budgetProgressValue {
-    return _budgetUsageRate.clamp(0.0, 1.0).toDouble();
+    return _budgetUsageRate
+        .clamp(0.0, 1.0)
+        .toDouble();
   }
 
   /// 여행 일수
@@ -183,7 +200,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
   Map<String, int> get _categoryTotals {
     final Map<String, int> totals = {};
 
-    for (final TravelExpenseModel expense in _expenses) {
+    for (final TravelExpenseModel expense
+    in _expenses) {
       final String category =
       expense.category.trim().isEmpty
           ? '기타'
@@ -204,10 +222,12 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     totals.entries.toList()
       ..sort(
             (
-            MapEntry<String, int> a,
-            MapEntry<String, int> b,
+            MapEntry<String, int> first,
+            MapEntry<String, int> second,
             ) {
-          return b.value.compareTo(a.value);
+          return second.value.compareTo(
+            first.value,
+          );
         },
       );
 
@@ -232,7 +252,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     return _categoryTotals.entries.first.value;
   }
 
-  /// 카테고리 비율
+  /// 카테고리 지출 비율
   double _getCategoryRate(int categoryAmount) {
     if (_totalExpenseAmount <= 0) {
       return 0;
@@ -241,13 +261,17 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     return categoryAmount / _totalExpenseAmount;
   }
 
-  /// 금액 천 단위 쉼표
+  /// 금액에 천 단위 쉼표를 추가한다.
   String _formatMoney(int amount) {
     final bool isNegative = amount < 0;
+
     final String value = amount.abs().toString();
+
     final StringBuffer result = StringBuffer();
 
-    for (int index = 0; index < value.length; index++) {
+    for (int index = 0;
+    index < value.length;
+    index++) {
       if (index > 0 &&
           (value.length - index) % 3 == 0) {
         result.write(',');
@@ -256,12 +280,14 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
       result.write(value[index]);
     }
 
-    return isNegative
-        ? '-${result.toString()}'
-        : result.toString();
+    if (isNegative) {
+      return '-${result.toString()}';
+    }
+
+    return result.toString();
   }
 
-  /// 날짜 표시
+  /// 날짜를 yyyy.MM.dd 형식으로 표시한다.
   String _formatDate(DateTime date) {
     final String month =
     date.month.toString().padLeft(2, '0');
@@ -331,7 +357,9 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         ),
         actions: [
           IconButton(
-            onPressed: _isLoading ? null : _loadReport,
+            onPressed: _isLoading
+                ? null
+                : _loadReport,
             tooltip: '새로고침',
             icon: const Icon(
               Icons.refresh_rounded,
@@ -364,7 +392,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
       color: const Color(0xFFE66C8E),
       onRefresh: _loadReport,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics:
+        const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           20,
           16,
@@ -382,7 +411,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
 
           _buildSectionTitle(
             title: '지출 요약',
-            description: '여행 지출을 한눈에 확인해 보세요.',
+            description:
+            '여행 지출을 한눈에 확인해 보세요.',
           ),
 
           const SizedBox(height: 12),
@@ -398,7 +428,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
 
           _buildSectionTitle(
             title: '카테고리별 지출',
-            description: '${_categoryTotals.length}개 카테고리',
+            description:
+            '${_categoryTotals.length}개 카테고리',
           ),
 
           const SizedBox(height: 12),
@@ -409,7 +440,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
 
           _buildSectionTitle(
             title: '지출 내역',
-            description: '총 ${_expenses.length}건',
+            description:
+            '총 ${_expenses.length}건',
           ),
 
           const SizedBox(height: 12),
@@ -420,9 +452,11 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     );
   }
 
-  /// 여행 정보 카드
+  /// 여행 기본 정보 카드
   Widget _buildTravelHeaderCard() {
     final TravelModel travel = _travel!;
+
+    final String title = travel.title.trim();
 
     return Container(
       width: double.infinity,
@@ -439,7 +473,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(18),
+              borderRadius:
+              BorderRadius.circular(18),
             ),
             child: const Text(
               '✈️',
@@ -455,15 +490,17 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  travel.title.trim().isEmpty
+                  title.isEmpty
                       ? '제목 없는 여행'
-                      : travel.title,
+                      : title,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF222222),
                     fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 7),
@@ -474,7 +511,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                   style: const TextStyle(
                     color: Color(0xFF777777),
                     fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                    fontWeight:
+                    FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -483,7 +521,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                   style: const TextStyle(
                     color: Color(0xFFE66C8E),
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight:
+                    FontWeight.w700,
                   ),
                 ),
               ],
@@ -494,13 +533,15 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     );
   }
 
-  /// 예산 사용 현황
+  /// 총예산, 총지출, 남은 예산과 사용률
   Widget _buildBudgetSummaryCard() {
     final bool hasBudget = _budgetAmount > 0;
+
     final bool isOverBudget =
         hasBudget && _remainingBudget < 0;
 
-    final Color progressColor = isOverBudget
+    final Color progressColor =
+    isOverBudget
         ? Colors.redAccent
         : const Color(0xFFE66C8E);
 
@@ -522,7 +563,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+        CrossAxisAlignment.start,
         children: [
           const Text(
             '예산 사용 현황',
@@ -537,9 +579,10 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             children: [
               Expanded(
                 child: _buildMoneyColumn(
-                  title: '전체 예산',
-                  amount:
-                  hasBudget ? _budgetAmount : null,
+                  title: '총예산',
+                  amount: hasBudget
+                      ? _budgetAmount
+                      : null,
                 ),
               ),
               _buildVerticalDivider(),
@@ -570,7 +613,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           if (hasBudget) ...[
             const SizedBox(height: 20),
             ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius:
+              BorderRadius.circular(20),
               child: LinearProgressIndicator(
                 minHeight: 10,
                 value: _budgetProgressValue,
@@ -591,9 +635,12 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                   style: TextStyle(
                     color: isOverBudget
                         ? Colors.redAccent
-                        : const Color(0xFF777777),
+                        : const Color(
+                      0xFF777777,
+                    ),
                     fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                    fontWeight:
+                    FontWeight.w700,
                   ),
                 ),
                 const Spacer(),
@@ -603,7 +650,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                     style: TextStyle(
                       color: Colors.redAccent,
                       fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontWeight:
+                      FontWeight.w700,
                     ),
                   ),
               ],
@@ -686,7 +734,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildStatisticCard(
-            icon: Icons.calendar_today_rounded,
+            icon:
+            Icons.calendar_today_rounded,
             title: '하루 평균',
             value:
             '${_formatMoney(_dailyAverageExpense)}원',
@@ -695,8 +744,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         const SizedBox(width: 10),
         Expanded(
           child: _buildStatisticCard(
-            icon:
-            Icons.local_fire_department_rounded,
+            icon: Icons
+                .local_fire_department_rounded,
             title: '최다 지출',
             value: _topCategory,
           ),
@@ -757,7 +806,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     );
   }
 
-  /// 최다 지출 카테고리 카드
+  /// 최다 지출 카테고리
   Widget _buildTopCategoryCard() {
     final double rate =
     _getCategoryRate(_topCategoryAmount);
@@ -779,7 +828,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             height: 45,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius:
+              BorderRadius.circular(15),
             ),
             child: Icon(
               _getCategoryIcon(_topCategory),
@@ -805,14 +855,16 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                   style: const TextStyle(
                     color: Color(0xFF333333),
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment:
+            CrossAxisAlignment.end,
             children: [
               Text(
                 '${_formatMoney(_topCategoryAmount)}원',
@@ -872,7 +924,9 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom:
-                index == entries.length - 1 ? 0 : 18,
+                index == entries.length - 1
+                    ? 0
+                    : 18,
               ),
               child: _buildCategoryRow(
                 category: entry.key,
@@ -892,7 +946,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     required double rate,
   }) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+      crossAxisAlignment:
+      CrossAxisAlignment.center,
       children: [
         Container(
           width: 38,
@@ -921,7 +976,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                       style: const TextStyle(
                         color: Color(0xFF444444),
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight:
+                        FontWeight.w700,
                       ),
                     ),
                   ),
@@ -930,22 +986,26 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                     style: const TextStyle(
                       color: Color(0xFF333333),
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight:
+                      FontWeight.w800,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 8),
               ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius:
+                BorderRadius.circular(10),
                 child: LinearProgressIndicator(
                   minHeight: 7,
-                  value:
-                  rate.clamp(0.0, 1.0).toDouble(),
+                  value: rate
+                      .clamp(0.0, 1.0)
+                      .toDouble(),
                   backgroundColor:
                   const Color(0xFFF2EEF1),
                   valueColor:
-                  const AlwaysStoppedAnimation<Color>(
+                  const AlwaysStoppedAnimation<
+                      Color>(
                     Color(0xFFE66C8E),
                   ),
                 ),
@@ -965,7 +1025,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     );
   }
 
-  /// 전체 지출 내역
+  /// 전체 여행 지출 목록
   Widget _buildExpenseList() {
     if (_expenses.isEmpty) {
       return _buildEmptyCard(
@@ -981,7 +1041,9 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           return Padding(
             padding: EdgeInsets.only(
               bottom:
-              index == _expenses.length - 1 ? 0 : 10,
+              index == _expenses.length - 1
+                  ? 0
+                  : 10,
             ),
             child: _buildExpenseItem(
               _expenses[index],
@@ -1001,6 +1063,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
         : expense.category.trim();
 
     final String place = expense.place.trim();
+
     final String memo = expense.memo.trim();
 
     return Container(
@@ -1020,7 +1083,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             height: 43,
             decoration: BoxDecoration(
               color: const Color(0xFFFFEDF2),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius:
+              BorderRadius.circular(14),
             ),
             child: Icon(
               _getCategoryIcon(category),
@@ -1035,24 +1099,31 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  place.isNotEmpty ? place : category,
+                  place.isNotEmpty
+                      ? place
+                      : category,
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF333333),
                     fontSize: 13,
-                    fontWeight: FontWeight.w800,
+                    fontWeight:
+                    FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 5),
                 Text(
                   [
                     category,
-                    _formatDate(expense.expenseDate),
+                    _formatDate(
+                      expense.expenseDate,
+                    ),
                     if (memo.isNotEmpty) memo,
                   ].join(' · '),
                   maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  overflow:
+                  TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF999999),
                     fontSize: 10,
@@ -1159,7 +1230,8 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             ),
             const SizedBox(height: 14),
             Text(
-              _errorMessage ?? '오류가 발생했습니다.',
+              _errorMessage ??
+                  '오류가 발생했습니다.',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Color(0xFF555555),
