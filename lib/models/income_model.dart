@@ -1,35 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// 수입 출처 (Firestore 저장값은 snake_case)
-enum IncomeSource {
-  salary('salary', '정기급여'),
-  freelanceIncome('freelance_income', '프리랜서'),
-  partTime('part_time', '단기알바'),
-  allowance('allowance', '용돈'),
-  etc('etc', '기타 수입');
-
-  final String code;
-  final String label;
-  const IncomeSource(this.code, this.label);
-
-  // 사라진 수입출처목록은 기타수입으로 묶어서 보내줌
-  static IncomeSource fromCode(String? code) => IncomeSource.values.firstWhere(
-        (e) => e.code == code,
-    orElse: () => IncomeSource.etc,
-  );
-}
-
 class IncomeModel {
   final String incomeId;
   final String userId;
-  final int amount; // 실수령액(세후) 필수 입력, 원 단위 정수
-  final IncomeSource incomeSource;
+  final int amount;
+
+  // 2. enum 대신 파이어베이스의 카테고리 문서 ID를 저장하도록 변경
+  final String categoryId;
+
   final DateTime date;
   final String? memo;
-
-  /// 반복등록(recurringIncomeTemplates 컬렉션)에서 자동 생성된 수입이면 참조, 수동 추가면 null
   final String? recurringIncomeTemplateId;
-
   final bool isDeleted;
   final DateTime? deletedAt;
   final DateTime? createdAt;
@@ -38,7 +19,7 @@ class IncomeModel {
     required this.incomeId,
     required this.userId,
     required this.amount,
-    required this.incomeSource,
+    required this.categoryId, // 필수값으로 변경
     required this.date,
     this.memo,
     this.recurringIncomeTemplateId,
@@ -47,8 +28,6 @@ class IncomeModel {
     this.createdAt,
   });
 
-  /// 프리랜서 소득 3.3% 원천징수 기준 세전 금액 역산 추정 (저장하지 않는 계산값)
-  /// 화면에는 반드시 "약 000원 (세전 추정)" 형태로 표기할 것
   num estimateGrossAmount() => amount / 0.967;
 
   factory IncomeModel.fromFirestore(DocumentSnapshot doc) {
@@ -57,7 +36,10 @@ class IncomeModel {
       incomeId: doc.id,
       userId: d['userId'] ?? '',
       amount: (d['amount'] as num?)?.toInt() ?? 0,
-      incomeSource: IncomeSource.fromCode(d['incomeSource']),
+
+      // 3. 파이어베이스에서 카테고리 ID를 직접 읽어옵니다.
+      categoryId: d['categoryId'] ?? '',
+
       date: (d['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       memo: d['memo'] as String?,
       recurringIncomeTemplateId: d['recurringIncomeTemplateId'] as String?,
@@ -70,7 +52,7 @@ class IncomeModel {
   Map<String, dynamic> toFirestore() => {
     'userId': userId.trim(),
     'amount': amount,
-    'incomeSource': incomeSource.code,
+    'categoryId': categoryId,
     'date': Timestamp.fromDate(date),
     'memo': memo,
     'recurringIncomeTemplateId': recurringIncomeTemplateId,
@@ -82,10 +64,10 @@ class IncomeModel {
   };
 
   IncomeModel copyWith({
-    String? incomeId, // 새로 발급된 ID를 넣을 수 있도록
-    String? userId,   // 기존 userId 유지 또는 변경
+    String? incomeId,
+    String? userId,
     int? amount,
-    IncomeSource? incomeSource,
+    String? categoryId, // 변경
     DateTime? date,
     String? memo,
     String? recurringIncomeTemplateId,
@@ -93,31 +75,30 @@ class IncomeModel {
     DateTime? deletedAt,
   }) {
     return IncomeModel(
-      incomeId: incomeId ?? this.incomeId,
-      userId: userId ?? this.userId,
-      amount: amount ?? this.amount,
-      incomeSource: incomeSource ?? this.incomeSource,
-      date: date ?? this.date,
-      memo: memo ?? this.memo,
-      recurringIncomeTemplateId: recurringIncomeTemplateId ?? this.recurringIncomeTemplateId,
-      isDeleted: isDeleted ?? this.isDeleted,
-      deletedAt: deletedAt ?? this.deletedAt,
-      createdAt: createdAt
+        incomeId: incomeId ?? this.incomeId,
+        userId: userId ?? this.userId,
+        amount: amount ?? this.amount,
+        categoryId: categoryId ?? this.categoryId, // 변경
+        date: date ?? this.date,
+        memo: memo ?? this.memo,
+        recurringIncomeTemplateId: recurringIncomeTemplateId ?? this.recurringIncomeTemplateId,
+        isDeleted: isDeleted ?? this.isDeleted,
+        deletedAt: deletedAt ?? this.deletedAt,
+        createdAt: createdAt
     );
   }
 }
 
-/// 매달 자동으로 IncomeModel을 생성하는 반복등록 원거래 (주로 월급)
+/// 매달 자동으로 생성되는 반복등록 템플릿
 class RecurringIncomeTemplate {
   final String recurringIncomeTemplateId;
   final String userId;
-  final IncomeSource incomeSource;
-  final int amount; // 매달 기본 금액
-  final int payDay; // 매달 며칠에 자동 생성할지 (1~31)
+  final String categoryId;
+  final int amount;
+  final int payDay;
   final bool isActive;
   final DateTime startDate;
   final String? memo;
-
   final bool isDeleted;
   final DateTime? deletedAt;
   final DateTime? createdAt;
@@ -125,7 +106,7 @@ class RecurringIncomeTemplate {
   RecurringIncomeTemplate({
     required this.recurringIncomeTemplateId,
     required this.userId,
-    required this.incomeSource,
+    required this.categoryId, // 변경
     required this.amount,
     required this.payDay,
     this.isActive = true,
@@ -141,7 +122,7 @@ class RecurringIncomeTemplate {
     return RecurringIncomeTemplate(
       recurringIncomeTemplateId: doc.id,
       userId: d['userId'] ?? '',
-      incomeSource: IncomeSource.fromCode(d['incomeSource']),
+      categoryId: d['categoryId'] ?? '', // 변경
       amount: (d['amount'] as num?)?.toInt() ?? 0,
       payDay: (d['payDay'] as num?)?.toInt() ?? 1,
       isActive: d['isActive'] ?? true,
@@ -155,7 +136,7 @@ class RecurringIncomeTemplate {
 
   Map<String, dynamic> toFirestore() => {
     'userId': userId.trim(),
-    'incomeSource': incomeSource.code,
+    'categoryId': categoryId, // 변경
     'amount': amount,
     'payDay': payDay,
     'isActive': isActive,
@@ -170,7 +151,7 @@ class RecurringIncomeTemplate {
 
   RecurringIncomeTemplate copyWith({
     String? userId,
-    IncomeSource? incomeSource,
+    String? categoryId, // 변경
     int? amount,
     int? payDay,
     bool? isActive,
@@ -181,7 +162,7 @@ class RecurringIncomeTemplate {
   }) {
     return RecurringIncomeTemplate(
       recurringIncomeTemplateId: recurringIncomeTemplateId,
-      incomeSource: incomeSource ?? this.incomeSource,
+      categoryId: categoryId ?? this.categoryId, // 변경
       amount: amount ?? this.amount,
       payDay: payDay ?? this.payDay,
       isActive: isActive ?? this.isActive,

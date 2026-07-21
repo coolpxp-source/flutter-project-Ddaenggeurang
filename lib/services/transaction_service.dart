@@ -81,7 +81,7 @@ class TransactionService {
         type: 'income',
         date: income.date,
         amount: income.amount,
-        title: income.incomeSource.label,
+        title: income.categoryId,
         subtitle: income.memo,
       ));
     }
