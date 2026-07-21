@@ -246,6 +246,8 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
           'isDirectDeal': _isDirectDeal,
         });
       } else {
+        final userDoc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
+        final myVerifiedDong = userDoc.data()?['verifiedDong'] as String?;
         // 신규 등록
         await _service.addProduct(
           sellerId: _myId,
@@ -255,6 +257,7 @@ class _ProductRegisterScreenState extends State<ProductRegisterScreen> {
           description: desc,
           images: allImageUrls,
           category: _category,
+          verifiedDong: myVerifiedDong,
           isUrgent: _isUrgent,
           isNegotiable: _isNegotiable,
           isDirectDeal: _isDirectDeal,
