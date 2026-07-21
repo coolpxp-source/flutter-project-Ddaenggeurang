@@ -18,9 +18,7 @@ Future<void> main() async {
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,
-      home: const PersonalizedBudgetRecommendationScreen(
-        resultType: 'planned_spender',
-      ),
+      home: const MyAvatarScreen(),
     ),
   );
 }

@@ -75,6 +75,13 @@ flutter:
     - assets/
     - assets/images/
     - assets/stickers/
+    - assets/avatar/base/
+    - assets/avatar/hair/
+    - assets/avatar/clothes/
+    - assets/avatar/shoes/
+    - assets/avatar/hat/
+    - assets/avatar/accessory/
+    - assets/avatar/pet/
     - .env
 
 flutter_launcher_icons:

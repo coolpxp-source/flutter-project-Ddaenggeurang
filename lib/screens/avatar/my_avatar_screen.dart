@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/avatar_item_model.dart';
 import '../../services/avatar_service.dart';
 import 'point_shop_screen.dart';
+import '../../widgets/avatar/avatar_layered_character.dart';
 class MyAvatarScreen extends StatefulWidget {
   const MyAvatarScreen({super.key});
 
@@ -369,27 +370,10 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
               color: Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 62,
-                  backgroundColor: Color(0xFFFFDBE9),
-                  child: Icon(
-                    Icons.pets,
-                    size: 78,
-                    color: Color(0xFF432C42),
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  '아바타 이미지 영역',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+            child: const Center(
+              child: AvatarLayeredCharacter(
+                size: 180,
+              ),
             ),
           ),
           const SizedBox(height: 18),
