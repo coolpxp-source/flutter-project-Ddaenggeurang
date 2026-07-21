@@ -425,7 +425,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: amountColor,
-                      // 💡 4. 완료된 저축이면 금액에 취소선 긋기
+                      // 4. 완료된 저축이면 금액에 취소선 긋기
                       decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
                     ),
                   ),
@@ -433,10 +433,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   Text(
                     '${item.title} ${item.subtitle != null ? '· ${item.subtitle}' : ''}',
                     style: TextStyle(
-                      // 💡 5. 완료된 저축이면 카테고리/메모 글씨도 더 연한 회색으로 변경 & 취소선
+                      // 5. 완료된 저축이면 카테고리/메모 글씨도 더 연한 회색으로 변경
                       color: isCompletedSaving ? Colors.grey[400] : Colors.grey[600],
                       fontSize: 13,
-                      decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
                     ),
                   ),
                 ],

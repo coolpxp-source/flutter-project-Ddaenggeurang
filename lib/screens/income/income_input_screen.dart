@@ -105,7 +105,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('수입 내역이 저장되었습니다!')),
         );
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       debugPrint('🔥 저장 에러: $e');
