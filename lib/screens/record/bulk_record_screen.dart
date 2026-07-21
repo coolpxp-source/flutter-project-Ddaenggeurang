@@ -8,13 +8,6 @@ import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
 import 'parsed_record_draft.dart';
 
-/// "한번에 기록하기" / 퉁치기 화면
-/// 자유 텍스트 한 번(또는 사진 여러 장)으로 여러 건을 한꺼번에 인식 → 확인/수정 → 전체 저장
-///
-/// TODO: _parseStub()을 실제 파싱 로직으로 교체
-///   - 텍스트: 로컬 AI에 프롬프트로 넘겨서 JSON 리스트로 항목 추출
-///   - 사진: OCR(ML Kit 등)로 각 이미지에서 항목 추출
-///   두 경로 모두 최종적으로는 List<ParsedRecordDraft>만 만들어주면 이 화면은 그대로 재사용 가능
 class BulkRecordScreen extends StatefulWidget {
   const BulkRecordScreen({super.key});
 
@@ -30,8 +23,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
   List<ParsedRecordDraft> _drafts = [];
   bool _isParsing = false;
-
-  // TODO: image_picker로 실제 여러 장 첨부 연결. 지금은 개수만 카운트하는 자리표시자.
   int _attachedPhotoCount = 0;
 
   @override
@@ -41,7 +32,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   }
 
   void _onTapAddPhoto() {
-    // TODO: image_picker(멀티 선택) 연결
     setState(() => _attachedPhotoCount++);
   }
 
@@ -55,7 +45,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
     setState(() => _isParsing = true);
 
-    // ── 스텁: 실제로는 로컬 AI/OCR 결과가 여기 채워짐 ──
     await Future.delayed(const Duration(milliseconds: 600));
     final now = DateTime.now();
     final stubResult = [
@@ -73,7 +62,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         date: now.subtract(const Duration(days: 2)),
         label: '용돈',
         amount: 50000,
-        incomeSource: IncomeSource.allowance,
+        categoryId: 'allowance_stub',
       ),
       ParsedRecordDraft.saving(
         date: now,
@@ -95,7 +84,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     final selected = _drafts.where((d) => d.isSelected).toList();
     if (selected.isEmpty) return;
 
-    // TODO: userId는 실제 로그인 유저 uid로 교체 (FirebaseAuth.instance.currentUser?.uid)
     const userId = 'TODO_USER_ID';
 
     for (final draft in selected) {
@@ -109,7 +97,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             categoryId: draft.categoryId ?? 'uncategorized',
             nature: draft.nature ?? ExpenseNature.variable,
             emotionTag: draft.emotionTag,
-            isQuickInput: true, // 퉁치기로 들어온 건 표시해둠
+            isQuickInput: true,
           ));
           break;
         case TransactionType.income:
@@ -117,7 +105,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             incomeId: '',
             userId: userId,
             amount: draft.amount,
-            incomeSource: draft.incomeSource ?? IncomeSource.etc,
+            categoryId: draft.categoryId ?? 'uncategorized',
             date: draft.date,
           ));
           break;
@@ -163,16 +151,13 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
               controller: _textController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n'
-                    '7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
+                hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
                 hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 contentPadding: const EdgeInsets.all(12),
               ),
             ),
             const SizedBox(height: 12),
-
-            // 사진 여러 장 첨부
             Row(
               children: [
                 for (int i = 0; i < _attachedPhotoCount; i++) ...[
@@ -183,7 +168,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
             SizedBox(
               width: double.infinity,
               height: 44,
@@ -194,24 +178,18 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                     ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
+                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
                     : const Text('AI로 분리하기', style: TextStyle(color: Colors.white)),
               ),
             ),
-
             if (_drafts.isNotEmpty) ...[
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('인식된 항목 ${_drafts.length}개',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const Text('틀린 부분은 눌러서 수정',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('인식된 항목 ${_drafts.length}개', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('틀린 부분은 눌러서 수정', style: TextStyle(fontSize: 12, color: Colors.grey)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -223,10 +201,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                 child: ElevatedButton(
                   onPressed: _selectedCount == 0 ? null : _saveAll,
                   style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  child: Text(
-                    '$_selectedCount개 항목 전체 저장',
-                    style: const TextStyle(color: Colors.white, fontSize: 16),
-                  ),
+                  child: Text('$_selectedCount개 항목 전체 저장', style: const TextStyle(color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -311,7 +286,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     );
   }
 
-  /// type별로 다른 빠른 수정 UI (nature/emotionTag or incomeSource or 저축 카테고리)
   Widget _buildDraftEditor(ParsedRecordDraft draft) {
     switch (draft.type) {
       case TransactionType.expense:
@@ -327,14 +301,21 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
           }).toList(),
         );
       case TransactionType.income:
+      // AI 파싱용 수입 임시 옵션 (나중에 서버 연동으로 고도화 가능)
+        const incomeOptions = [
+          ('salary', '월급'),
+          ('freelance', '프리랜서'),
+          ('allowance', '용돈'),
+          ('etc', '기타'),
+        ];
         return Wrap(
           spacing: 6,
-          children: IncomeSource.values.map((s) {
-            final selected = draft.incomeSource == s;
+          children: incomeOptions.map((o) {
+            final selected = draft.categoryId == o.$1;
             return ChoiceChip(
-              label: Text(s.label, style: const TextStyle(fontSize: 12)),
+              label: Text(o.$2, style: const TextStyle(fontSize: 12)),
               selected: selected,
-              onSelected: (_) => setState(() => draft.incomeSource = s),
+              onSelected: (_) => setState(() => draft.categoryId = o.$1),
             );
           }).toList(),
         );
