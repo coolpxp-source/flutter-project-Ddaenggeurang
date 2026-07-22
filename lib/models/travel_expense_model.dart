@@ -10,6 +10,14 @@ class TravelExpenseModel {
   /// 경비를 등록한 사용자 UID
   final String userId;
 
+  /// 실제 결제자 ID
+  ///
+  /// 기존 데이터에 값이 없으면 userId를 결제자 ID로 사용한다.
+  final String payerId;
+
+  /// 실제 결제자 이름
+  final String payerName;
+
   /// 지출 금액
   final int amount;
 
@@ -38,6 +46,8 @@ class TravelExpenseModel {
     required this.expenseId,
     required this.travelId,
     required this.userId,
+    this.payerId = '',
+    this.payerName = '',
     required this.amount,
     required this.category,
     required this.place,
@@ -47,6 +57,27 @@ class TravelExpenseModel {
     this.isDeleted = false,
     this.deletedAt,
   });
+
+  /// 실제 정산에 사용할 결제자 ID
+  ///
+  /// 기존 경비 데이터에 payerId가 없으면
+  /// 경비 등록자 userId를 결제자로 처리한다.
+  String get effectivePayerId {
+    if (payerId.trim().isNotEmpty) {
+      return payerId.trim();
+    }
+
+    return userId.trim();
+  }
+
+  /// 화면에 표시할 결제자 이름
+  String get displayPayerName {
+    if (payerName.trim().isNotEmpty) {
+      return payerName.trim();
+    }
+
+    return '결제자 미지정';
+  }
 
   /// Firestore 문서를 TravelExpenseModel로 변환
   factory TravelExpenseModel.fromFirestore(
@@ -60,10 +91,15 @@ class TravelExpenseModel {
       );
     }
 
+    final String userId = _toString(data['userId']);
+    final String payerId = _toString(data['payerId']);
+
     return TravelExpenseModel(
       expenseId: document.id,
       travelId: _toString(data['travelId']),
-      userId: _toString(data['userId']),
+      userId: userId,
+      payerId: payerId.isEmpty ? userId : payerId,
+      payerName: _toString(data['payerName']),
       amount: _toInt(data['amount']),
       category: _toCategory(data['category']),
       place: _toString(data['place']),
@@ -89,6 +125,8 @@ class TravelExpenseModel {
       'expenseId': expenseId,
       'travelId': travelId.trim(),
       'userId': userId.trim(),
+      'payerId': effectivePayerId,
+      'payerName': payerName.trim(),
       'amount': amount,
       'category': category.trim().isEmpty
           ? '기타'
@@ -115,6 +153,8 @@ class TravelExpenseModel {
     String? expenseId,
     String? travelId,
     String? userId,
+    String? payerId,
+    String? payerName,
     int? amount,
     String? category,
     String? place,
@@ -129,12 +169,13 @@ class TravelExpenseModel {
       expenseId: expenseId ?? this.expenseId,
       travelId: travelId ?? this.travelId,
       userId: userId ?? this.userId,
+      payerId: payerId ?? this.payerId,
+      payerName: payerName ?? this.payerName,
       amount: amount ?? this.amount,
       category: category ?? this.category,
       place: place ?? this.place,
       memo: memo ?? this.memo,
-      expenseDate:
-      expenseDate ?? this.expenseDate,
+      expenseDate: expenseDate ?? this.expenseDate,
       createdAt: createdAt ?? this.createdAt,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: clearDeletedAt
@@ -144,13 +185,14 @@ class TravelExpenseModel {
   }
 
   /// Map 데이터로 변환
-  ///
-  /// 디버깅이나 로컬 상태 확인 시 사용할 수 있다.
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'expenseId': expenseId,
       'travelId': travelId,
       'userId': userId,
+      'payerId': payerId,
+      'effectivePayerId': effectivePayerId,
+      'payerName': payerName,
       'amount': amount,
       'category': category,
       'place': place,
@@ -173,8 +215,7 @@ class TravelExpenseModel {
 
   /// 카테고리 변환
   static String _toCategory(dynamic value) {
-    final String category =
-    _toString(value);
+    final String category = _toString(value);
 
     if (category.isEmpty) {
       return '기타';
@@ -198,8 +239,7 @@ class TravelExpenseModel {
     }
 
     final String stringValue =
-        value?.toString().replaceAll(',', '').trim() ??
-            '';
+        value?.toString().replaceAll(',', '').trim() ?? '';
 
     return int.tryParse(stringValue) ?? 0;
   }
@@ -215,8 +255,7 @@ class TravelExpenseModel {
     }
 
     final String stringValue =
-        value?.toString().trim().toLowerCase() ??
-            '';
+        value?.toString().trim().toLowerCase() ?? '';
 
     return stringValue == 'true' ||
         stringValue == '1' ||
@@ -234,8 +273,7 @@ class TravelExpenseModel {
     }
 
     if (value is String) {
-      return DateTime.tryParse(value) ??
-          DateTime.now();
+      return DateTime.tryParse(value) ?? DateTime.now();
     }
 
     if (value is int) {
@@ -286,6 +324,8 @@ class TravelExpenseModel {
         'expenseId: $expenseId, '
         'travelId: $travelId, '
         'userId: $userId, '
+        'payerId: $payerId, '
+        'payerName: $payerName, '
         'amount: $amount, '
         'category: $category, '
         'place: $place, '
@@ -307,6 +347,8 @@ class TravelExpenseModel {
         other.expenseId == expenseId &&
         other.travelId == travelId &&
         other.userId == userId &&
+        other.payerId == payerId &&
+        other.payerName == payerName &&
         other.amount == amount &&
         other.category == category &&
         other.place == place &&
@@ -323,6 +365,8 @@ class TravelExpenseModel {
       expenseId,
       travelId,
       userId,
+      payerId,
+      payerName,
       amount,
       category,
       place,

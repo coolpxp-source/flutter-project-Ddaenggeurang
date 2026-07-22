@@ -8,17 +8,18 @@ class TravelExpenseService {
   TravelExpenseService({
     FirebaseFirestore? firestore,
     FirebaseAuth? auth,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+  })  : _firestore =
+      firestore ?? FirebaseFirestore.instance,
         _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
 
-  CollectionReference<Map<String, dynamic>> get _expenseCollection {
+  CollectionReference<Map<String, dynamic>>
+  get _expenseCollection {
     return _firestore.collection('travelExpenses');
   }
 
-  /// 현재 로그인한 사용자 UID
   String get _currentUserId {
     final User? user = _auth.currentUser;
 
@@ -32,6 +33,8 @@ class TravelExpenseService {
   /// 여행 경비 등록
   Future<String> createExpense({
     required String travelId,
+    required String payerId,
+    required String payerName,
     required int amount,
     required String category,
     required String place,
@@ -39,6 +42,8 @@ class TravelExpenseService {
     required DateTime expenseDate,
   }) async {
     final String trimmedTravelId = travelId.trim();
+    final String trimmedPayerId = payerId.trim();
+    final String trimmedPayerName = payerName.trim();
     final String trimmedCategory = category.trim();
     final String trimmedPlace = place.trim();
     final String trimmedMemo = memo.trim();
@@ -47,22 +52,38 @@ class TravelExpenseService {
       throw ArgumentError('여행 ID가 비어 있습니다.');
     }
 
+    if (trimmedPayerId.isEmpty) {
+      throw ArgumentError('결제자를 선택해야 합니다.');
+    }
+
+    if (trimmedPayerName.isEmpty) {
+      throw ArgumentError('결제자 이름이 비어 있습니다.');
+    }
+
     if (amount <= 0) {
-      throw ArgumentError('경비 금액은 0원보다 커야 합니다.');
+      throw ArgumentError(
+        '경비 금액은 0원보다 커야 합니다.',
+      );
     }
 
     if (trimmedCategory.isEmpty) {
-      throw ArgumentError('경비 카테고리를 선택해야 합니다.');
+      throw ArgumentError(
+        '경비 카테고리를 선택해야 합니다.',
+      );
     }
 
     final String userId = _currentUserId;
-    final DocumentReference<Map<String, dynamic>> document =
-    _expenseCollection.doc();
 
-    final TravelExpenseModel expense = TravelExpenseModel(
+    final DocumentReference<Map<String, dynamic>>
+    document = _expenseCollection.doc();
+
+    final TravelExpenseModel expense =
+    TravelExpenseModel(
       expenseId: document.id,
       travelId: trimmedTravelId,
       userId: userId,
+      payerId: trimmedPayerId,
+      payerName: trimmedPayerName,
       amount: amount,
       category: trimmedCategory,
       place: trimmedPlace,
@@ -74,14 +95,16 @@ class TravelExpenseService {
     );
 
     try {
-      await document.set({
+      await document.set(<String, dynamic>{
         ...expense.toFirestore(),
         'expenseId': document.id,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('여행 경비 등록 성공: ${document.id}');
+      debugPrint(
+        '여행 경비 등록 성공: ${document.id}',
+      );
 
       return document.id;
     } on FirebaseException catch (error, stackTrace) {
@@ -103,13 +126,16 @@ class TravelExpenseService {
   }
 
   /// 여행별 경비 실시간 조회
-  Stream<List<TravelExpenseModel>> watchExpensesByTravelId(
+  Stream<List<TravelExpenseModel>>
+  watchExpensesByTravelId(
       String travelId,
       ) {
     final String trimmedTravelId = travelId.trim();
 
     if (trimmedTravelId.isEmpty) {
-      return Stream<List<TravelExpenseModel>>.value([]);
+      return Stream<List<TravelExpenseModel>>.value(
+        <TravelExpenseModel>[],
+      );
     }
 
     final String userId = _currentUserId;
@@ -128,14 +154,24 @@ class TravelExpenseService {
       isEqualTo: false,
     )
         .snapshots()
-        .map((QuerySnapshot<Map<String, dynamic>> snapshot) {
-      final List<TravelExpenseModel> expenses = snapshot.docs
-          .map(TravelExpenseModel.fromFirestore)
+        .map((
+        QuerySnapshot<Map<String, dynamic>> snapshot,
+        ) {
+      final List<TravelExpenseModel> expenses =
+      snapshot.docs
+          .map(
+        TravelExpenseModel.fromFirestore,
+      )
           .toList();
 
       expenses.sort(
-            (TravelExpenseModel a, TravelExpenseModel b) {
-          return b.expenseDate.compareTo(a.expenseDate);
+            (
+            TravelExpenseModel first,
+            TravelExpenseModel second,
+            ) {
+          return second.expenseDate.compareTo(
+            first.expenseDate,
+          );
         },
       );
 
@@ -144,22 +180,21 @@ class TravelExpenseService {
   }
 
   /// 여행별 경비 1회 조회
-  ///
-  /// 여행 리포트 화면에서 사용
-  Future<List<TravelExpenseModel>> getExpensesByTravelId(
+  Future<List<TravelExpenseModel>>
+  getExpensesByTravelId(
       String travelId,
       ) async {
     final String trimmedTravelId = travelId.trim();
 
     if (trimmedTravelId.isEmpty) {
-      return [];
+      return <TravelExpenseModel>[];
     }
 
     final String userId = _currentUserId;
 
     try {
-      final QuerySnapshot<Map<String, dynamic>> snapshot =
-      await _expenseCollection
+      final QuerySnapshot<Map<String, dynamic>>
+      snapshot = await _expenseCollection
           .where(
         'userId',
         isEqualTo: userId,
@@ -174,13 +209,21 @@ class TravelExpenseService {
       )
           .get();
 
-      final List<TravelExpenseModel> expenses = snapshot.docs
-          .map(TravelExpenseModel.fromFirestore)
+      final List<TravelExpenseModel> expenses =
+      snapshot.docs
+          .map(
+        TravelExpenseModel.fromFirestore,
+      )
           .toList();
 
       expenses.sort(
-            (TravelExpenseModel a, TravelExpenseModel b) {
-          return b.expenseDate.compareTo(a.expenseDate);
+            (
+            TravelExpenseModel first,
+            TravelExpenseModel second,
+            ) {
+          return second.expenseDate.compareTo(
+            first.expenseDate,
+          );
         },
       );
 
@@ -197,7 +240,9 @@ class TravelExpenseService {
             '[${error.code}] ${error.message ?? ''}',
       );
     } catch (error, stackTrace) {
-      debugPrint('여행 경비 목록 조회 중 오류: $error');
+      debugPrint(
+        '여행 경비 목록 조회 중 오류: $error',
+      );
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
@@ -208,7 +253,8 @@ class TravelExpenseService {
   Future<TravelExpenseModel?> getExpenseById(
       String expenseId,
       ) async {
-    final String trimmedExpenseId = expenseId.trim();
+    final String trimmedExpenseId =
+    expenseId.trim();
 
     if (trimmedExpenseId.isEmpty) {
       return null;
@@ -217,17 +263,21 @@ class TravelExpenseService {
     final String userId = _currentUserId;
 
     try {
-      final DocumentSnapshot<Map<String, dynamic>> document =
-      await _expenseCollection.doc(trimmedExpenseId).get();
+      final DocumentSnapshot<Map<String, dynamic>>
+      document = await _expenseCollection
+          .doc(trimmedExpenseId)
+          .get();
 
-      if (!document.exists || document.data() == null) {
+      if (!document.exists ||
+          document.data() == null) {
         return null;
       }
 
       final TravelExpenseModel expense =
       TravelExpenseModel.fromFirestore(document);
 
-      if (expense.userId != userId || expense.isDeleted) {
+      if (expense.userId != userId ||
+          expense.isDeleted) {
         return null;
       }
 
@@ -244,7 +294,9 @@ class TravelExpenseService {
             '[${error.code}] ${error.message ?? ''}',
       );
     } catch (error, stackTrace) {
-      debugPrint('여행 경비 단건 조회 중 오류: $error');
+      debugPrint(
+        '여행 경비 단건 조회 중 오류: $error',
+      );
       debugPrintStack(stackTrace: stackTrace);
 
       rethrow;
@@ -252,16 +304,25 @@ class TravelExpenseService {
   }
 
   /// 여행 경비 수정
+  ///
+  /// payerId와 payerName을 전달하지 않으면
+  /// 기존 결제자 정보를 유지한다.
   Future<void> updateExpense({
     required String expenseId,
+    String? payerId,
+    String? payerName,
     required int amount,
     required String category,
     required String place,
     required String memo,
     required DateTime expenseDate,
   }) async {
-    final String trimmedExpenseId = expenseId.trim();
-    final String trimmedCategory = category.trim();
+    final String trimmedExpenseId =
+    expenseId.trim();
+
+    final String trimmedCategory =
+    category.trim();
+
     final String trimmedPlace = place.trim();
     final String trimmedMemo = memo.trim();
 
@@ -270,31 +331,54 @@ class TravelExpenseService {
     }
 
     if (amount <= 0) {
-      throw ArgumentError('경비 금액은 0원보다 커야 합니다.');
+      throw ArgumentError(
+        '경비 금액은 0원보다 커야 합니다.',
+      );
     }
 
     if (trimmedCategory.isEmpty) {
-      throw ArgumentError('경비 카테고리를 선택해야 합니다.');
+      throw ArgumentError(
+        '경비 카테고리를 선택해야 합니다.',
+      );
     }
 
     final TravelExpenseModel? expense =
     await getExpenseById(trimmedExpenseId);
 
     if (expense == null) {
-      throw StateError('수정할 여행 경비를 찾을 수 없습니다.');
+      throw StateError(
+        '수정할 여행 경비를 찾을 수 없습니다.',
+      );
     }
 
+    final String updatedPayerId =
+    payerId?.trim().isNotEmpty == true
+        ? payerId!.trim()
+        : expense.effectivePayerId;
+
+    final String updatedPayerName =
+    payerName?.trim().isNotEmpty == true
+        ? payerName!.trim()
+        : expense.payerName.trim();
+
     try {
-      await _expenseCollection.doc(trimmedExpenseId).update({
+      await _expenseCollection
+          .doc(trimmedExpenseId)
+          .update(<String, dynamic>{
+        'payerId': updatedPayerId,
+        'payerName': updatedPayerName,
         'amount': amount,
         'category': trimmedCategory,
         'place': trimmedPlace,
         'memo': trimmedMemo,
-        'expenseDate': Timestamp.fromDate(expenseDate),
+        'expenseDate':
+        Timestamp.fromDate(expenseDate),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('여행 경비 수정 성공: $trimmedExpenseId');
+      debugPrint(
+        '여행 경비 수정 성공: $trimmedExpenseId',
+      );
     } on FirebaseException catch (error, stackTrace) {
       debugPrint('여행 경비 수정 실패');
       debugPrint('expenseId: $trimmedExpenseId');
@@ -318,7 +402,8 @@ class TravelExpenseService {
   Future<void> deleteExpense(
       String expenseId,
       ) async {
-    final String trimmedExpenseId = expenseId.trim();
+    final String trimmedExpenseId =
+    expenseId.trim();
 
     if (trimmedExpenseId.isEmpty) {
       throw ArgumentError('경비 ID가 비어 있습니다.');
@@ -328,17 +413,23 @@ class TravelExpenseService {
     await getExpenseById(trimmedExpenseId);
 
     if (expense == null) {
-      throw StateError('삭제할 여행 경비를 찾을 수 없습니다.');
+      throw StateError(
+        '삭제할 여행 경비를 찾을 수 없습니다.',
+      );
     }
 
     try {
-      await _expenseCollection.doc(trimmedExpenseId).update({
+      await _expenseCollection
+          .doc(trimmedExpenseId)
+          .update(<String, dynamic>{
         'isDeleted': true,
         'deletedAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('여행 경비 삭제 성공: $trimmedExpenseId');
+      debugPrint(
+        '여행 경비 삭제 성공: $trimmedExpenseId',
+      );
     } on FirebaseException catch (error, stackTrace) {
       debugPrint('여행 경비 삭제 실패');
       debugPrint('expenseId: $trimmedExpenseId');
@@ -367,7 +458,10 @@ class TravelExpenseService {
 
     return expenses.fold<int>(
       0,
-          (int total, TravelExpenseModel expense) {
+          (
+          int total,
+          TravelExpenseModel expense,
+          ) {
         return total + expense.amount;
       },
     );
@@ -380,9 +474,11 @@ class TravelExpenseService {
     final List<TravelExpenseModel> expenses =
     await getExpensesByTravelId(travelId);
 
-    final Map<String, int> totals = <String, int>{};
+    final Map<String, int> totals =
+    <String, int>{};
 
-    for (final TravelExpenseModel expense in expenses) {
+    for (final TravelExpenseModel expense
+    in expenses) {
       totals.update(
         expense.category,
             (int currentAmount) {
@@ -397,8 +493,13 @@ class TravelExpenseService {
     final List<MapEntry<String, int>> entries =
     totals.entries.toList()
       ..sort(
-            (MapEntry<String, int> a, MapEntry<String, int> b) {
-          return b.value.compareTo(a.value);
+            (
+            MapEntry<String, int> first,
+            MapEntry<String, int> second,
+            ) {
+          return second.value.compareTo(
+            first.value,
+          );
         },
       );
 

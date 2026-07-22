@@ -1,9 +1,11 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../models/travel_expense_model.dart';
 import '../../models/travel_model.dart';
 import '../../services/travel_expense_service.dart';
 import '../../services/travel_service.dart';
+import 'travel_settlement_screen.dart';
 
 class TravelReportScreen extends StatefulWidget {
   const TravelReportScreen({
@@ -39,6 +41,51 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     super.initState();
 
     _loadReport();
+  }
+
+  /// 여행 정산 화면으로 이동한다.
+  Future<void> _openSettlementScreen() async {
+    final User? user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('로그인이 필요한 기능입니다.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final String displayName = user.displayName?.trim() ?? '';
+    final String email = user.email?.trim() ?? '';
+
+    final String userName = displayName.isNotEmpty
+        ? displayName
+        : email.contains('@')
+        ? email.split('@').first
+        : '나';
+
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => TravelSettlementScreen(
+          travelId: widget.travelId,
+          currentUserId: user.uid,
+          currentUserName: userName,
+        ),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _loadReport();
   }
 
   /// 여행 정보와 여행 지출 목록을 함께 조회한다.
@@ -407,6 +454,10 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
 
           _buildBudgetSummaryCard(),
 
+          const SizedBox(height: 14),
+
+          _buildSettlementButton(),
+
           const SizedBox(height: 26),
 
           _buildSectionTitle(
@@ -676,6 +727,33 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
       width: 1,
       height: 38,
       color: const Color(0xFFF0EDF0),
+    );
+  }
+
+  /// 여행 정산 화면 이동 버튼
+  Widget _buildSettlementButton() {
+    return SizedBox(
+      height: 54,
+      child: FilledButton.icon(
+        onPressed: _openSettlementScreen,
+        icon: const Icon(
+          Icons.calculate_outlined,
+        ),
+        label: const Text(
+          '여행 정산하기',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFFE66C8E),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
     );
   }
 
