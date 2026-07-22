@@ -125,6 +125,7 @@ class AvatarService {
     }
   }
 
+  // 기본 아바타 아이템의 보유 및 장착 상태를 초기화하는 메서드
   Future<void> initializeDefaultAvatar() async {
     final userId = _currentUserId;
 
@@ -132,70 +133,69 @@ class AvatarService {
         .collection('users')
         .doc(userId);
 
-    final ownedItemsRef =
-    userRef.collection('ownedItems');
-
-    final ownedItemsSnapshot =
-    await ownedItemsRef.limit(1).get();
+    final ownedItemsRef = userRef.collection('ownedItems');
 
     final userSnapshot = await userRef.get();
+
+    if (!userSnapshot.exists) {
+      throw StateError('사용자 정보가 없습니다.');
+    }
+
     final userData = userSnapshot.data();
 
-    final equippedItems =
-    Map<String, dynamic>.from(
+    final equippedItems = Map<String, dynamic>.from(
       userData?['equippedItems'] ?? {},
     );
 
+    // Firestore avatarItems 문서 ID와 반드시 동일해야 함
+    final defaultItems = <String, String>{
+      'hair': 'hair_basic',
+      'clothes': 'basic_clothes',
+      'shoes': 'basic_shoes',
+      'accessory': 'basic_accessory',
+      'pet': 'pet_basic',
+    };
+
     final batch = _firestore.batch();
 
-    if (ownedItemsSnapshot.docs.isEmpty) {
-      final defaultItemIds = [
-        'accessory_basic',
-        'clothes_basic',
-        'hat_basic',
-        'shoes_basic',
-      ];
+    // 기존 사용자도 누락된 기본 아이템을 받을 수 있도록 개별 확인
+    for (final itemId in defaultItems.values) {
+      final ownedItemRef = ownedItemsRef.doc(itemId);
+      final ownedItemSnapshot = await ownedItemRef.get();
 
-      for (final itemId in defaultItemIds) {
-        final itemRef =
-        ownedItemsRef.doc(itemId);
-
+      if (!ownedItemSnapshot.exists) {
         batch.set(
-          itemRef,
+          ownedItemRef,
           {
-            'purchasedAt':
-            FieldValue.serverTimestamp(),
+            'purchasedAt': FieldValue.serverTimestamp(),
             'pricePaid': 0,
           },
         );
       }
     }
 
-    final hasNoEquippedItems =
-        equippedItems['accessory'] == null &&
-            equippedItems['clothes'] == null &&
-            equippedItems['hat'] == null &&
-            equippedItems['shoes'] == null;
+    // 기존 장착 상태는 유지하고 누락된 슬롯만 기본 아이템으로 설정
+    final updatedEquippedItems = Map<String, dynamic>.from(equippedItems);
 
-    if (hasNoEquippedItems) {
-      batch.update(
-        userRef,
-        {
-          'equippedItems': {
-            'accessory':
-            'accessory_basic',
-            'clothes':
-            'clothes_basic',
-            'hat':
-            'hat_basic',
-            'shoes':
-            'shoes_basic',
-          },
-          'updatedAt':
-          FieldValue.serverTimestamp(),
-        },
-      );
+    for (final entry in defaultItems.entries) {
+      final currentItemId = updatedEquippedItems[entry.key];
+
+      if (currentItemId == null ||
+          currentItemId.toString().trim().isEmpty) {
+        updatedEquippedItems[entry.key] = entry.value;
+      }
     }
+
+    // 1차 common 세트에서는 hat 슬롯을 사용하지 않음
+    updatedEquippedItems.remove('hat');
+
+    batch.update(
+      userRef,
+      {
+        'equippedItems': updatedEquippedItems,
+        'updatedAt': FieldValue.serverTimestamp(),
+      },
+    );
 
     await batch.commit();
   }
