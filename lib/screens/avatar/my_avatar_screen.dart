@@ -15,10 +15,11 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
   final AvatarService _avatarService = AvatarService.instance;
 
   final List<String> _slots = [
-    'hat',
+    'hair',
     'clothes',
     'shoes',
     'accessory',
+    'pet',
   ];
 
   bool _isLoading = true;
@@ -27,7 +28,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
   int _level = 1;
 
   String _nickname = '사용자';
-  String _selectedSlot = 'hat';
+  String _selectedSlot = 'hair';
 
   List<AvatarItem> _items = [];
   Future<void> _openPointShop() async {
@@ -206,31 +207,37 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     });
   }
 
+  // 아바타 슬롯의 화면 표시 이름을 반환하는 메서드
   String _slotLabel(String slot) {
     switch (slot) {
-      case 'hat':
-        return '모자';
+      case 'hair':
+        return '헤어';
       case 'clothes':
-        return '상의';
+        return '의상';
       case 'shoes':
         return '신발';
       case 'accessory':
         return '소품';
+      case 'pet':
+        return '펫';
       default:
         return slot;
     }
   }
 
+  // 아바타 슬롯별 아이콘을 반환하는 메서드
   IconData _slotIcon(String slot) {
     switch (slot) {
-      case 'hat':
-        return Icons.checkroom;
+      case 'hair':
+        return Icons.face_retouching_natural;
       case 'clothes':
         return Icons.dry_cleaning;
       case 'shoes':
         return Icons.ice_skating;
       case 'accessory':
         return Icons.auto_awesome;
+      case 'pet':
+        return Icons.pets;
       default:
         return Icons.star_outline;
     }
@@ -300,6 +307,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
             level: _level,
             ownedCount: ownedCount,
             equippedCount: equippedCount,
+            items: _items,
             pinkColor: pinkColor,
             purpleColor: purpleColor,
           ),
@@ -321,7 +329,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     required int ownedCount,
     required int equippedCount,
     required Color pinkColor,
-    required Color purpleColor,
+    required Color purpleColor, required List<AvatarItem> items,
   }) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -370,8 +378,9 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
               color: Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(24),
             ),
-            child: const Center(
+            child: Center(
               child: AvatarLayeredCharacter(
+                items: _items,
                 size: 180,
               ),
             ),
