@@ -3,6 +3,12 @@ import 'package:flutter/material.dart';
 import '../../models/travel_member_model.dart';
 import '../../services/travel_member_service.dart';
 
+// 앱 공통 블루 테마 컬러
+const Color _mainColor = Color(0xFF4F7DF3);
+const Color _mainSoftColor = Color(0xFFE8EFFE);
+const Color _bgColor = Color(0xFFF8F7FA);
+const Color _errorColor = Color(0xFFE0483C);
+
 class TravelMemberScreen extends StatefulWidget {
   final String travelId;
   final String currentUserId;
@@ -73,6 +79,78 @@ class _TravelMemberScreenState
     }
   }
 
+  /// 공통 입력창 디자인 (다른 여행 화면들과 동일한 톤)
+  InputDecoration _fieldDecoration({
+    required String hintText,
+    String? labelText,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      hintStyle: const TextStyle(
+        color: Color(0xFFAAAAAA),
+        fontSize: 13,
+      ),
+      prefixIcon: const Icon(
+        Icons.person_outline_rounded,
+        color: _mainColor,
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 16,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFE6E3E7),
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: Color(0xFFE6E3E7),
+        ),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(
+          color: _mainColor,
+          width: 1.5,
+        ),
+      ),
+    );
+  }
+
+  /// 다이얼로그 취소/확정 버튼 공통 스타일
+  Widget _dialogPrimaryButton({
+    required String label,
+    required bool isSaving,
+    required VoidCallback? onPressed,
+    Color color = _mainColor,
+  }) {
+    return FilledButton(
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: isSaving
+          ? const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Colors.white,
+        ),
+      )
+          : Text(label),
+    );
+  }
+
   /// 참여자 추가 창
   Future<void> _showAddMemberDialog() async {
     final TextEditingController nameController =
@@ -135,26 +213,39 @@ class _TravelMemberScreenState
             }
 
             return AlertDialog(
-              title: const Text('여행 참여자 추가'),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                '여행 참여자 추가',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
               content: TextField(
                 controller: nameController,
                 autofocus: true,
                 enabled: !isSaving,
                 maxLength: 20,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
+                decoration: _fieldDecoration(
                   labelText: '참여자 이름',
                   hintText: '예: 민수',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(
-                    Icons.person_outline,
-                  ),
                 ),
                 onSubmitted: (_) {
                   if (!isSaving) {
                     saveMember();
                   }
                 },
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                14,
               ),
               actions: <Widget>[
                 TextButton(
@@ -165,21 +256,17 @@ class _TravelMemberScreenState
                       dialogContext,
                     ).pop();
                   },
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                    const Color(0xFF999999),
+                  ),
                   child: const Text('취소'),
                 ),
-                FilledButton(
+                _dialogPrimaryButton(
+                  label: '추가',
+                  isSaving: isSaving,
                   onPressed:
                   isSaving ? null : saveMember,
-                  child: isSaving
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text('추가'),
                 ),
               ],
             );
@@ -262,22 +349,38 @@ class _TravelMemberScreenState
             }
 
             return AlertDialog(
-              title: const Text('참여자 이름 수정'),
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: const Text(
+                '참여자 이름 수정',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
+                ),
+              ),
               content: TextField(
                 controller: nameController,
                 autofocus: true,
                 enabled: !isSaving,
                 maxLength: 20,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: '참여자 이름',
-                  border: OutlineInputBorder(),
+                decoration: _fieldDecoration(
+                  hintText: '참여자 이름',
                 ),
                 onSubmitted: (_) {
                   if (!isSaving) {
                     updateMember();
                   }
                 },
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                14,
               ),
               actions: <Widget>[
                 TextButton(
@@ -288,21 +391,17 @@ class _TravelMemberScreenState
                       dialogContext,
                     ).pop();
                   },
+                  style: TextButton.styleFrom(
+                    foregroundColor:
+                    const Color(0xFF999999),
+                  ),
                   child: const Text('취소'),
                 ),
-                FilledButton(
+                _dialogPrimaryButton(
+                  label: '수정',
+                  isSaving: isSaving,
                   onPressed:
                   isSaving ? null : updateMember,
-                  child: isSaving
-                      ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child:
-                    CircularProgressIndicator(
-                      strokeWidth: 2,
-                    ),
-                  )
-                      : const Text('수정'),
                 ),
               ],
             );
@@ -326,34 +425,56 @@ class _TravelMemberScreenState
       return;
     }
 
-    final bool? shouldDelete =
-    await showDialog<bool>(
+    final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('참여자 삭제'),
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            '참여자 삭제',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF222222),
+            ),
+          ),
           content: Text(
             '${member.displayName} 님을 '
                 '여행 참여자에서 삭제할까요?\n\n'
                 '이 참여자가 결제한 경비가 있다면 '
                 '정산 전에 결제자를 변경해야 합니다.',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF555555),
+              height: 1.5,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            14,
           ),
           actions: <Widget>[
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF999999),
+              ),
               child: const Text('취소'),
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor:
-                Theme.of(context).colorScheme.error,
-              ),
+            _dialogPrimaryButton(
+              label: '삭제',
+              isSaving: false,
+              color: _errorColor,
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
-              child: const Text('삭제'),
             ),
           ],
         );
@@ -401,9 +522,8 @@ class _TravelMemberScreenState
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: isError
-              ? Theme.of(context).colorScheme.error
-              : null,
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: isError ? _errorColor : null,
         ),
       );
   }
@@ -411,18 +531,44 @@ class _TravelMemberScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: _bgColor,
       appBar: AppBar(
-        title: const Text('여행 참여자'),
+        elevation: 0,
+        centerTitle: true,
+        backgroundColor: _bgColor,
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFF222222),
+        title: const Text(
+          '여행 참여자',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed:
         _isInitializing ? null : _showAddMemberDialog,
-        icon: const Icon(Icons.person_add_outlined),
-        label: const Text('참여자 추가'),
+        backgroundColor: _mainColor,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+        ),
+        icon: const Icon(Icons.person_add_alt_1_rounded),
+        label: const Text(
+          '참여자 추가',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
       ),
       body: _isInitializing
           ? const Center(
-        child: CircularProgressIndicator(),
+        child: CircularProgressIndicator(
+          color: _mainColor,
+        ),
       )
           : StreamBuilder<List<TravelMemberModel>>(
         stream: _memberService.watchMembers(
@@ -446,7 +592,9 @@ class _TravelMemberScreenState
               ConnectionState.waiting &&
               !snapshot.hasData) {
             return const Center(
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(
+                color: _mainColor,
+              ),
             );
           }
 
@@ -466,9 +614,9 @@ class _TravelMemberScreenState
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(
-                    16,
+                    20,
                     8,
-                    16,
+                    20,
                     100,
                   ),
                   itemCount: members.length,
@@ -476,7 +624,7 @@ class _TravelMemberScreenState
                       BuildContext context,
                       int index,
                       ) {
-                    return const SizedBox(height: 8);
+                    return const SizedBox(height: 10);
                   },
                   itemBuilder: (
                       BuildContext context,
@@ -511,6 +659,7 @@ class _TravelMemberScreenState
   }
 }
 
+/// 상단 참여자 인원 수 요약 카드
 class _MemberSummary extends StatelessWidget {
   final int memberCount;
 
@@ -520,25 +669,30 @@ class _MemberSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colorScheme =
-        Theme.of(context).colorScheme;
-
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 20,
+        vertical: 20,
+      ),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
+        color: _mainSoftColor,
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         children: <Widget>[
-          CircleAvatar(
-            backgroundColor:
-            colorScheme.primary.withValues(alpha: 0.12),
-            child: Icon(
-              Icons.groups_outlined,
-              color: colorScheme.primary,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.groups_rounded,
+              color: _mainColor,
+              size: 22,
             ),
           ),
           const SizedBox(width: 14),
@@ -549,15 +703,18 @@ class _MemberSummary extends StatelessWidget {
                 const Text(
                   '현재 여행 참여자',
                   style: TextStyle(
-                    fontSize: 13,
+                    color: Color(0xFF4C5B7A),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   '$memberCount명',
                   style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF222222),
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
@@ -569,6 +726,7 @@ class _MemberSummary extends StatelessWidget {
   }
 }
 
+/// 개별 참여자 카드
 class _MemberCard extends StatelessWidget {
   final TravelMemberModel member;
   final VoidCallback onEdit;
@@ -582,128 +740,188 @@ class _MemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme colorScheme =
-        Theme.of(context).colorScheme;
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 8,
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFFE6E3E7),
         ),
-        leading: CircleAvatar(
-          backgroundColor: member.isOwner
-              ? colorScheme.primaryContainer
-              : colorScheme.surfaceContainerHighest,
-          child: Icon(
-            member.isOwner
-                ? Icons.person
-                : Icons.person_outline,
-            color: member.isOwner
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-          ),
-        ),
-        title: Row(
-          children: <Widget>[
-            Flexible(
-              child: Text(
-                member.displayName,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: member.isOwner
+                  ? _mainSoftColor
+                  : const Color(0xFFF1F1F4),
+              shape: BoxShape.circle,
             ),
-            if (member.isOwner) ...<Widget>[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  '여행 생성자',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-        subtitle: Text(
-          member.userId.trim().isEmpty
-              ? '비회원 참여자'
-              : '회원 참여자',
-        ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (String value) {
-            if (value == 'edit') {
-              onEdit();
-            } else if (value == 'delete') {
-              onDelete?.call();
-            }
-          },
-          itemBuilder: (BuildContext context) {
-            return <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
-                value: 'edit',
-                child: Row(
+            child: Icon(
+              member.isOwner
+                  ? Icons.person_rounded
+                  : Icons.person_outline_rounded,
+              color: member.isOwner
+                  ? _mainColor
+                  : const Color(0xFF999999),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
                   children: <Widget>[
-                    Icon(Icons.edit_outlined),
-                    SizedBox(width: 12),
-                    Text('이름 수정'),
+                    Flexible(
+                      child: Text(
+                        member.displayName,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF222222),
+                        ),
+                      ),
+                    ),
+                    if (member.isOwner) ...<Widget>[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _mainSoftColor,
+                          borderRadius:
+                          BorderRadius.circular(12),
+                        ),
+                        child: const Text(
+                          '여행 생성자',
+                          style: TextStyle(
+                            color: _mainColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-              if (!member.isOwner)
+                const SizedBox(height: 3),
+                Text(
+                  member.userId.trim().isEmpty
+                      ? '비회원 참여자'
+                      : '회원 참여자',
+                  style: const TextStyle(
+                    color: Color(0xFF999999),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              color: Color(0xFF999999),
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            color: Colors.white,
+            onSelected: (String value) {
+              if (value == 'edit') {
+                onEdit();
+              } else if (value == 'delete') {
+                onDelete?.call();
+              }
+            },
+            itemBuilder: (BuildContext context) {
+              return <PopupMenuEntry<String>>[
                 const PopupMenuItem<String>(
-                  value: 'delete',
+                  value: 'edit',
                   child: Row(
                     children: <Widget>[
-                      Icon(Icons.delete_outline),
-                      SizedBox(width: 12),
-                      Text('삭제'),
+                      Icon(
+                        Icons.edit_outlined,
+                        size: 18,
+                        color: _mainColor,
+                      ),
+                      SizedBox(width: 10),
+                      Text(
+                        '이름 수정',
+                        style: TextStyle(fontSize: 13),
+                      ),
                     ],
                   ),
                 ),
-            ];
-          },
-        ),
+                if (!member.isOwner)
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: <Widget>[
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: _errorColor,
+                        ),
+                        SizedBox(width: 10),
+                        Text(
+                          '삭제',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+              ];
+            },
+          ),
+        ],
       ),
     );
   }
 }
 
+/// 참여자가 없을 때 화면
 class _EmptyMemberView extends StatelessWidget {
   const _EmptyMemberView();
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Padding(
-        padding: EdgeInsets.all(32),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.group_off_outlined,
-              size: 64,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: _mainSoftColor,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.group_off_rounded,
+                size: 32,
+                color: _mainColor,
+              ),
             ),
-            SizedBox(height: 16),
-            Text(
+            const SizedBox(height: 18),
+            const Text(
               '등록된 여행 참여자가 없습니다.',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
               ),
             ),
           ],
@@ -713,6 +931,7 @@ class _EmptyMemberView extends StatelessWidget {
   }
 }
 
+/// 참여자 목록 로딩 실패 화면
 class _ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback onRetry;
@@ -730,29 +949,60 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Icon(
-              Icons.error_outline,
-              size: 56,
-              color: Theme.of(context).colorScheme.error,
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEDEC),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.error_outline_rounded,
+                size: 28,
+                color: _errorColor,
+              ),
             ),
             const SizedBox(height: 16),
             const Text(
               '참여자 목록을 불러오지 못했습니다.',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               message,
               textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF999999),
+              ),
             ),
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
-              label: const Text('다시 시도'),
+            const SizedBox(height: 22),
+            SizedBox(
+              height: 46,
+              child: FilledButton.icon(
+                onPressed: onRetry,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _mainColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  size: 18,
+                ),
+                label: const Text(
+                  '다시 시도',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
