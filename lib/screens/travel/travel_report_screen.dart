@@ -7,6 +7,12 @@ import '../../services/travel_expense_service.dart';
 import '../../services/travel_service.dart';
 import 'travel_settlement_screen.dart';
 
+// 앱 공통 블루 테마 컬러
+const Color _mainColor = Color(0xFF4F7DF3);
+const Color _mainSoftColor = Color(0xFFE8EFFE);
+const Color _mainSofterColor = Color(0xFFF3F6FE);
+const Color _mainBorderSoftColor = Color(0xFFDCE6FC);
+
 class TravelReportScreen extends StatefulWidget {
   const TravelReportScreen({
     super.key,
@@ -410,6 +416,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             tooltip: '새로고침',
             icon: const Icon(
               Icons.refresh_rounded,
+              color: _mainColor,
             ),
           ),
         ],
@@ -422,7 +429,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     if (_isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          color: Color(0xFFE66C8E),
+          color: _mainColor,
         ),
       );
     }
@@ -436,7 +443,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     }
 
     return RefreshIndicator(
-      color: const Color(0xFFE66C8E),
+      color: _mainColor,
       onRefresh: _loadReport,
       child: ListView(
         physics:
@@ -513,7 +520,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDF2),
+        color: _mainSoftColor,
         borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
@@ -570,7 +577,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                 Text(
                   '총 $_travelDays일 여행',
                   style: const TextStyle(
-                    color: Color(0xFFE66C8E),
+                    color: _mainColor,
                     fontSize: 12,
                     fontWeight:
                     FontWeight.w700,
@@ -594,7 +601,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
     final Color progressColor =
     isOverBudget
         ? Colors.redAccent
-        : const Color(0xFFE66C8E);
+        : _mainColor;
 
     return Container(
       width: double.infinity,
@@ -641,8 +648,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                 child: _buildMoneyColumn(
                   title: '총지출',
                   amount: _totalExpenseAmount,
-                  amountColor:
-                  const Color(0xFFE66C8E),
+                  amountColor: _mainColor,
                 ),
               ),
               _buildVerticalDivider(),
@@ -747,7 +753,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           ),
         ),
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFFE66C8E),
+          backgroundColor: _mainColor,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
@@ -857,7 +863,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           Icon(
             icon,
             size: 22,
-            color: const Color(0xFFE66C8E),
+            color: _mainColor,
           ),
           const SizedBox(height: 9),
           Text(
@@ -893,10 +899,10 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF6F8),
+        color: _mainSofterColor,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFFFFDFE8),
+          color: _mainBorderSoftColor,
         ),
       ),
       child: Row(
@@ -911,7 +917,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             ),
             child: Icon(
               _getCategoryIcon(_topCategory),
-              color: const Color(0xFFE66C8E),
+              color: _mainColor,
             ),
           ),
           const SizedBox(width: 13),
@@ -947,7 +953,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
               Text(
                 '${_formatMoney(_topCategoryAmount)}원',
                 style: const TextStyle(
-                  color: Color(0xFFE66C8E),
+                  color: _mainColor,
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                 ),
@@ -1031,13 +1037,13 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           width: 38,
           height: 38,
           decoration: BoxDecoration(
-            color: const Color(0xFFFFEDF2),
+            color: _mainSoftColor,
             borderRadius: BorderRadius.circular(13),
           ),
           child: Icon(
             _getCategoryIcon(category),
             size: 19,
-            color: const Color(0xFFE66C8E),
+            color: _mainColor,
           ),
         ),
         const SizedBox(width: 12),
@@ -1084,7 +1090,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                   valueColor:
                   const AlwaysStoppedAnimation<
                       Color>(
-                    Color(0xFFE66C8E),
+                    _mainColor,
                   ),
                 ),
               ),
@@ -1160,14 +1166,14 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             width: 43,
             height: 43,
             decoration: BoxDecoration(
-              color: const Color(0xFFFFEDF2),
+              color: _mainSoftColor,
               borderRadius:
               BorderRadius.circular(14),
             ),
             child: Icon(
               _getCategoryIcon(category),
               size: 21,
-              color: const Color(0xFFE66C8E),
+              color: _mainColor,
             ),
           ),
           const SizedBox(width: 13),
@@ -1214,7 +1220,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
           Text(
             '-${_formatMoney(expense.amount)}원',
             style: const TextStyle(
-              color: Color(0xFFE66C8E),
+              color: _mainColor,
               fontSize: 13,
               fontWeight: FontWeight.w800,
             ),
@@ -1320,8 +1326,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
             ElevatedButton(
               onPressed: _loadReport,
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                const Color(0xFFE66C8E),
+                backgroundColor: _mainColor,
                 foregroundColor: Colors.white,
               ),
               child: const Text('다시 시도'),
@@ -1367,8 +1372,7 @@ class _TravelReportScreenState extends State<TravelReportScreen> {
                 Navigator.of(context).pop();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                const Color(0xFFE66C8E),
+                backgroundColor: _mainColor,
                 foregroundColor: Colors.white,
               ),
               child: const Text('돌아가기'),

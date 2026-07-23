@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:ddaenggeurang/screens/travel/travel_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -1052,7 +1053,7 @@ class _QuickActionsGrid extends StatelessWidget {
         bg: _C.blueSoft,
         fg: _C.blue,
         onTap: (context) => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const TravelModeStartScreen())),
+            .push(MaterialPageRoute(builder: (_) => const TravelListScreen())),
       ),
     ];
 

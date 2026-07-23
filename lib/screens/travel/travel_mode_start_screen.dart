@@ -47,18 +47,96 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     super.dispose();
   }
 
+  /// 앱 블루 테마를 적용한 날짜 선택 다이얼로그 공통 호출
+  Future<DateTime?> _pickDate({
+    required DateTime initialDate,
+    required DateTime firstDate,
+    required DateTime lastDate,
+    required String helpText,
+  }) {
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: helpText,
+      cancelText: '취소',
+      confirmText: '선택',
+      builder: (BuildContext context, Widget? child) {
+        // 기본 다이얼로그 레이아웃은 유지하되
+        // 색상만 앱 메인 컬러(블루)로 테마 적용
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF4F7DF3),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF222222),
+            ),
+            datePickerTheme: DatePickerThemeData(
+              headerBackgroundColor: const Color(0xFF4F7DF3),
+              headerForegroundColor: Colors.white,
+              // 선택된 날짜(오늘 포함)는 파란 배경 + 흰 글씨,
+              // 선택되지 않은 오늘 날짜는 파란 글씨로 구분
+              dayForegroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  if (states.contains(WidgetState.disabled)) {
+                    return const Color(0xFFCCCCCC);
+                  }
+                  return const Color(0xFF222222);
+                },
+              ),
+              dayBackgroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF4F7DF3);
+                  }
+                  return null;
+                },
+              ),
+              todayForegroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  return const Color(0xFF4F7DF3);
+                },
+              ),
+              todayBackgroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return const Color(0xFF4F7DF3);
+                  }
+                  return null;
+                },
+              ),
+              todayBorder: const BorderSide(
+                color: Color(0xFF4F7DF3),
+              ),
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFF4F7DF3),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+  }
+
   /// 여행 시작일 선택
   Future<void> _selectStartDate() async {
     final DateTime now = DateTime.now();
 
-    final DateTime? selectedDate = await showDatePicker(
-      context: context,
+    final DateTime? selectedDate = await _pickDate(
       initialDate: _startDate ?? now,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 5),
       helpText: '여행 시작일 선택',
-      cancelText: '취소',
-      confirmText: '선택',
     );
 
     // 날짜를 선택하지 않고 창을 닫은 경우
@@ -86,14 +164,11 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       return;
     }
 
-    final DateTime? selectedDate = await showDatePicker(
-      context: context,
+    final DateTime? selectedDate = await _pickDate(
       initialDate: _endDate ?? _startDate!,
       firstDate: _startDate!,
       lastDate: DateTime(_startDate!.year + 5),
       helpText: '여행 종료일 선택',
-      cancelText: '취소',
-      confirmText: '선택',
     );
 
     // 날짜를 선택하지 않고 창을 닫은 경우
@@ -368,12 +443,18 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
               _buildHeaderCard(),
               const SizedBox(height: 26),
 
-              _buildSectionTitle('여행 이름'),
+              _buildSectionTitle(
+                '여행 이름',
+                icon: Icons.flight_takeoff_rounded,
+              ),
               const SizedBox(height: 10),
               _buildTitleField(),
               const SizedBox(height: 24),
 
-              _buildSectionTitle('여행 기간'),
+              _buildSectionTitle(
+                '여행 기간',
+                icon: Icons.calendar_month_rounded,
+              ),
               const SizedBox(height: 10),
               _buildDateFields(),
 
@@ -382,7 +463,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
                 Text(
                   '총 $_travelDays일 여행',
                   style: const TextStyle(
-                    color: Color(0xFFE66C8E),
+                    color: Color(0xFF4F7DF3),
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
@@ -393,6 +474,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
 
               _buildSectionTitle(
                 '여행 예산',
+                icon: Icons.account_balance_wallet_rounded,
                 description: '예산은 입력하지 않아도 됩니다.',
               ),
               const SizedBox(height: 10),
@@ -411,44 +493,46 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
   }
 
   /// 화면 상단 안내 카드
+  ///
+  /// 여행 기간을 설정했는지 여부와 상관없이 항상 노출되는
+  /// 큰 제목 문구는 제거하고, 색상 배경 + 설명 문구만 표시
   Widget _buildHeaderCard() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(
         horizontal: 20,
-        vertical: 22,
+        vertical: 20,
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEDF2),
+        color: const Color(0xFFE8EFFE),
         borderRadius: BorderRadius.circular(22),
       ),
-      child: const Column(
+      child: Row(
         children: [
-          Text(
-            '✈️',
-            style: TextStyle(
-              fontSize: 42,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.flight_takeoff_rounded,
+              color: Color(0xFF4F7DF3),
+              size: 22,
             ),
           ),
-          SizedBox(height: 12),
-          Text(
-            '여행 기간을 설정해 주세요',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF222222),
-              fontSize: 17,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            '설정한 기간에 등록되는 변동 지출은\n'
-                '여행 지출로 자동 분류됩니다.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Color(0xFF777777),
-              fontSize: 12,
-              height: 1.5,
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Text(
+              '설정한 기간에 등록되는 변동 지출은\n'
+                  '여행 지출로 자동 분류됩니다.',
+              style: TextStyle(
+                color: Color(0xFF4C5B7A),
+                fontSize: 12,
+                height: 1.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -459,11 +543,18 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
   /// 입력 영역 제목
   Widget _buildSectionTitle(
       String title, {
+        required IconData icon,
         String? description,
       }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        Icon(
+          icon,
+          size: 16,
+          color: const Color(0xFF4F7DF3),
+        ),
+        const SizedBox(width: 6),
         Text(
           title,
           style: const TextStyle(
@@ -589,7 +680,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
                   const Icon(
                     Icons.calendar_month_rounded,
                     size: 18,
-                    color: Color(0xFFE66C8E),
+                    color: Color(0xFF4F7DF3),
                   ),
                   const SizedBox(width: 7),
                   Expanded(
@@ -704,7 +795,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
             value: dailyBudget != null
                 ? '${_formatMoney(dailyBudget)}원'
                 : '계산 전',
-            valueColor: const Color(0xFFE66C8E),
+            valueColor: const Color(0xFF4F7DF3),
           ),
         ],
       ),
@@ -750,9 +841,9 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
             : _saveTravel,
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: const Color(0xFFE66C8E),
+          backgroundColor: const Color(0xFF4F7DF3),
           disabledBackgroundColor:
-          const Color(0xFFF0B8C7),
+          const Color(0xFFAEC5F7),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(17),
@@ -792,7 +883,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       ),
       prefixIcon: Icon(
         prefixIcon,
-        color: const Color(0xFFE66C8E),
+        color: const Color(0xFF4F7DF3),
       ),
       suffixText: suffixText,
       suffixStyle: const TextStyle(
@@ -821,7 +912,7 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
         borderSide: const BorderSide(
-          color: Color(0xFFE66C8E),
+          color: Color(0xFF4F7DF3),
           width: 1.5,
         ),
       ),
