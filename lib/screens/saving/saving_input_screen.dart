@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/formatters.dart';
@@ -6,18 +7,6 @@ import '../../models/saving_model.dart';
 import '../../services/saving_service.dart';
 
 /// expense/income_input_screen.dart와 통일한 팔레트.
-class _C {
-  static const ink = Color(0xFF221A20);
-  static const inkSub = Color(0xFF8A8798);
-
-  static const blue = Color(0xFF4F7DF3);
-  static const blueSoft = Color(0xFFE8EFFE);
-
-  static const purple = Color(0xFF6C5CE7);
-  static const purpleSoft = Color(0xFFEDE9FE);
-
-  static const cardBorder = Color(0xFFE0E7FA);
-}
 
 class SavingInputScreen extends StatefulWidget {
   const SavingInputScreen({super.key});
@@ -166,7 +155,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _C.cardBorder, width: 1.2),
+        border: Border.all(color: AppColors.cardBorder, width: 1.2),
       ),
       child: child,
     );
@@ -180,17 +169,17 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: iconBg ?? _C.blueSoft,
+              color: iconBg ?? AppColors.utilitySoft,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor ?? _C.blue),
+            child: Icon(icon, size: 14, color: iconColor ?? AppColors.utility),
           ),
           const SizedBox(width: 8),
         ],
         Text(
           text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
       ],
     );
@@ -214,7 +203,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.blue, width: 1.6),
+        borderSide: const BorderSide(color: AppColors.utility, width: 1.6),
       ),
     );
   }
@@ -239,14 +228,14 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: _C.ink,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text('저축 / 투자 기록', style: TextStyle(fontWeight: FontWeight.w800, color: _C.ink)),
+        title: const Text('저축 / 투자 기록', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
       ),
       body: _isLoadingCategories
-          ? const Center(child: CircularProgressIndicator(color: _C.blue))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.utility))
           : SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
@@ -265,7 +254,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: _C.blue.withValues(alpha: 0.3),
+                    color: AppColors.utility.withValues(alpha: 0.3),
                     blurRadius: 24,
                     offset: const Offset(0, 12),
                   ),
@@ -319,7 +308,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
-                    hint: const Text('대분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('대분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -339,7 +328,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -370,7 +359,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                   const SizedBox(height: 10),
                   TextField(
                     controller: _accountNameController,
-                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    style: const TextStyle(fontSize: 14, color: AppColors.ink),
                     decoration: _fieldDecoration(
                       label: '계좌명 (선택)',
                       hint: '예: 국민은행 청년희망적금',
@@ -387,14 +376,14 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _sectionLabel('투자 상세 정보',
-                        icon: Icons.show_chart_rounded, iconColor: _C.purple, iconBg: _C.purpleSoft),
+                        icon: Icons.show_chart_rounded, iconColor: AppColors.saving, iconBg: AppColors.savingSoft),
                     const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _brokerageController,
-                            style: const TextStyle(fontSize: 14, color: _C.ink),
+                            style: const TextStyle(fontSize: 14, color: AppColors.ink),
                             decoration: _fieldDecoration(
                               label: '증권사명 (필수)',
                               hint: '예: 토스증권',
@@ -406,7 +395,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                           child: TextField(
                             controller: _quantityController,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                            style: const TextStyle(fontSize: 14, color: _C.ink),
+                            style: const TextStyle(fontSize: 14, color: AppColors.ink),
                             decoration: _fieldDecoration(
                               label: '매수 수량 (선택)',
                               hint: '예: 2.5',
@@ -418,7 +407,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _assetNameController,
-                      style: const TextStyle(fontSize: 14, color: _C.ink),
+                      style: const TextStyle(fontSize: 14, color: AppColors.ink),
                       decoration: _fieldDecoration(
                         label: '종목명 (필수)',
                         hint: '예: S&P500 ETF',
@@ -444,16 +433,16 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                             width: 26,
                             height: 26,
                             decoration: BoxDecoration(
-                              color: _C.blueSoft,
+                              color: AppColors.utilitySoft,
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
-                            child: const Icon(Icons.event_rounded, size: 14, color: _C.blue),
+                            child: const Icon(Icons.event_rounded, size: 14, color: AppColors.utility),
                           ),
                           const SizedBox(width: 8),
                           Text('기록일: ${_selectedDate.toLocal().toString().split(' ')[0]}',
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                         ],
                       ),
                       InkWell(
@@ -468,12 +457,12 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                               return Theme(
                                 data: Theme.of(context).copyWith(
                                   colorScheme: const ColorScheme.light(
-                                    primary: _C.blue,
+                                    primary: AppColors.utility,
                                     onPrimary: Colors.white,
-                                    onSurface: _C.ink,
+                                    onSurface: AppColors.ink,
                                   ),
                                   textButtonTheme: TextButtonThemeData(
-                                    style: TextButton.styleFrom(foregroundColor: _C.blue),
+                                    style: TextButton.styleFrom(foregroundColor: AppColors.utility),
                                   ),
                                 ),
                                 child: child!,
@@ -485,11 +474,11 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: _C.blueSoft,
+                            color: AppColors.utilitySoft,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text('날짜 변경',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.blue)),
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.utility)),
                         ),
                       ),
                     ],
@@ -497,7 +486,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _memoController,
-                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    style: const TextStyle(fontSize: 14, color: AppColors.ink),
                     decoration: _fieldDecoration(label: '메모 (선택)'),
                   ),
                 ],
@@ -510,7 +499,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
               height: 56,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.ink,
+                  backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

@@ -7,6 +7,7 @@ import '../../services/transaction_service.dart';
 import '../expense/expense_input_screen.dart';
 import '../income/income_input_screen.dart';
 import '../saving/saving_input_screen.dart';
+import '../../utils/app_colors.dart';
 
 class TransactionDetailScreen extends StatelessWidget {
   final TransactionItem item;
@@ -22,7 +23,7 @@ class TransactionDetailScreen extends StatelessWidget {
     // 금액 기호 및 색상 세팅
     final String sign = isExpense ? '-' : (isSaving ? '' : '+');
     final String amountText = '$sign${CurrencyFormatter.format(item.amount)}원';
-    final Color amountColor = isExpense ? Colors.black87 : (isSaving ? Colors.teal[600]! : Colors.blueAccent);
+    final Color amountColor = isExpense ? AppColors.ink : (isSaving ? AppColors.saving : AppColors.utility);
 
     // 상단 타이틀 세팅
     final String screenTitle = isExpense ? '지출 상세' : (isSaving ? '저축 상세' : '수입 상세');
@@ -31,19 +32,20 @@ class TransactionDetailScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.ink, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           screenTitle,
-          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+          style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold, fontSize: 18),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit, color: Colors.grey),
+            icon: const Icon(Icons.edit, color: AppColors.inkSub),
             onPressed: () async {
               Widget? targetScreen;
 
@@ -81,7 +83,7 @@ class TransactionDetailScreen extends StatelessWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            icon: const Icon(Icons.delete_outline, color: AppColors.danger),
             onPressed: () {
               _showDeleteDialog(context);
             },
@@ -99,7 +101,7 @@ class TransactionDetailScreen extends StatelessWidget {
                 children: [
                   Text(
                     item.title,
-                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                    style: const TextStyle(color: AppColors.inkSub, fontSize: 16),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -110,7 +112,7 @@ class TransactionDetailScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 40),
-            const Divider(color: Color(0xFFEEEEEE), thickness: 1),
+            const Divider(color: AppColors.divider, thickness: 1),
             const SizedBox(height: 24),
 
             // 2. 공통 정보 영역 (날짜, 메모)
@@ -147,13 +149,13 @@ class TransactionDetailScreen extends StatelessWidget {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(color: Colors.grey, fontSize: 15, fontWeight: FontWeight.w500),
+            style: const TextStyle(color: AppColors.inkSub, fontSize: 15, fontWeight: FontWeight.w500),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
+            style: const TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w600),
             textAlign: TextAlign.right,
           ),
         ),
@@ -237,10 +239,10 @@ class TransactionDetailScreen extends StatelessWidget {
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('취소', style: TextStyle(color: Colors.grey)),
+                    child: const Text('취소', style: TextStyle(color: AppColors.inkSub)),
                   ),
                   ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.saving),
                     onPressed: isSaving ? null : () async {
                       // 최종 금액 파싱
                       int? returnedAmount;
@@ -315,7 +317,7 @@ class TransactionDetailScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx), // 취소 시 다이얼로그만 닫기
-            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+            child: const Text('취소', style: TextStyle(color: AppColors.inkSub)),
           ),
           TextButton(
             onPressed: () async {
@@ -329,7 +331,7 @@ class TransactionDetailScreen extends StatelessWidget {
                 Navigator.pop(context);
               }
             },
-            child: const Text('삭제', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text('삭제', style: TextStyle(color: AppColors.danger, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

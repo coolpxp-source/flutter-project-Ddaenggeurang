@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../utils/app_colors.dart';
 import 'package:flutter/services.dart';
 import '../../models/expense_model.dart';
 import '../../services/expense_service.dart';
@@ -8,23 +9,6 @@ import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
-class _C {
-  static const bg = Color(0xFFFFF8F0);
-  static const ink = Color(0xFF221A20);
-  static const inkSub = Color(0xFF8A8798);
-
-  static const amber = Color(0xFFFFA733);
-  static const amberDeep = Color(0xFF8A5200);
-
-  static const blue = Color(0xFF4F7DF3);
-  static const blueSoft = Color(0xFFE8EFFE);
-
-  static const pink = Color(0xFFFF6F91);
-  static const pinkSoft = Color(0xFFFFE3EC);
-
-  static const expense = Color(0xFFF04438);
-  static const purple = Color(0xFF6C5CE7);
-}
 
 class ExpenseInputScreen extends StatefulWidget {
   final TransactionItem? editItem;
@@ -238,17 +222,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: iconBg ?? _C.amber.withValues(alpha: 0.15),
+              color: iconBg ?? AppColors.expense.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor ?? _C.amberDeep),
+            child: Icon(icon, size: 14, color: iconColor ?? AppColors.expenseDeep),
           ),
           const SizedBox(width: 8),
         ],
         Text(
           text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
       ],
     );
@@ -272,7 +256,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.amber, width: 1.6),
+        borderSide: const BorderSide(color: AppColors.expense, width: 1.6),
       ),
     );
   }
@@ -302,17 +286,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: _C.ink,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: Text(
           widget.editItem == null ? '지출 기록' : '지출 수정',
-          style: const TextStyle(fontWeight: FontWeight.w800, color: _C.ink),
+          style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
       ),
       body: _isLoadingCategories
-          ? const Center(child: CircularProgressIndicator(color: _C.amber))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.expense))
           : SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
@@ -385,8 +369,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 children: [
                   _sectionLabel('지출 성격',
                       icon: Icons.category_rounded,
-                      iconColor: _C.amberDeep,
-                      iconBg: _C.amber.withValues(alpha: 0.15)),
+                      iconColor: AppColors.expenseDeep,
+                      iconBg: AppColors.expense.withValues(alpha: 0.15)),
                   const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
@@ -409,12 +393,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 children: [
                   _sectionLabel('대분류',
                       icon: Icons.folder_outlined,
-                      iconColor: _C.blue,
-                      iconBg: _C.blueSoft),
+                      iconColor: AppColors.utility,
+                      iconBg: AppColors.utilitySoft),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
-                    hint: const Text('대분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('대분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -433,14 +417,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   const SizedBox(height: 20),
                   _sectionLabel('소분류',
                       icon: Icons.subdirectory_arrow_right_rounded,
-                      iconColor: _C.blue,
-                      iconBg: _C.blueSoft),
+                      iconColor: AppColors.utility,
+                      iconBg: AppColors.utilitySoft),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: childCategories.any((category) => category['id'] == _selectedCategoryId)
                         ? _selectedCategoryId
                         : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -468,8 +452,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   children: [
                     _sectionLabel('감정 태그',
                         icon: Icons.favorite_rounded,
-                        iconColor: _C.pink,
-                        iconBg: _C.pinkSoft),
+                        iconColor: AppColors.pink,
+                        iconBg: AppColors.pinkSoft),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -484,10 +468,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                               : (isSelected) {
                             setState(() => _selectedEmotion = isSelected ? tag : null);
                           },
-                          selectedColor: _C.pink,
-                          backgroundColor: _C.pinkSoft,
+                          selectedColor: AppColors.pink,
+                          backgroundColor: AppColors.pinkSoft,
                           labelStyle: TextStyle(
-                            color: selected ? Colors.white : _C.pink,
+                            color: selected ? Colors.white : AppColors.pink,
                             fontWeight: FontWeight.w700,
                             fontSize: 12.5,
                           ),
@@ -518,17 +502,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                 children: [
                   _sectionLabel('부가 기능 연결 (옵션)',
                       icon: Icons.settings_suggest_outlined,
-                      iconColor: _C.purple, // _C에 purple이 없으면 아래 참고
+                      iconColor: AppColors.purple, // _C에 purple이 없으면 아래 참고
                       iconBg: const Color(0xFFEDE9FE)),
                   const SizedBox(height: 4),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('할부 결제인가요?',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     subtitle: const Text('무이자 균등금액으로 분할 기록됩니다.',
-                        style: TextStyle(fontSize: 12, color: _C.inkSub)),
+                        style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
                     value: _isInstallment,
-                    activeColor: _C.amber,
+                    activeColor: AppColors.expense,
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E8EB),
                     trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
@@ -547,7 +531,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       child: Row(
                         children: [
                           const Text('할부 개월 수:',
-                              style: TextStyle(fontSize: 13, color: _C.inkSub)),
+                              style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
                           const SizedBox(width: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -576,14 +560,14 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('매월 반복되는 정기결제/구독인가요?',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     subtitle: _isTravel
                         ? const Text('여행 지출은 정기결제로 설정할 수 없습니다.',
-                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        style: TextStyle(fontSize: 12, color: AppColors.expenseNegative))
                         : const Text('다음 달부터 자동으로 내역이 생성됩니다.',
-                        style: TextStyle(fontSize: 12, color: _C.inkSub)),
+                        style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
                     value: _isRecurring,
-                    activeColor: _C.amber,
+                    activeColor: AppColors.expense,
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E8EB),
                     trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
@@ -600,17 +584,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: const Text('현재 진행 중인 여행 지출인가요?',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                     subtitle: _isRecurring
                         ? const Text('정기결제는 여행 지출로 설정할 수 없습니다.',
-                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        style: TextStyle(fontSize: 12, color: AppColors.expenseNegative))
                         : (_selectedNature == ExpenseNature.fixed
                         ? const Text('고정비는 여행 지출로 태깅할 수 없습니다.',
-                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        style: TextStyle(fontSize: 12, color: AppColors.expenseNegative))
                         : const Text('진행 중인 여행 예산에 포함됩니다.',
-                        style: TextStyle(fontSize: 12, color: _C.inkSub))),
+                        style: TextStyle(fontSize: 12, color: AppColors.inkSub))),
                     value: _isTravel,
-                    activeColor: _C.amber,
+                    activeColor: AppColors.expense,
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: const Color(0xFFE5E8EB),
                     trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
@@ -642,16 +626,16 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                             width: 26,
                             height: 26,
                             decoration: BoxDecoration(
-                              color: _C.blueSoft,
+                              color: AppColors.utilitySoft,
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
-                            child: const Icon(Icons.event_rounded, size: 14, color: _C.blue),
+                            child: const Icon(Icons.event_rounded, size: 14, color: AppColors.utility),
                           ),
                           const SizedBox(width: 8),
                           Text('결제일: ${_selectedDate.toLocal().toString().split(' ')[0]}',
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                         ],
                       ),
                       InkWell(
@@ -668,13 +652,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                               return Theme(
                                 data: Theme.of(context).copyWith(
                                   colorScheme: const ColorScheme.light(
-                                    primary: _C.amber,        // 선택된 날짜 배경, 상단 헤더
+                                    primary: AppColors.expense,        // 선택된 날짜 배경, 상단 헤더
                                     onPrimary: Colors.white,  // 선택된 날짜 글씨
-                                    onSurface: _C.ink,        // 기본 날짜 글씨
+                                    onSurface: AppColors.ink,        // 기본 날짜 글씨
                                   ),
                                   textButtonTheme: TextButtonThemeData(
                                     style: TextButton.styleFrom(
-                                      foregroundColor: _C.amberDeep, // Cancel/OK 버튼 글씨
+                                      foregroundColor: AppColors.expenseDeep, // Cancel/OK 버튼 글씨
                                     ),
                                   ),
                                 ),
@@ -687,12 +671,12 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: _C.blueSoft,
+                            color: AppColors.utilitySoft,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text('날짜 변경',
                               style: TextStyle(
-                                  fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.blue)),
+                                  fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.utility)),
                         ),
                       ),
                     ],
@@ -701,7 +685,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                   TextField(
                     controller: _memoController,
                     enabled: !_isSaving,
-                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    style: const TextStyle(fontSize: 14, color: AppColors.ink),
                     decoration: _fieldDecoration(label: '메모 (선택)'),
                   ),
                 ],
@@ -714,7 +698,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
               height: 56,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.ink,
+                  backgroundColor: AppColors.ink,
                   disabledBackgroundColor: const Color(0xFFE5E8EB),
                   foregroundColor: Colors.white,
                   elevation: 0,
@@ -742,10 +726,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       label: Text(label),
       selected: selected,
       onSelected: _isSaving ? null : (_) => _onNatureChanged(nature),
-      selectedColor: _C.amber,
-      backgroundColor: _C.bg,
+      selectedColor: AppColors.expense,
+      backgroundColor: AppColors.bg,
       labelStyle: TextStyle(
-        color: selected ? Colors.white : _C.amberDeep,
+        color: selected ? Colors.white : AppColors.expenseDeep,
         fontWeight: FontWeight.w700,
         fontSize: 12.5,
       ),

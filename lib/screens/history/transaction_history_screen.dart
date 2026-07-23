@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
+import '../../utils/app_colors.dart';
 import 'transaction_detail_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
@@ -112,17 +113,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.ink, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.arrow_left, color: Colors.black),
+              icon: const Icon(Icons.arrow_left, color: AppColors.ink),
               onPressed: () {
                 setState(() {
                   _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
@@ -132,10 +134,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             ),
             Text(
               '${_focusedDay.month}월',
-              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18),
+              style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold, fontSize: 18),
             ),
             IconButton(
-              icon: const Icon(Icons.arrow_right, color: Colors.black),
+              icon: const Icon(Icons.arrow_right, color: AppColors.ink),
               onPressed: () {
                 setState(() {
                   _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
@@ -156,7 +158,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             },
             child: const Text(
               '오늘',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
@@ -164,7 +166,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               _calendarFormat == CalendarFormat.week
                   ? Icons.calendar_month
                   : Icons.calendar_view_week,
-              color: Colors.black,
+              color: AppColors.ink,
             ),
             onPressed: () {
               setState(() {
@@ -175,7 +177,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.black),
+            icon: const Icon(Icons.search, color: AppColors.ink),
             onPressed: () {}, // TODO: 검색 화면 이동 연결
           ),
         ],
@@ -223,9 +225,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               setState(() => _calendarFormat = format);
             },
             calendarStyle: CalendarStyle(
-              selectedDecoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+              selectedDecoration: const BoxDecoration(color: AppColors.utility, shape: BoxShape.circle),
               todayDecoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
-              todayTextStyle: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              todayTextStyle: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
               cellMargin: const EdgeInsets.only(bottom: 20),
             ),
             calendarBuilders: CalendarBuilders(
@@ -237,7 +239,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     width: 28, // 파란 동그라미 너비
                     height: 28, // 파란 동그라미 높이
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+                    decoration: const BoxDecoration(color: AppColors.utility, shape: BoxShape.circle),
                     child: Text('${date.day}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                   ),
                 );
@@ -251,7 +253,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     height: 28,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(color: Colors.grey[300], shape: BoxShape.circle),
-                    child: Text('${date.day}', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    child: Text('${date.day}', style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold)),
                   ),
                 );
               },
@@ -270,13 +272,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       children: [
                         if (sums['income']! > 0)
                           Text('+${CurrencyFormatter.format(sums['income']!)}',
-                              style: const TextStyle(color: Colors.blue, fontSize: 9, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(color: AppColors.income, fontSize: 9, fontWeight: FontWeight.w600)),
                         if (sums['expense']! > 0)
                           Text('-${CurrencyFormatter.format(sums['expense']!)}',
-                              style: const TextStyle(color: Colors.red, fontSize: 9, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(color: AppColors.expenseNegative, fontSize: 9, fontWeight: FontWeight.w600)),
                         if (sums['saving']! > 0)
                           Text('${CurrencyFormatter.format(sums['saving']!)}',
-                              style: const TextStyle(color: Colors.teal, fontSize: 9, fontWeight: FontWeight.w600)),
+                              style: const TextStyle(color: AppColors.saving, fontSize: 9, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -292,7 +294,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : groupedData.isEmpty
-                ? const Center(child: Text('내역이 없습니다.', style: TextStyle(color: Colors.grey)))
+                ? const Center(child: Text('내역이 없습니다.', style: TextStyle(color: AppColors.inkSub)))
 
             // ListView.builder 대신 ListView를 사용
                 : ListView(
@@ -319,7 +321,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16.0),
-                        child: Text(dateString, style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.w600)),
+                        child: Text(dateString, style: const TextStyle(color: AppColors.inkSub, fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
                       ...items.map((item) => _buildTransactionItem(item)),
                     ],
@@ -349,10 +351,10 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           });
         },
         backgroundColor: Colors.grey[100],
-        selectedColor: Colors.grey[800],
+        selectedColor: AppColors.ink,
         labelStyle: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : Colors.grey[700],
+          color: isSelected ? Colors.white : AppColors.inkSub,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
@@ -379,12 +381,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     // 2. 아이콘 배경색 (완료된 저축이면 회색, 아니면 기존 색상)
     final Color iconColor = isCompletedSaving
         ? Colors.grey[400]!
-        : (isExpense ? Colors.yellow[700]! : (isSaving ? Colors.teal[400]! : Colors.blue[300]!));
+        : (isExpense ? AppColors.expense : (isSaving ? AppColors.saving : AppColors.income));
 
     // 3. 금액 글씨색 (완료된 저축이면 회색, 아니면 기존 색상)
     final Color amountColor = isCompletedSaving
-        ? Colors.grey
-        : (isExpense ? Colors.black87 : (isSaving ? Colors.teal[600]! : Colors.blueAccent));
+        ? AppColors.inkSub
+        : (isExpense ? AppColors.ink : (isSaving ? AppColors.saving : AppColors.utility));
 
     return InkWell(
       onTap: () async {
@@ -434,7 +436,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     '${item.title} ${item.subtitle != null ? '· ${item.subtitle}' : ''}',
                     style: TextStyle(
                       // 5. 완료된 저축이면 카테고리/메모 글씨도 더 연한 회색으로 변경
-                      color: isCompletedSaving ? Colors.grey[400] : Colors.grey[600],
+                      color: isCompletedSaving ? Colors.grey[400] : AppColors.inkSub,
                       fontSize: 13,
                     ),
                   ),
@@ -465,4 +467,3 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     }
   }
 }
-
