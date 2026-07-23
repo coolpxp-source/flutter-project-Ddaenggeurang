@@ -3,10 +3,28 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/expense_model.dart';
-import '../../services/category_service.dart';
 import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
+
+/// 홈 화면(_C)과 통일한 팔레트.
+class _C {
+  static const bg = Color(0xFFFFF8F0);
+  static const ink = Color(0xFF221A20);
+  static const inkSub = Color(0xFF8A8798);
+
+  static const amber = Color(0xFFFFA733);
+  static const amberDeep = Color(0xFF8A5200);
+
+  static const blue = Color(0xFF4F7DF3);
+  static const blueSoft = Color(0xFFE8EFFE);
+
+  static const pink = Color(0xFFFF6F91);
+  static const pinkSoft = Color(0xFFFFE3EC);
+
+  static const expense = Color(0xFFF04438);
+  static const purple = Color(0xFF6C5CE7);
+}
 
 class ExpenseInputScreen extends StatefulWidget {
   final TransactionItem? editItem;
@@ -197,6 +215,68 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     super.dispose();
   }
 
+  // ─────────────────────── 스타일 헬퍼 ───────────────────────
+
+  Widget _sectionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0E6D8), width: 1.2),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: iconBg ?? _C.amber.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 14, color: iconColor ?? _C.amberDeep),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? label, String? hint, String? prefixText}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixText: prefixText,
+      filled: true,
+      fillColor: Color(0xFFF7F7F9),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _C.amber, width: 1.6),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final natureFilteredCategories = _allCategories.where((category) {
@@ -219,215 +299,464 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.editItem == null ? '지출 기록' : '지출 수정')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: _C.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: Text(
+          widget.editItem == null ? '지출 기록' : '지출 수정',
+          style: const TextStyle(fontWeight: FontWeight.w800, color: _C.ink),
+        ),
+      ),
       body: _isLoadingCategories
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: _C.amber))
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _amountController,
-              enabled: !_isSaving,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyFormatter()],
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                labelText: '결제 금액',
-                prefixText: '₩ ',
-                prefixStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                border: OutlineInputBorder(),
+            // ── 결제 금액 히어로 카드 ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFFFFC168), Color(0xFFFF7A45), Color(0xFFFF5C7A)],
+                  stops: [0.0, 0.55, 1.0],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF6A66).withValues(alpha: 0.35),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '결제 금액',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _amountController,
+                    enabled: !_isSaving,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CurrencyFormatter()],
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                    cursorColor: Colors.white,
+                    decoration: const InputDecoration(
+                      prefixText: '₩ ',
+                      prefixStyle: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            const Text('1. 지출 성격', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: const Text('고정비'),
-                  selected: _selectedNature == ExpenseNature.fixed,
-                  onSelected: _isSaving ? null : (_) => _onNatureChanged(ExpenseNature.fixed),
-                ),
-                ChoiceChip(
-                  label: const Text('변동비'),
-                  selected: _selectedNature == ExpenseNature.variable,
-                  onSelected: _isSaving ? null : (_) => _onNatureChanged(ExpenseNature.variable),
-                ),
-                ChoiceChip(
-                  label: const Text('기타 (경조사 등)'),
-                  selected: _selectedNature == ExpenseNature.other,
-                  onSelected: _isSaving ? null : (_) => _onNatureChanged(ExpenseNature.other),
-                ),
-              ],
+            // ── 지출 성격 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('지출 성격',
+                      icon: Icons.category_rounded,
+                      iconColor: _C.amberDeep,
+                      iconBg: _C.amber.withValues(alpha: 0.15)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _natureChip('고정비', ExpenseNature.fixed),
+                      _natureChip('변동비', ExpenseNature.variable),
+                      _natureChip('기타 (경조사 등)', ExpenseNature.other),
+                    ],
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
 
-            const Text('2. 대분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
-              hint: const Text('대분류 선택'),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: parentCategories.map((parentName) {
-                return DropdownMenuItem<String>(value: parentName, child: Text(parentName));
-              }).toList(),
-              onChanged: _isSaving || parentCategories.isEmpty ? null : (newParent) {
-                setState(() {
-                  _selectedParentCategory = newParent;
-                  _selectedCategoryId = null;
-                });
-              },
+            // ── 대분류 / 소분류 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('대분류',
+                      icon: Icons.folder_outlined,
+                      iconColor: _C.blue,
+                      iconBg: _C.blueSoft),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
+                    hint: const Text('대분류 선택', style: TextStyle(color: _C.inkSub)),
+                    decoration: _fieldDecoration(),
+                    borderRadius: BorderRadius.circular(14),
+                    dropdownColor: Colors.white,
+                    items: parentCategories.map((parentName) {
+                      return DropdownMenuItem<String>(value: parentName, child: Text(parentName));
+                    }).toList(),
+                    onChanged: _isSaving || parentCategories.isEmpty
+                        ? null
+                        : (newParent) {
+                      setState(() {
+                        _selectedParentCategory = newParent;
+                        _selectedCategoryId = null;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _sectionLabel('소분류',
+                      icon: Icons.subdirectory_arrow_right_rounded,
+                      iconColor: _C.blue,
+                      iconBg: _C.blueSoft),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: childCategories.any((category) => category['id'] == _selectedCategoryId)
+                        ? _selectedCategoryId
+                        : null,
+                    hint: const Text('소분류 선택', style: TextStyle(color: _C.inkSub)),
+                    decoration: _fieldDecoration(),
+                    borderRadius: BorderRadius.circular(14),
+                    dropdownColor: Colors.white,
+                    items: childCategories.map((categoryData) {
+                      return DropdownMenuItem<String>(
+                        value: categoryData['id']?.toString(),
+                        child: Text(categoryData['name']?.toString() ?? '이름 없음'),
+                      );
+                    }).toList(),
+                    onChanged: _isSaving || _selectedParentCategory == null || childCategories.isEmpty
+                        ? null
+                        : (newId) {
+                      setState(() => _selectedCategoryId = newId);
+                    },
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-
-            const Text('3. 소분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-              hint: const Text('소분류 선택'),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: childCategories.map((categoryData) {
-                return DropdownMenuItem<String>(
-                  value: categoryData['id']?.toString(),
-                  child: Text(categoryData['name']?.toString() ?? '이름 없음'),
-                );
-              }).toList(),
-              onChanged: _isSaving || _selectedParentCategory == null || childCategories.isEmpty ? null : (newId) {
-                setState(() => _selectedCategoryId = newId);
-              },
-            ),
-            const SizedBox(height: 24),
 
             if (_selectedNature == ExpenseNature.variable) ...[
-              const Text('감정 태그', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: _emotionTags.map((tag) {
-                  return ChoiceChip(
-                    label: Text(tag),
-                    selected: _selectedEmotion == tag,
-                    onSelected: _isSaving ? null : (selected) {
-                      setState(() => _selectedEmotion = selected ? tag : null);
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-            ],
-
-            const Divider(thickness: 2),
-            const Text('부가 기능 연결 (옵션)', style: TextStyle(fontWeight: FontWeight.bold)),
-
-            SwitchListTile(
-              title: const Text('할부 결제인가요?'),
-              subtitle: const Text('무이자 균등금액으로 분할 기록됩니다.'),
-              value: _isInstallment,
-              onChanged: _isSaving ? null : (value) {
-                setState(() {
-                  _isInstallment = value;
-                  if (value) _isRecurring = false;
-                });
-              },
-            ),
-            if (_isInstallment)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
+              const SizedBox(height: 16),
+              _sectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('할부 개월 수:'),
-                    const SizedBox(width: 16),
-                    DropdownButton<int>(
-                      value: _installmentMonths,
-                      items: const [2, 3, 4, 5, 6, 10, 12, 24].map((value) {
-                        return DropdownMenuItem<int>(value: value, child: Text('$value개월'));
+                    _sectionLabel('감정 태그',
+                        icon: Icons.favorite_rounded,
+                        iconColor: _C.pink,
+                        iconBg: _C.pinkSoft),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _emotionTags.map((tag) {
+                        final selected = _selectedEmotion == tag;
+                        return ChoiceChip(
+                          label: Text(tag),
+                          selected: selected,
+                          onSelected: _isSaving
+                              ? null
+                              : (isSelected) {
+                            setState(() => _selectedEmotion = isSelected ? tag : null);
+                          },
+                          selectedColor: _C.pink,
+                          backgroundColor: _C.pinkSoft,
+                          labelStyle: TextStyle(
+                            color: selected ? Colors.white : _C.pink,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12.5,
+                          ),
+                          side: BorderSide.none,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide.none,
+                          ),
+                          showCheckmark: false,
+                          elevation: 0,
+                          pressElevation: 0,
+                          shadowColor: Colors.transparent,
+                          surfaceTintColor: Colors.transparent,
+                        );
                       }).toList(),
-                      onChanged: _isSaving ? null : (newValue) {
-                        if (newValue != null) setState(() => _installmentMonths = newValue);
-                      },
                     ),
                   ],
                 ),
               ),
+            ],
 
-            SwitchListTile(
-              title: const Text('매월 반복되는 정기결제/구독인가요?'),
-              subtitle: _isTravel
-                  ? const Text('여행 지출은 정기결제로 설정할 수 없습니다.', style: TextStyle(color: Colors.red))
-                  : const Text('다음 달부터 자동으로 내역이 생성됩니다.'),
-              value: _isRecurring,
-              onChanged: _isSaving || _isTravel ? null : (value) {
-                setState(() {
-                  _isRecurring = value;
-                  if (value) _isInstallment = false;
-                });
-              },
-            ),
-
-            SwitchListTile(
-              title: const Text('현재 진행 중인 여행 지출인가요?'),
-              subtitle: _isRecurring
-                  ? const Text('정기결제는 여행 지출로 설정할 수 없습니다.', style: TextStyle(color: Colors.red))
-                  : (_selectedNature == ExpenseNature.fixed
-                  ? const Text('고정비는 여행 지출로 태깅할 수 없습니다.', style: TextStyle(color: Colors.red))
-                  : const Text('진행 중인 여행 예산에 포함됩니다.')),
-              value: _isTravel,
-              onChanged: _isSaving || _isRecurring || _selectedNature == ExpenseNature.fixed ? null : (value) {
-                setState(() {
-                  _isTravel = value;
-                  if (value) _isRecurring = false;
-                });
-              },
-            ),
-
-            const Divider(thickness: 2),
             const SizedBox(height: 16),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('결제일: ${_selectedDate.toLocal().toString().split(' ')[0]}'),
-                OutlinedButton(
-                  onPressed: _isSaving ? null : () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null && mounted) setState(() => _selectedDate = picked);
-                  },
-                  child: const Text('날짜 변경'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _memoController,
-              enabled: !_isSaving,
-              decoration: const InputDecoration(labelText: '메모 (선택)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 32),
-
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
+            // ── 부가 기능 연결 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('부가 기능 연결 (옵션)',
+                      icon: Icons.settings_suggest_outlined,
+                      iconColor: _C.purple, // _C에 purple이 없으면 아래 참고
+                      iconBg: const Color(0xFFEDE9FE)),
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('할부 결제인가요?',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                    subtitle: const Text('무이자 균등금액으로 분할 기록됩니다.',
+                        style: TextStyle(fontSize: 12, color: _C.inkSub)),
+                    value: _isInstallment,
+                    activeColor: _C.amber,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFE5E8EB),
+                    trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                    onChanged: _isSaving
+                        ? null
+                        : (value) {
+                      setState(() {
+                        _isInstallment = value;
+                        if (value) _isRecurring = false;
+                      });
+                    },
+                  ),
+                  if (_isInstallment)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          const Text('할부 개월 수:',
+                              style: TextStyle(fontSize: 13, color: _C.inkSub)),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: DropdownButton<int>(
+                              value: _installmentMonths,
+                              underline: const SizedBox.shrink(),
+                              dropdownColor: Colors.white,
+                              items: const [2, 3, 4, 5, 6, 10, 12, 24].map((value) {
+                                return DropdownMenuItem<int>(value: value, child: Text('$value개월'));
+                              }).toList(),
+                              onChanged: _isSaving
+                                  ? null
+                                  : (newValue) {
+                                if (newValue != null) setState(() => _installmentMonths = newValue);
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const Divider(height: 20, color: Color(0xFFF0EDF5)),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('매월 반복되는 정기결제/구독인가요?',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                    subtitle: _isTravel
+                        ? const Text('여행 지출은 정기결제로 설정할 수 없습니다.',
+                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        : const Text('다음 달부터 자동으로 내역이 생성됩니다.',
+                        style: TextStyle(fontSize: 12, color: _C.inkSub)),
+                    value: _isRecurring,
+                    activeColor: _C.amber,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFE5E8EB),
+                    trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                    onChanged: _isSaving || _isTravel
+                        ? null
+                        : (value) {
+                      setState(() {
+                        _isRecurring = value;
+                        if (value) _isInstallment = false;
+                      });
+                    },
+                  ),
+                  const Divider(height: 20, color: Color(0xFFF0EDF5)),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('현재 진행 중인 여행 지출인가요?',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                    subtitle: _isRecurring
+                        ? const Text('정기결제는 여행 지출로 설정할 수 없습니다.',
+                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        : (_selectedNature == ExpenseNature.fixed
+                        ? const Text('고정비는 여행 지출로 태깅할 수 없습니다.',
+                        style: TextStyle(fontSize: 12, color: _C.expense))
+                        : const Text('진행 중인 여행 예산에 포함됩니다.',
+                        style: TextStyle(fontSize: 12, color: _C.inkSub))),
+                    value: _isTravel,
+                    activeColor: _C.amber,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFE5E8EB),
+                    trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                    onChanged: _isSaving || _isRecurring || _selectedNature == ExpenseNature.fixed
+                        ? null
+                        : (value) {
+                      setState(() {
+                        _isTravel = value;
+                        if (value) _isRecurring = false;
+                      });
+                    },
+                  ),
+                ],
               ),
-              onPressed: _isSaving ? null : _saveExpense,
-              child: _isSaving
-                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 16),
+
+            // ── 날짜 / 메모 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: _C.blueSoft,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.event_rounded, size: 14, color: _C.blue),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('결제일: ${_selectedDate.toLocal().toString().split(' ')[0]}',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                        ],
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: _isSaving
+                            ? null
+                            : () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: _C.amber,        // 선택된 날짜 배경, 상단 헤더
+                                    onPrimary: Colors.white,  // 선택된 날짜 글씨
+                                    onSurface: _C.ink,        // 기본 날짜 글씨
+                                  ),
+                                  textButtonTheme: TextButtonThemeData(
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: _C.amberDeep, // Cancel/OK 버튼 글씨
+                                    ),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null && mounted) setState(() => _selectedDate = picked);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _C.blueSoft,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('날짜 변경',
+                              style: TextStyle(
+                                  fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.blue)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _memoController,
+                    enabled: !_isSaving,
+                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ── 저장 버튼 ──
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.ink,
+                  disabledBackgroundColor: const Color(0xFFE5E8EB),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: _isSaving ? null : _saveExpense,
+                child: _isSaving
+                    ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                )
+                    : const Text('저장하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _natureChip(String label, ExpenseNature nature) {
+    final selected = _selectedNature == nature;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: _isSaving ? null : (_) => _onNatureChanged(nature),
+      selectedColor: _C.amber,
+      backgroundColor: _C.bg,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : _C.amberDeep,
+        fontWeight: FontWeight.w700,
+        fontSize: 12.5,
+      ),
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide.none,
+      ),
+      showCheckmark: false,
+      elevation: 0,
+      pressElevation: 0,
     );
   }
 }

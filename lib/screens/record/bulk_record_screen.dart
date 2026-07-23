@@ -2,13 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/category_model.dart' show TransactionType;
 import '../../models/expense_model.dart';
-import '../../models/income_model.dart';
-import '../../models/saving_model.dart';
 import '../../services/expense_service.dart';
 import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
 import '../../services/ai_service.dart';
 import 'parsed_record_draft.dart';
+
+/// 다른 입력 화면들과 통일한 팔레트.
+class _C {
+  static const bg = Color(0xFFF7F7F9);
+  static const ink = Color(0xFF221A20);
+  static const inkSub = Color(0xFF8A8798);
+
+  static const amber = Color(0xFFFFA733);
+  static const amberDeep = Color(0xFF8A5200);
+
+  static const cardBorder = Color(0xFFF0E6D8);
+
+  static const expenseColor = Color(0xFFF04438);
+  static const incomeColor = Color(0xFF4F7DF3);
+  static const savingColor = Color(0xFFFF9166);
+}
 
 class BulkRecordScreen extends StatefulWidget {
   const BulkRecordScreen({super.key});
@@ -196,83 +210,184 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     }
   }
 
+  // ─────────────────────── 스타일 헬퍼 ───────────────────────
+
+  Widget _sectionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _C.cardBorder, width: 1.2),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: iconBg ?? _C.amber.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 14, color: iconColor ?? _C.amberDeep),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: _C.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('한번에 기록하기'),
+        title: const Text('한번에 기록하기',
+            style: TextStyle(fontWeight: FontWeight.w800, color: _C.ink)),
         centerTitle: true,
-        elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text(
-              '밀린 지출을 한꺼번에 입력하면 AI가 정리해드려요',
-              style: TextStyle(fontSize: 13, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _textController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
-                hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                contentPadding: const EdgeInsets.all(12),
+            // ── 입력 카드 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('밀린 내역 붙여넣기',
+                      icon: Icons.auto_awesome_rounded,
+                      iconColor: _C.amberDeep,
+                      iconBg: _C.amber.withValues(alpha: 0.15)),
+                  const SizedBox(height: 4),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 34),
+                    child: Text(
+                      '밀린 지출을 한꺼번에 입력하면 AI가 정리해드려요',
+                      style: TextStyle(fontSize: 12, color: _C.inkSub),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _textController,
+                    maxLines: 4,
+                    style: const TextStyle(fontSize: 13.5, color: _C.ink),
+                    decoration: InputDecoration(
+                      hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
+                      hintStyle: const TextStyle(fontSize: 12.5, color: _C.inkSub),
+                      filled: true,
+                      fillColor: _C.bg,
+                      contentPadding: const EdgeInsets.all(14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: _C.amber, width: 1.6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      for (int i = 0; i < _attachedPhotoCount; i++) ...[
+                        _buildPhotoThumb(),
+                        const SizedBox(width: 8),
+                      ],
+                      _buildAddPhotoButton(),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                for (int i = 0; i < _attachedPhotoCount; i++) ...[
-                  _buildPhotoThumb(),
-                  const SizedBox(width: 8),
-                ],
-                _buildAddPhotoButton(),
-              ],
-            ),
             const SizedBox(height: 16),
+
+            // ── AI 분리하기 버튼 ──
             SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 54,
               child: ElevatedButton(
                 onPressed: _isParsing ? null : _onTapParse,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.ink,
+                  disabledBackgroundColor: const Color(0xFFE5E8EB),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
                 child: _isParsing
                     ? const SizedBox(
                   width: 20,
                   height: 20,
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
-                    : const Text('AI로 분리하기', style: TextStyle(color: Colors.white)),
+                    : const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.auto_awesome_rounded, size: 18, color: Colors.white),
+                    SizedBox(width: 8),
+                    Text('AI로 분리하기',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ],
+                ),
               ),
             ),
+
             if (_drafts.isNotEmpty) ...[
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('인식된 항목 ${_drafts.length}개', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const Text('틀린 부분은 눌러서 수정', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text('인식된 항목 ${_drafts.length}개',
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
+                  const Text('틀린 부분은 눌러서 수정',
+                      style: TextStyle(fontSize: 11.5, color: _C.inkSub)),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               ..._drafts.map((d) => _buildDraftRow(d)),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
-                height: 48,
+                height: 54,
                 child: ElevatedButton(
                   onPressed: _selectedCount == 0 ? null : _saveAll,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-                  child: Text('$_selectedCount개 항목 전체 저장', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _C.ink,
+                    disabledBackgroundColor: const Color(0xFFE5E8EB),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: Text('$_selectedCount개 항목 전체 저장',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Colors.white)),
                 ),
               ),
             ],
@@ -285,36 +400,38 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   Widget _buildAddPhotoButton() {
     return InkWell(
       onTap: _onTapAddPhoto,
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        width: 64,
-        height: 64,
+        width: 60,
+        height: 60,
         decoration: BoxDecoration(
-          border: Border.all(color: Colors.green, style: BorderStyle.solid),
-          borderRadius: BorderRadius.circular(10),
+          color: _C.amber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _C.amber.withValues(alpha: 0.4)),
         ),
-        child: const Icon(Icons.add, color: Colors.green),
+        child: const Icon(Icons.add_rounded, color: _C.amberDeep),
       ),
     );
   }
 
   Widget _buildPhotoThumb() {
     return Container(
-      width: 64,
-      height: 64,
+      width: 60,
+      height: 60,
       decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        color: _C.amber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
       ),
       alignment: Alignment.center,
-      child: const Text('receipt', style: TextStyle(fontSize: 11, color: Colors.green)),
+      child: const Text('receipt', style: TextStyle(fontSize: 10.5, color: _C.amberDeep)),
     );
   }
 
   Widget _buildDraftRow(ParsedRecordDraft draft) {
     final typeColor = switch (draft.type) {
-      TransactionType.expense => Colors.redAccent,
-      TransactionType.income => Colors.blueAccent,
-      TransactionType.saving => Colors.orangeAccent,
+      TransactionType.expense => _C.expenseColor,
+      TransactionType.income => _C.incomeColor,
+      TransactionType.saving => _C.savingColor,
     };
     final typeLabel = switch (draft.type) {
       TransactionType.expense => '지출',
@@ -323,36 +440,46 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     };
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE8ECF3)),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white,
+        border: Border.all(color: _C.cardBorder, width: 1.2),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
+        collapsedIconColor: _C.inkSub,
+        iconColor: _C.amberDeep,
         leading: Checkbox(
           value: draft.isSelected,
+          activeColor: _C.amber,
           onChanged: (v) => setState(() => draft.isSelected = v ?? true),
         ),
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: typeColor.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(6),
+                color: typeColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(typeLabel, style: TextStyle(fontSize: 11, color: typeColor)),
+              child: Text(typeLabel,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: typeColor)),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             // 💡 화면에 띄울 때만 memo와 categoryName을 가운데 점(·)으로 이어붙여 줍니다!
-            Expanded(child: Text('${draft.memo} · ${draft.categoryName}', overflow: TextOverflow.ellipsis)),
+            Expanded(
+                child: Text('${draft.memo} · ${draft.categoryName}',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13.5, color: _C.ink))),
           ],
         ),
-        subtitle: Text(_formatDate(draft.date), style: const TextStyle(fontSize: 12)),
-        trailing: Text('${draft.amount}원', style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Text(_formatDate(draft.date),
+            style: const TextStyle(fontSize: 11.5, color: _C.inkSub)),
+        trailing: Text('${draft.amount}원',
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
         children: [_buildDraftEditor(draft)],
       ),
     );
@@ -363,12 +490,14 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       case TransactionType.expense:
         return Wrap(
           spacing: 6,
+          runSpacing: 6,
           children: ExpenseNature.values.map((n) {
             final selected = draft.nature == n;
-            return ChoiceChip(
-              label: Text(n.label, style: const TextStyle(fontSize: 12)),
+            return _draftChip(
+              label: n.label,
               selected: selected,
-              onSelected: (_) => setState(() => draft.nature = n),
+              color: _C.expenseColor,
+              onSelected: () => setState(() => draft.nature = n),
             );
           }).toList(),
         );
@@ -381,12 +510,14 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         ];
         return Wrap(
           spacing: 6,
+          runSpacing: 6,
           children: incomeOptions.map((o) {
             final selected = draft.categoryId == o.$1;
-            return ChoiceChip(
-              label: Text(o.$2, style: const TextStyle(fontSize: 12)),
+            return _draftChip(
+              label: o.$2,
               selected: selected,
-              onSelected: (_) => setState(() => draft.categoryId = o.$1),
+              color: _C.incomeColor,
+              onSelected: () => setState(() => draft.categoryId = o.$1),
             );
           }).toList(),
         );
@@ -400,16 +531,45 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         ];
         return Wrap(
           spacing: 6,
+          runSpacing: 6,
           children: savingOptions.map((o) {
             final selected = draft.categoryId == o.$1;
-            return ChoiceChip(
-              label: Text(o.$2, style: const TextStyle(fontSize: 12)),
+            return _draftChip(
+              label: o.$2,
               selected: selected,
-              onSelected: (_) => setState(() => draft.categoryId = o.$1),
+              color: _C.savingColor,
+              onSelected: () => setState(() => draft.categoryId = o.$1),
             );
           }).toList(),
         );
     }
+  }
+
+  Widget _draftChip({
+    required String label,
+    required bool selected,
+    required Color color,
+    required VoidCallback onSelected,
+  }) {
+    return ChoiceChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: color,
+      backgroundColor: color.withValues(alpha: 0.1),
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : color,
+        fontWeight: FontWeight.w700,
+      ),
+      side: BorderSide.none,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide.none,
+      ),
+      showCheckmark: false,
+      elevation: 0,
+      pressElevation: 0,
+    );
   }
 
   String _formatDate(DateTime date) {

@@ -2,22 +2,36 @@ import 'package:flutter/material.dart';
 import '../../services/notification_history_service.dart';
 import '../../screens/notification/notification_history_screen.dart';
 
-PreferredSizeWidget buildDdaengHeader(BuildContext context, String uid, {required Color inkColor}) {
+PreferredSizeWidget buildDdaengHeader(
+    BuildContext context,
+    String uid, {
+      required Color inkColor,
+      List<Widget> extraActions = const []
+    }) {
   return AppBar(
     backgroundColor: Colors.white,
     foregroundColor: inkColor,
     elevation: 0,
     scrolledUnderElevation: 0,
     surfaceTintColor: Colors.transparent,
+    centerTitle: false,
+    titleSpacing: 0,
     title: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Image.asset('assets/images/Icon.png', width: 26, height: 26),
         const SizedBox(width: 8),
-        Text('땡그랑', style: TextStyle(fontWeight: FontWeight.w800, color: inkColor)),
+        Flexible(
+          child: Text(
+            '땡그랑',
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontWeight: FontWeight.w800, color: inkColor),
+          ),
+        ),
       ],
     ),
     actions: [
+      ...extraActions,
       IconButton(
         icon: StreamBuilder<int>(
           stream: NotificationHistoryService().watchUnreadCount(uid),

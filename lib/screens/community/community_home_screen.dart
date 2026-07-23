@@ -8,6 +8,8 @@ import 'post_detail_screen.dart';
 import 'post_write_screen.dart';
 import 'package:circular_menu/circular_menu.dart';
 import '../market/market_home_screen.dart';
+import '../../widgets/common/app_header.dart';
+import '../../widgets/common/app_drawer.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
@@ -50,11 +52,12 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
     final uid = FirebaseAuth.instance.currentUser!.uid;
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF8F9FA),
-        elevation: 0,
-        title: const Text('커뮤니티', style: TextStyle(color: Colors.black)),
-        actions: [
+      drawer: const AppDrawer(),
+      appBar: buildDdaengHeader(
+        context,
+        uid,
+        inkColor: Colors.black87,
+        extraActions: [
           if (_showMarketHint)
             GestureDetector(
               onTap: () {
@@ -93,7 +96,6 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                       ],
                     ),
                   ),
-                  // 말풍선 꼬리 (오른쪽 방향)
                   ClipPath(
                     clipper: _RightTailClipper(),
                     child: Container(width: 6, height: 12, color: _green),
@@ -112,7 +114,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
               );
             },
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
 

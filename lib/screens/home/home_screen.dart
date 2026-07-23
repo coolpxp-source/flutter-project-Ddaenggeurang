@@ -41,6 +41,11 @@ import '../budget/budget_setting_screen.dart';
 import '../psychology/psychology_test_start_screen.dart';
 import '../group/group_create_join_screen.dart';
 import '../notification/notification_history_screen.dart';
+import '../history/transaction_history_screen.dart';
+import '../subscription/subscription_list_screen.dart';
+import '../travel/travel_mode_start_screen.dart';
+import '../budget/budget_vs_expense_screen.dart';
+import '../../widgets/home/quick_add_fab.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -91,6 +96,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   NavTab _currentTab = NavTab.home;
+  bool _fabOpen = false;
 
   // 홈 대시보드는 데이터를 FutureBuilder로 한 번만 읽어오므로, 지출 입력 등
   // 다른 화면에서 돌아왔을 때 HomeRefreshService 신호를 받으면 이 값을 올려서
@@ -208,6 +214,12 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       body: _buildBody(uid),
+      floatingActionButton: _currentTab == NavTab.home
+          ? QuickAddFab(
+        isOpen: _fabOpen,
+        onToggle: () => setState(() => _fabOpen = !_fabOpen),
+      )
+          : null,
     );
   }
 
@@ -216,7 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case NavTab.home:
         return _HomeDashboard(key: ValueKey(_dashboardVersion), uid: uid);
       case NavTab.expense:
-        return const _TabPlaceholder(title: '지출');
+        return const TransactionHistoryScreen();
       case NavTab.aiConsult:
         return const AiConsultScreen();
       case NavTab.community:
@@ -798,7 +810,7 @@ class _BudgetHero extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(20),
                                 onTap: () => Navigator.of(context)
                                     .push(MaterialPageRoute(
-                                        builder: (_) => BudgetSettingScreen(userId: user.userId)))
+                                    builder: (_) => BudgetSettingScreen(userId: user.userId)))
                                     .then((_) => onBudgetChanged()),
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -806,16 +818,34 @@ class _BudgetHero extends StatelessWidget {
                                     color: Colors.white.withValues(alpha: 0.22),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: const Row(
+                                  child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.settings_outlined, size: 14, color: Colors.white),
-                                      SizedBox(width: 3),
-                                      Text('설정',
+                                      const Icon(Icons.settings_outlined, size: 14, color: Colors.white),
+                                      const SizedBox(width: 3),
+                                      const Text('예산 설정',
                                           style: TextStyle(
                                               fontSize: 11.5,
                                               fontWeight: FontWeight.w700,
                                               color: Colors.white)),
+                                      if (total == 0) ...[
+                                        const SizedBox(width: 3),
+                                        Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFFF3B30),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          alignment: Alignment.center,
+                                          child: const Text('!',
+                                              style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w900,
+                                                  color: Colors.white,
+                                                  height: 1)),
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -845,18 +875,26 @@ class _BudgetHero extends StatelessWidget {
                         ],
                       ),
                     ),
-                    CircularPercentIndicator(
-                      radius: 42,
-                      lineWidth: 9,
-                      percent: progress,
-                      animation: true,
-                      animationDuration: 700,
-                      circularStrokeCap: CircularStrokeCap.round,
-                      backgroundColor: Colors.white.withValues(alpha: 0.28),
-                      progressColor: Colors.white,
-                      center: Text('${(progress * 100).round()}%',
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                    InkWell(
+                      borderRadius: BorderRadius.circular(50),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => BudgetVsExpenseScreen(userId: user.userId),
+                        ),
+                      ),
+                      child: CircularPercentIndicator(
+                        radius: 42,
+                        lineWidth: 9,
+                        percent: progress,
+                        animation: true,
+                        animationDuration: 700,
+                        circularStrokeCap: CircularStrokeCap.round,
+                        backgroundColor: Colors.white.withValues(alpha: 0.28),
+                        progressColor: Colors.white,
+                        center: Text('${(progress * 100).round()}%',
+                            style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ),
                     ),
                   ],
                 ),
@@ -1002,7 +1040,11 @@ class _QuickActionsGrid extends StatelessWidget {
         bg: _C.pinkSoft,
         fg: _C.pink,
         onTap: (context) => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '구독/정기결제 관리'))),
+            MaterialPageRoute(
+              builder: (_) => SubscriptionListScreen(
+                userId: FirebaseAuth.instance.currentUser!.uid,
+              ),
+            )),
       ),
       _QuickActionButton(
         label: '여행관리',
@@ -1010,7 +1052,7 @@ class _QuickActionsGrid extends StatelessWidget {
         bg: _C.blueSoft,
         fg: _C.blue,
         onTap: (context) => Navigator.of(context)
-            .push(MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '여행 관리'))),
+            .push(MaterialPageRoute(builder: (_) => const TravelModeStartScreen())),
       ),
     ];
 
