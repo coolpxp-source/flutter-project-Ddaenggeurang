@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/category_model.dart' show TransactionType;
 import '../../models/expense_model.dart';
@@ -9,20 +10,6 @@ import '../../services/ai_service.dart';
 import 'parsed_record_draft.dart';
 
 /// 다른 입력 화면들과 통일한 팔레트.
-class _C {
-  static const bg = Color(0xFFF7F7F9);
-  static const ink = Color(0xFF221A20);
-  static const inkSub = Color(0xFF8A8798);
-
-  static const amber = Color(0xFFFFA733);
-  static const amberDeep = Color(0xFF8A5200);
-
-  static const cardBorder = Color(0xFFF0E6D8);
-
-  static const expenseColor = Color(0xFFF04438);
-  static const incomeColor = Color(0xFF4F7DF3);
-  static const savingColor = Color(0xFFFF9166);
-}
 
 class BulkRecordScreen extends StatefulWidget {
   const BulkRecordScreen({super.key});
@@ -219,7 +206,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _C.cardBorder, width: 1.2),
+        border: Border.all(color: AppColors.cardBorder, width: 1.2),
       ),
       child: child,
     );
@@ -233,17 +220,17 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: iconBg ?? _C.amber.withValues(alpha: 0.15),
+              color: iconBg ?? AppColors.expense.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor ?? _C.amberDeep),
+            child: Icon(icon, size: 14, color: iconColor ?? AppColors.expenseDeep),
           ),
           const SizedBox(width: 8),
         ],
         Text(
           text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
       ],
     );
@@ -255,7 +242,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: _C.ink,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
@@ -264,7 +251,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text('한번에 기록하기',
-            style: TextStyle(fontWeight: FontWeight.w800, color: _C.ink)),
+            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -279,26 +266,26 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                 children: [
                   _sectionLabel('밀린 내역 붙여넣기',
                       icon: Icons.auto_awesome_rounded,
-                      iconColor: _C.amberDeep,
-                      iconBg: _C.amber.withValues(alpha: 0.15)),
+                      iconColor: AppColors.expenseDeep,
+                      iconBg: AppColors.expense.withValues(alpha: 0.15)),
                   const SizedBox(height: 4),
                   const Padding(
                     padding: EdgeInsets.only(left: 34),
                     child: Text(
                       '밀린 지출을 한꺼번에 입력하면 AI가 정리해드려요',
-                      style: TextStyle(fontSize: 12, color: _C.inkSub),
+                      style: TextStyle(fontSize: 12, color: AppColors.inkSub),
                     ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _textController,
                     maxLines: 4,
-                    style: const TextStyle(fontSize: 13.5, color: _C.ink),
+                    style: const TextStyle(fontSize: 13.5, color: AppColors.ink),
                     decoration: InputDecoration(
                       hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
-                      hintStyle: const TextStyle(fontSize: 12.5, color: _C.inkSub),
+                      hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.inkSub),
                       filled: true,
-                      fillColor: _C.bg,
+                      fillColor: AppColors.bg,
                       contentPadding: const EdgeInsets.all(14),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -310,7 +297,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: _C.amber, width: 1.6),
+                        borderSide: const BorderSide(color: AppColors.expense, width: 1.6),
                       ),
                     ),
                   ),
@@ -336,7 +323,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
               child: ElevatedButton(
                 onPressed: _isParsing ? null : _onTapParse,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.ink,
+                  backgroundColor: AppColors.ink,
                   disabledBackgroundColor: const Color(0xFFE5E8EB),
                   foregroundColor: Colors.white,
                   elevation: 0,
@@ -366,9 +353,9 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text('인식된 항목 ${_drafts.length}개',
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
                   const Text('틀린 부분은 눌러서 수정',
-                      style: TextStyle(fontSize: 11.5, color: _C.inkSub)),
+                      style: TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
                 ],
               ),
               const SizedBox(height: 10),
@@ -380,7 +367,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                 child: ElevatedButton(
                   onPressed: _selectedCount == 0 ? null : _saveAll,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _C.ink,
+                    backgroundColor: AppColors.ink,
                     disabledBackgroundColor: const Color(0xFFE5E8EB),
                     foregroundColor: Colors.white,
                     elevation: 0,
@@ -405,11 +392,11 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         width: 60,
         height: 60,
         decoration: BoxDecoration(
-          color: _C.amber.withValues(alpha: 0.12),
+          color: AppColors.expense.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _C.amber.withValues(alpha: 0.4)),
+          border: Border.all(color: AppColors.expense.withValues(alpha: 0.4)),
         ),
-        child: const Icon(Icons.add_rounded, color: _C.amberDeep),
+        child: const Icon(Icons.add_rounded, color: AppColors.expenseDeep),
       ),
     );
   }
@@ -419,19 +406,19 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-        color: _C.amber.withValues(alpha: 0.12),
+        color: AppColors.expense.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
       ),
       alignment: Alignment.center,
-      child: const Text('receipt', style: TextStyle(fontSize: 10.5, color: _C.amberDeep)),
+      child: const Text('receipt', style: TextStyle(fontSize: 10.5, color: AppColors.expenseDeep)),
     );
   }
 
   Widget _buildDraftRow(ParsedRecordDraft draft) {
     final typeColor = switch (draft.type) {
-      TransactionType.expense => _C.expenseColor,
-      TransactionType.income => _C.incomeColor,
-      TransactionType.saving => _C.savingColor,
+      TransactionType.expense => AppColors.expense,
+      TransactionType.income => AppColors.income,
+      TransactionType.saving => AppColors.saving,
     };
     final typeLabel = switch (draft.type) {
       TransactionType.expense => '지출',
@@ -444,17 +431,17 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: _C.cardBorder, width: 1.2),
+        border: Border.all(color: AppColors.cardBorder, width: 1.2),
         borderRadius: BorderRadius.circular(14),
       ),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,
         childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-        collapsedIconColor: _C.inkSub,
-        iconColor: _C.amberDeep,
+        collapsedIconColor: AppColors.inkSub,
+        iconColor: AppColors.expenseDeep,
         leading: Checkbox(
           value: draft.isSelected,
-          activeColor: _C.amber,
+          activeColor: AppColors.expense,
           onChanged: (v) => setState(() => draft.isSelected = v ?? true),
         ),
         title: Row(
@@ -473,13 +460,13 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             Expanded(
                 child: Text('${draft.memo} · ${draft.categoryName}',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, color: _C.ink))),
+                    style: const TextStyle(fontSize: 13.5, color: AppColors.ink))),
           ],
         ),
         subtitle: Text(_formatDate(draft.date),
-            style: const TextStyle(fontSize: 11.5, color: _C.inkSub)),
+            style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
         trailing: Text('${draft.amount}원',
-            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
         children: [_buildDraftEditor(draft)],
       ),
     );
@@ -496,7 +483,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             return _draftChip(
               label: n.label,
               selected: selected,
-              color: _C.expenseColor,
+              color: AppColors.expense,
               onSelected: () => setState(() => draft.nature = n),
             );
           }).toList(),
@@ -516,7 +503,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             return _draftChip(
               label: o.$2,
               selected: selected,
-              color: _C.incomeColor,
+              color: AppColors.income,
               onSelected: () => setState(() => draft.categoryId = o.$1),
             );
           }).toList(),
@@ -537,7 +524,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
             return _draftChip(
               label: o.$2,
               selected: selected,
-              color: _C.savingColor,
+              color: AppColors.saving,
               onSelected: () => setState(() => draft.categoryId = o.$1),
             );
           }).toList(),

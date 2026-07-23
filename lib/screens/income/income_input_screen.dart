@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/app_colors.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,18 +10,6 @@ import '../../services/income_service.dart';
 import '../../models/transaction_item.dart';
 
 /// expense_input_screen.dart와 통일한 팔레트.
-class _C {
-  static const ink = Color(0xFF221A20);
-  static const inkSub = Color(0xFF8A8798);
-
-  static const blue = Color(0xFF4F7DF3);
-  static const blueSoft = Color(0xFFE8EFFE);
-
-  static const green = Color(0xFF12B76A);
-  static const greenSoft = Color(0xFFD9F1D8);
-
-  static const cardBorder = Color(0xFFD4F0E0);
-}
 
 class IncomeInputScreen extends StatefulWidget {
   final TransactionItem? editItem;
@@ -168,7 +157,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _C.cardBorder, width: 1.2),
+        border: Border.all(color: AppColors.cardBorder, width: 1.2),
       ),
       child: child,
     );
@@ -182,17 +171,17 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: iconBg ?? _C.greenSoft,
+              color: iconBg ?? AppColors.incomeSoft,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor ?? _C.green),
+            child: Icon(icon, size: 14, color: iconColor ?? AppColors.income),
           ),
           const SizedBox(width: 8),
         ],
         Text(
           text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
       ],
     );
@@ -216,7 +205,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: _C.green, width: 1.6),
+        borderSide: const BorderSide(color: AppColors.income, width: 1.6),
       ),
     );
   }
@@ -244,14 +233,14 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        foregroundColor: _C.ink,
+        foregroundColor: AppColors.ink,
         elevation: 0,
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text('수입 기록', style: TextStyle(fontWeight: FontWeight.w800, color: _C.ink)),
+        title: const Text('수입 기록', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
       ),
       body: _isLoadingCategories
-          ? const Center(child: CircularProgressIndicator(color: _C.green))
+          ? const Center(child: CircularProgressIndicator(color: AppColors.income))
           : SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
@@ -332,11 +321,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _sectionLabel('대분류',
-                      icon: Icons.folder_outlined, iconColor: _C.blue, iconBg: _C.blueSoft),
+                      icon: Icons.folder_outlined, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
-                    hint: const Text('대분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('대분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -358,11 +347,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                   ),
                   const SizedBox(height: 20),
                   _sectionLabel('소분류',
-                      icon: Icons.subdirectory_arrow_right_rounded, iconColor: _C.blue, iconBg: _C.blueSoft),
+                      icon: Icons.subdirectory_arrow_right_rounded, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: _C.inkSub)),
+                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
                     decoration: _fieldDecoration(),
                     borderRadius: BorderRadius.circular(14),
                     dropdownColor: Colors.white,
@@ -398,11 +387,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text('매달 자동으로 기록하기',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                       subtitle: const Text('매월 설정한 날짜에 자동으로 내역이 생성됩니다.',
-                          style: TextStyle(fontSize: 12, color: _C.inkSub)),
+                          style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
                       value: _isRecurring,
-                      activeColor: _C.green,
+                      activeColor: AppColors.income,
                       inactiveThumbColor: Colors.white,
                       inactiveTrackColor: const Color(0xFFE5E8EB),
                       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
@@ -411,7 +400,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     if (_isRecurring)
                       Row(
                         children: [
-                          const Text('매월 입금일:', style: TextStyle(fontSize: 13, color: _C.inkSub)),
+                          const Text('매월 입금일:', style: TextStyle(fontSize: 13, color: AppColors.inkSub)),
                           const SizedBox(width: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -453,16 +442,16 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                             width: 26,
                             height: 26,
                             decoration: BoxDecoration(
-                              color: _C.blueSoft,
+                              color: AppColors.utilitySoft,
                               shape: BoxShape.circle,
                             ),
                             alignment: Alignment.center,
-                            child: const Icon(Icons.event_rounded, size: 14, color: _C.blue),
+                            child: const Icon(Icons.event_rounded, size: 14, color: AppColors.utility),
                           ),
                           const SizedBox(width: 8),
                           Text('입금일: ${_selectedDate.toLocal().toString().split(' ')[0]}',
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                                  fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
                         ],
                       ),
                       InkWell(
@@ -477,12 +466,12 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                               return Theme(
                                 data: Theme.of(context).copyWith(
                                   colorScheme: const ColorScheme.light(
-                                    primary: _C.green,
+                                    primary: AppColors.income,
                                     onPrimary: Colors.white,
-                                    onSurface: _C.ink,
+                                    onSurface: AppColors.ink,
                                   ),
                                   textButtonTheme: TextButtonThemeData(
-                                    style: TextButton.styleFrom(foregroundColor: _C.green),
+                                    style: TextButton.styleFrom(foregroundColor: AppColors.income),
                                   ),
                                 ),
                                 child: child!,
@@ -494,11 +483,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: _C.blueSoft,
+                            color: AppColors.utilitySoft,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Text('날짜 변경',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.blue)),
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.utility)),
                         ),
                       ),
                     ],
@@ -506,7 +495,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _memoController,
-                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    style: const TextStyle(fontSize: 14, color: AppColors.ink),
                     decoration: _fieldDecoration(label: '메모 (선택)'),
                   ),
                 ],
@@ -519,7 +508,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
               height: 56,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _C.ink,
+                  backgroundColor: AppColors.ink,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
