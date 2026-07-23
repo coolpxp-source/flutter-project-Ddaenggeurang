@@ -4,6 +4,11 @@ import '../../screens/history/transaction_history_screen.dart';
 import 'drawer_menu_item.dart';
 import 'placeholder_screen.dart';
 import '../../screens/record/record_type_select_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../screens/subscription/subscription_list_screen.dart';
+import '../../screens/travel/travel_mode_start_screen.dart';
+import '../../screens/budget/budget_setting_screen.dart';
+import '../../screens/budget/budget_vs_expense_screen.dart';
 
 /// 앱 전체에서 공용으로 쓰는 사이드바.
 /// 사용법: 각 화면 Scaffold에 drawer: const AppDrawer() 한 줄만 추가.
@@ -111,17 +116,19 @@ class AppDrawer extends StatelessWidget {
             iconColor: _blue,
             iconBg: _blueSoft,
           ),
-          const DrawerMenuItem(
+          DrawerMenuItem(
             icon: Icons.autorenew,
             title: '구독/정기결제 관리',
-            destinationScreen: PlaceholderScreen(title: '구독/정기결제 관리'),
+            destinationScreen: SubscriptionListScreen(
+              userId: FirebaseAuth.instance.currentUser!.uid,
+            ),
             iconColor: _blue,
             iconBg: _blueSoft,
           ),
           const DrawerMenuItem(
             icon: Icons.flight_takeoff,
             title: '여행 관리',
-            destinationScreen: PlaceholderScreen(title: '여행 관리'),
+            destinationScreen: TravelModeStartScreen(),
             iconColor: _blue,
             iconBg: _blueSoft,
           ),
@@ -145,6 +152,24 @@ class AppDrawer extends StatelessWidget {
 
           const Divider(),
           const DrawerSectionLabel(label: '설정'),
+          DrawerMenuItem(
+            icon: Icons.account_balance_wallet_outlined,
+            title: '예산 설정',
+            destinationScreen: BudgetSettingScreen(
+              userId: FirebaseAuth.instance.currentUser!.uid,
+            ),
+            iconColor: _purple,
+            iconBg: _purpleSoft,
+          ),
+          DrawerMenuItem(
+            icon: Icons.pie_chart_outline_rounded,
+            title: '예산 대비 지출',
+            destinationScreen: BudgetVsExpenseScreen(
+              userId: FirebaseAuth.instance.currentUser!.uid,
+            ),
+            iconColor: _purple,
+            iconBg: _purpleSoft,
+          ),
           DrawerMenuItem(
             icon: Icons.category_outlined,
             title: '카테고리 관리',

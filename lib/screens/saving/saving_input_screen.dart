@@ -1,11 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/formatters.dart';
 import '../../models/saving_model.dart';
 import '../../services/saving_service.dart';
+
+/// expense/income_input_screen.dart와 통일한 팔레트.
+class _C {
+  static const ink = Color(0xFF221A20);
+  static const inkSub = Color(0xFF8A8798);
+
+  static const blue = Color(0xFF4F7DF3);
+  static const blueSoft = Color(0xFFE8EFFE);
+
+  static const purple = Color(0xFF6C5CE7);
+  static const purpleSoft = Color(0xFFEDE9FE);
+
+  static const cardBorder = Color(0xFFE0E7FA);
+}
 
 class SavingInputScreen extends StatefulWidget {
   const SavingInputScreen({super.key});
@@ -15,7 +27,7 @@ class SavingInputScreen extends StatefulWidget {
 }
 
 class _SavingInputScreenState extends State<SavingInputScreen> {
-  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _amountController = TextEditingController(text: '0');
   final TextEditingController _accountNameController = TextEditingController();
   final TextEditingController _memoController = TextEditingController();
 
@@ -145,6 +157,68 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
     }
   }
 
+  // ─────────────────────── 스타일 헬퍼 ───────────────────────
+
+  Widget _sectionCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _C.cardBorder, width: 1.2),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+    return Row(
+      children: [
+        if (icon != null) ...[
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: iconBg ?? _C.blueSoft,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 14, color: iconColor ?? _C.blue),
+          ),
+          const SizedBox(width: 8),
+        ],
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink),
+        ),
+      ],
+    );
+  }
+
+  InputDecoration _fieldDecoration({String? label, String? hint, String? prefixText}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      prefixText: prefixText,
+      filled: true,
+      fillColor: const Color(0xFFF7F7F9),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _C.blue, width: 1.6),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final List<String> parentCategories = _savingCategories
@@ -159,156 +233,291 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       return parent == _selectedParentCategory;
     }).toList();
 
+    final bool isInvestment = _selectedCategoryName == '투자' || _selectedCategoryName == '주식';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('저축 / 투자 기록')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: _C.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('저축 / 투자 기록', style: TextStyle(fontWeight: FontWeight.w800, color: _C.ink)),
+      ),
       body: _isLoadingCategories
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: _C.blue))
           : SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _amountController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyFormatter()],
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              decoration: const InputDecoration(
-                labelText: '이체 / 매수 금액',
-                prefixText: '₩ ',
-                prefixStyle: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                border: OutlineInputBorder(),
+            // ── 이체/매수 금액 히어로 카드 ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF6C93FF), Color(0xFF4F7DF3)],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: _C.blue.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 24),
-
-            const Text('1. 대분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
-              hint: const Text('대분류 선택'),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: parentCategories.map((parentName) {
-                return DropdownMenuItem<String>(value: parentName, child: Text(parentName));
-              }).toList(),
-              onChanged: parentCategories.isEmpty ? null : (newParent) {
-                setState(() {
-                  _selectedParentCategory = newParent;
-                  _selectedCategoryId = null;
-                  _selectedCategoryName = null;
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-
-            const Text('2. 소분류', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-              hint: const Text('소분류 선택'),
-              decoration: const InputDecoration(border: OutlineInputBorder()),
-              items: childCategories.map((categoryData) {
-                return DropdownMenuItem<String>(
-                  value: categoryData['id']?.toString(),
-                  child: Text(categoryData['name']?.toString() ?? '이름 없음'),
-                );
-              }).toList(),
-              onChanged: _selectedParentCategory == null || childCategories.isEmpty ? null : (newId) {
-                setState(() {
-                  _selectedCategoryId = newId;
-                  _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
-                });
-              },
-            ),
-            const SizedBox(height: 24),
-
-            const Text('3. 계좌 정보', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _accountNameController,
-              decoration: const InputDecoration(
-                labelText: '계좌명 (선택) - 예: 국민은행 청년희망적금',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            if (_selectedCategoryName == '투자' || _selectedCategoryName == '주식') ...[
-              const Divider(thickness: 2),
-              const Text('투자 상세 정보', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _brokerageController,
-                      decoration: const InputDecoration(
-                        labelText: '증권사명 (필수)',
-                        hintText: '예: 토스증권',
-                        border: OutlineInputBorder(),
-                      ),
+                  Text(
+                    '이체 / 매수 금액',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: _quantityController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: '매수 수량 (선택)',
-                        hintText: '예: 2.5',
-                        border: OutlineInputBorder(),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _amountController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [CurrencyFormatter()],
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                    cursorColor: Colors.white,
+                    decoration: const InputDecoration(
+                      prefixText: '₩ ',
+                      prefixStyle: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
                       ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _assetNameController,
-                decoration: const InputDecoration(
-                  labelText: '종목명 (필수)',
-                  hintText: '예: S&P500 ETF',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Divider(thickness: 2),
-            ],
+            ),
+            const SizedBox(height: 20),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('기록일: ${_selectedDate.toLocal().toString().split(' ')[0]}'),
-                OutlinedButton(
-                  onPressed: () async {
-                    final DateTime? picked = await showDatePicker(
-                      context: context,
-                      initialDate: _selectedDate,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) setState(() => _selectedDate = picked);
-                  },
-                  child: const Text('날짜 변경'),
-                ),
-              ],
+            // ── 대분류 / 소분류 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('대분류', icon: Icons.folder_outlined),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
+                    hint: const Text('대분류 선택', style: TextStyle(color: _C.inkSub)),
+                    decoration: _fieldDecoration(),
+                    borderRadius: BorderRadius.circular(14),
+                    dropdownColor: Colors.white,
+                    items: parentCategories.map((parentName) {
+                      return DropdownMenuItem<String>(value: parentName, child: Text(parentName));
+                    }).toList(),
+                    onChanged: parentCategories.isEmpty ? null : (newParent) {
+                      setState(() {
+                        _selectedParentCategory = newParent;
+                        _selectedCategoryId = null;
+                        _selectedCategoryName = null;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  _sectionLabel('소분류', icon: Icons.subdirectory_arrow_right_rounded),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
+                    hint: const Text('소분류 선택', style: TextStyle(color: _C.inkSub)),
+                    decoration: _fieldDecoration(),
+                    borderRadius: BorderRadius.circular(14),
+                    dropdownColor: Colors.white,
+                    items: childCategories.map((categoryData) {
+                      return DropdownMenuItem<String>(
+                        value: categoryData['id']?.toString(),
+                        child: Text(categoryData['name']?.toString() ?? '이름 없음'),
+                      );
+                    }).toList(),
+                    onChanged: _selectedParentCategory == null || childCategories.isEmpty ? null : (newId) {
+                      setState(() {
+                        _selectedCategoryId = newId;
+                        _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
+                      });
+                    },
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _memoController,
-              decoration: const InputDecoration(labelText: '메모 (선택)', border: OutlineInputBorder()),
-            ),
-            const SizedBox(height: 32),
 
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
+            // ── 계좌 정보 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('계좌 정보', icon: Icons.account_balance_outlined),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _accountNameController,
+                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    decoration: _fieldDecoration(
+                      label: '계좌명 (선택)',
+                      hint: '예: 국민은행 청년희망적금',
+                    ),
+                  ),
+                ],
               ),
-              onPressed: _saveSaving,
-              child: const Text('저장하기', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+
+            if (isInvestment) ...[
+              const SizedBox(height: 16),
+              _sectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionLabel('투자 상세 정보',
+                        icon: Icons.show_chart_rounded, iconColor: _C.purple, iconBg: _C.purpleSoft),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _brokerageController,
+                            style: const TextStyle(fontSize: 14, color: _C.ink),
+                            decoration: _fieldDecoration(
+                              label: '증권사명 (필수)',
+                              hint: '예: 토스증권',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: TextField(
+                            controller: _quantityController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            style: const TextStyle(fontSize: 14, color: _C.ink),
+                            decoration: _fieldDecoration(
+                              label: '매수 수량 (선택)',
+                              hint: '예: 2.5',
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _assetNameController,
+                      style: const TextStyle(fontSize: 14, color: _C.ink),
+                      decoration: _fieldDecoration(
+                        label: '종목명 (필수)',
+                        hint: '예: S&P500 ETF',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+
+            // ── 날짜 / 메모 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 26,
+                            height: 26,
+                            decoration: BoxDecoration(
+                              color: _C.blueSoft,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.event_rounded, size: 14, color: _C.blue),
+                          ),
+                          const SizedBox(width: 8),
+                          Text('기록일: ${_selectedDate.toLocal().toString().split(' ')[0]}',
+                              style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                        ],
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () async {
+                          final DateTime? picked = await showDatePicker(
+                            context: context,
+                            initialDate: _selectedDate,
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                            builder: (context, child) {
+                              return Theme(
+                                data: Theme.of(context).copyWith(
+                                  colorScheme: const ColorScheme.light(
+                                    primary: _C.blue,
+                                    onPrimary: Colors.white,
+                                    onSurface: _C.ink,
+                                  ),
+                                  textButtonTheme: TextButtonThemeData(
+                                    style: TextButton.styleFrom(foregroundColor: _C.blue),
+                                  ),
+                                ),
+                                child: child!,
+                              );
+                            },
+                          );
+                          if (picked != null) setState(() => _selectedDate = picked);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _C.blueSoft,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('날짜 변경',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _C.blue)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _memoController,
+                    style: const TextStyle(fontSize: 14, color: _C.ink),
+                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            // ── 저장 버튼 ──
+            SizedBox(
+              height: 56,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _C.ink,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                onPressed: _saveSaving,
+                child: const Text('저장하기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
             ),
           ],
         ),
