@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:simple_icons/simple_icons.dart';
 
@@ -6,6 +7,11 @@ import '../../models/subscription_model.dart';
 import '../../services/subscription_service.dart';
 import 'subscription_add_screen.dart';
 import 'subscription_edit_screen.dart';
+
+// 앱 공통 핑크 테마 컬러 (홈 화면 퀵메뉴에서 구독관리 = 핑크로 지정됨)
+const Color _mainColor = Color(0xFFFF6F91);
+const Color _mainSoftColor = Color(0xFFFFE3EC);
+const Color _mainBorderSoftColor = Color(0xFFFFD3E0);
 
 class SubscriptionListScreen extends StatefulWidget {
   final String userId;
@@ -30,30 +36,30 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: const Color(0xFFF8F7FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          onPressed: () => Navigator.maybePop(context),
-          icon: const Icon(Icons.chevron_left),
-        ),
+        backgroundColor: const Color(0xFFF8F7FA),
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFF222222),
         title: const Text(
           '구독/결제일 알림',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+          ),
         ),
         actions: const [
           Padding(
             padding: EdgeInsets.only(right: 16),
             child: CircleAvatar(
               radius: 17,
-              backgroundColor: Color(0xFFFFF6D8),
+              backgroundColor: _mainSoftColor,
               child: Icon(
-                Icons.notifications,
+                Icons.notifications_rounded,
                 size: 18,
-                color: Color(0xFFF1B600),
+                color: _mainColor,
               ),
             ),
           ),
@@ -63,7 +69,11 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         stream: _service.getSubscriptions(widget.userId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(
+                color: _mainColor,
+              ),
+            );
           }
 
           if (snapshot.hasError) {
@@ -84,7 +94,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           next == null ? 0 : _daysUntilPayment(next.paymentDay);
 
           return ListView(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 110),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
             children: [
               _SummaryCard(
                 totalAmount: total,
@@ -118,8 +128,9 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                     const Text(
                       '알림 설정',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF222222),
                       ),
                     ),
                     _AlertSwitch(
@@ -154,9 +165,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openAdd,
-        backgroundColor: const Color(0xFF8A63F6),
+        backgroundColor: _mainColor,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(17),
+        ),
+        child: const Icon(Icons.add_rounded),
       ),
     );
   }
@@ -224,15 +239,41 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     final result = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('구독 삭제'),
-        content: Text('${subscription.name} 구독을 삭제하시겠습니까?'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          '구독 삭제',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF222222),
+          ),
+        ),
+        content: Text(
+          '${subscription.name} 구독을 삭제하시겠습니까?',
+          style: const TextStyle(
+            fontSize: 13,
+            color: Color(0xFF555555),
+          ),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF999999),
+            ),
             child: const Text('취소'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFE0483C),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
             onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('삭제'),
           ),
@@ -251,13 +292,19 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('구독이 삭제되었습니다.')),
+        const SnackBar(
+          content: Text('구독이 삭제되었습니다.'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     } catch (e) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('구독 삭제 중 오류가 발생했습니다.\n$e')),
+        SnackBar(
+          content: Text('구독 삭제 중 오류가 발생했습니다.\n$e'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -279,26 +326,32 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF8063E9), Color(0xFFEA70BE)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFF6F91), Color(0xFFFF9AB0)],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             '이번 달 고정 구독비',
-            style: TextStyle(color: Colors.white70),
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             '${formatAmount(totalAmount)}원',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 31,
+              fontSize: 28,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -339,7 +392,7 @@ class _SummaryItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.16),
+          color: Colors.white.withOpacity(0.18),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
@@ -359,7 +412,7 @@ class _SummaryItem extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -383,13 +436,13 @@ class _PaymentAlertCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF0F4),
+        color: _mainSoftColor,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
           const CircleAvatar(
-            backgroundColor: Color(0xFFFF7A9E),
+            backgroundColor: _mainColor,
             child: Icon(
               Icons.warning_amber_rounded,
               color: Colors.white,
@@ -402,8 +455,9 @@ class _PaymentAlertCard extends StatelessWidget {
                   '${subscription.name} '
                   '${formatAmount(subscription.amount)}원 결제 예정',
               style: const TextStyle(
-                color: Color(0xFFD82959),
-                fontWeight: FontWeight.bold,
+                color: Color(0xFFC63A5C),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -438,8 +492,9 @@ class _CalendarCard extends StatelessWidget {
           Text(
             '결제 캘린더 · ${now.month}월',
             style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF222222),
             ),
           ),
           const SizedBox(height: 14),
@@ -461,11 +516,11 @@ class _CalendarCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: isToday
-                        ? const Color(0xFF29283A)
+                        ? _mainColor
                         : const Color(0xFFF6F7FA),
                     borderRadius: BorderRadius.circular(14),
                     border: paymentDays.contains(date.day) && !isToday
-                        ? Border.all(color: const Color(0xFFFF83AA))
+                        ? Border.all(color: _mainBorderSoftColor)
                         : null,
                   ),
                   child: Column(
@@ -493,7 +548,7 @@ class _CalendarCard extends StatelessWidget {
                       CircleAvatar(
                         radius: 2.5,
                         backgroundColor: paymentDays.contains(date.day)
-                            ? const Color(0xFFFF5E91)
+                            ? (isToday ? Colors.white : _mainColor)
                             : Colors.transparent,
                       ),
                     ],
@@ -537,12 +592,22 @@ class _SubscriptionSection extends StatelessWidget {
               child: Text(
                 '내 구독 목록',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF222222),
                 ),
               ),
             ),
-            TextButton(onPressed: onAdd, child: const Text('추가')),
+            TextButton(
+              onPressed: onAdd,
+              style: TextButton.styleFrom(
+                foregroundColor: _mainColor,
+              ),
+              child: const Text(
+                '추가',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
           ],
         ),
         if (subscriptions.isEmpty)
@@ -551,18 +616,47 @@ class _SubscriptionSection extends StatelessWidget {
             child: Center(
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.subscriptions_outlined,
-                    size: 42,
-                    color: Color(0xFF8A63F6),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: _mainSoftColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.subscriptions_rounded,
+                      size: 30,
+                      color: _mainColor,
+                    ),
                   ),
-                  const SizedBox(height: 10),
-                  const Text('등록된 구독이 없습니다.'),
-                  const SizedBox(height: 10),
-                  FilledButton.icon(
-                    onPressed: onAdd,
-                    icon: const Icon(Icons.add),
-                    label: const Text('구독 추가'),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '등록된 구독이 없습니다.',
+                    style: TextStyle(
+                      color: Color(0xFF555555),
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 46,
+                    child: FilledButton.icon(
+                      onPressed: onAdd,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _mainColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text(
+                        '구독 추가',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -654,13 +748,47 @@ class _SubscriptionTile extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               PopupMenuButton<String>(
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                  color: Color(0xFF999999),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                color: Colors.white,
                 onSelected: (value) {
                   if (value == 'edit') onEdit();
                   if (value == 'delete') onDelete();
                 },
                 itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'edit', child: Text('수정')),
-                  PopupMenuItem(value: 'delete', child: Text('삭제')),
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 18,
+                          color: _mainColor,
+                        ),
+                        SizedBox(width: 10),
+                        Text('수정', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Color(0xFFE0483C),
+                        ),
+                        SizedBox(width: 10),
+                        Text('삭제', style: TextStyle(fontSize: 13)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -685,7 +813,7 @@ class SubscriptionIconResolver {
 
     return const ServiceVisual(
       icon: Icons.subscriptions_rounded,
-      background: Color(0xFF8A63F6),
+      background: _mainColor,
     );
   }
 
@@ -929,18 +1057,34 @@ class _AlertSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF444444),
+              ),
+            ),
+          ),
+          Transform.scale(
+            scale: 0.85,
+            child: CupertinoSwitch(
+              value: value,
+              onChanged: onChanged,
+              activeTrackColor: _mainColor,
+              inactiveTrackColor: const Color(0xFFE3E3E8),
+              trackOutlineColor: const WidgetStatePropertyAll(
+                Colors.transparent,
+              ),
+            ),
+          ),
+        ],
       ),
-      value: value,
-      onChanged: onChanged,
-      activeColor: const Color(0xFFCE65E8),
     );
   }
 }
@@ -953,14 +1097,14 @@ class _ReportCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1ECFF),
+        color: _mainSoftColor,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: const Color(0xFFDCD0FF)),
+        border: Border.all(color: _mainBorderSoftColor),
       ),
       child: const Row(
         children: [
           CircleAvatar(
-            backgroundColor: Color(0xFF8A63F6),
+            backgroundColor: _mainColor,
             child: Icon(Icons.auto_graph_rounded, color: Colors.white),
           ),
           SizedBox(width: 12),
@@ -968,12 +1112,13 @@ class _ReportCard extends StatelessWidget {
             child: Text(
               '구독 소비 리포트\n이번 달 구독료 변화를 확인해 보세요.',
               style: TextStyle(
-                color: Color(0xFF6841D5),
-                fontWeight: FontWeight.bold,
+                color: Color(0xFFC63A5C),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
-          Icon(Icons.chevron_right, color: Color(0xFF8A63F6)),
+          Icon(Icons.chevron_right_rounded, color: _mainColor),
         ],
       ),
     );
@@ -990,15 +1135,18 @@ class _SectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(17),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(21),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFF0EDF0),
+        ),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0F1D2939),
-            blurRadius: 12,
-            offset: Offset(0, 4),
+            color: Color(0x0A000000),
+            blurRadius: 14,
+            offset: Offset(0, 5),
           ),
         ],
       ),
@@ -1022,6 +1170,10 @@ class _ErrorView extends StatelessWidget {
         child: Text(
           '구독 목록을 불러오지 못했습니다.\n$message',
           textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF555555),
+            fontSize: 13,
+          ),
         ),
       ),
     );
