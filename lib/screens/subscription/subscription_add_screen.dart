@@ -149,41 +149,67 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
       ),
     );
 
-    final selectedDate = await showDatePicker(
+    final DateTime? selectedDate = await showDatePicker(
       context: context,
       initialDate: initialDate,
       firstDate: DateTime(now.year - 1),
       lastDate: DateTime(now.year + 3),
-      locale: const Locale('ko', 'KR'),
       helpText: '매월 결제일 선택',
       cancelText: '취소',
       confirmText: '선택',
-      builder: (context, child) {
+      builder: (BuildContext context, Widget? child) {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: const ColorScheme.light(
               primary: _mainColor,
               onPrimary: Colors.white,
-              surface: Colors.white,
               onSurface: Color(0xFF222222),
             ),
             datePickerTheme: DatePickerThemeData(
-              backgroundColor: Colors.white,
               headerBackgroundColor: _mainColor,
               headerForegroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+              dayForegroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  if (states.contains(WidgetState.disabled)) {
+                    return const Color(0xFFCCCCCC);
+                  }
+                  return const Color(0xFF222222);
+                },
               ),
-              dayShape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+              dayBackgroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return _mainColor;
+                  }
+                  return null;
+                },
+              ),
+              todayForegroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return Colors.white;
+                  }
+                  return _mainColor;
+                },
+              ),
+              todayBackgroundColor: WidgetStateProperty.resolveWith(
+                    (Set<WidgetState> states) {
+                  if (states.contains(WidgetState.selected)) {
+                    return _mainColor;
+                  }
+                  return null;
+                },
+              ),
+              todayBorder: const BorderSide(
+                color: _mainColor,
               ),
             ),
-            dialogTheme: DialogThemeData(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: _mainColor,
               ),
             ),
           ),
