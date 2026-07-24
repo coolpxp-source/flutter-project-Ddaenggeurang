@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -26,8 +27,8 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
 
   final _nicknameController = TextEditingController();
 
-  String _ageGroup = '20대';
-  String _job = '학생';
+  String _ageGroup = '20대 초반';
+  String _job = '개발·데이터 엔지니어';
 
   bool _isLoadingMonthly = true;
   bool _isSaving = false;
@@ -64,14 +65,33 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
       _expenseService.getExpensesByDateRangeOnce(userId: _myId, start: start, end: end),
       _incomeService.getIncomesByDateRangeOnce(userId: _myId, start: start, end: end),
       _savingService.getTotalSavingAmount(userId: _myId, start: start, end: end),
+      _incomeService.getRecurringTemplates(_myId).first,
     ]);
 
     final expenses = results[0] as List;
     final incomes = results[1] as List;
     final totalSaving = results[2] as double;
+    final recurringTemplates = results[3] as List;
 
     final totalExpense = expenses.fold<num>(0, (sum, e) => sum + e.amount);
-    final totalIncome = incomes.fold<num>(0, (sum, i) => sum + i.amount);
+
+    // incomes에 실제로 기록된 금액 (수동 입력분)
+    final manualIncomeTotal = incomes.fold<num>(0, (sum, i) => sum + i.amount);
+
+    // 반복수입 템플릿은 매달 자동으로 incomes 문서가 생기지 않으므로,
+    // 이미 시작된 활성 템플릿 금액을 이번 달 수입으로 별도 합산
+    final activeTemplates = recurringTemplates.where(
+          (t) => t.isActive && !t.isDeleted && !t.startDate.isAfter(end),
+    );
+    final recurringIncomeTotal = activeTemplates.fold<num>(0, (sum, t) => sum + t.amount);
+
+    num totalIncome = manualIncomeTotal + recurringIncomeTotal;
+
+    // 가입 첫 달처럼 incomes/템플릿이 아직 하나도 없는 경우, users.salary를 최초 급여로 사용
+    if (totalIncome == 0) {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
+      totalIncome = (userDoc.data()?['salary'] as num?) ?? 0;
+    }
 
     if (!mounted) return;
 
@@ -152,7 +172,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
           DropdownButtonFormField<String>(
             initialValue: _ageGroup,
             decoration: _inputDecoration(hintText: '연령대 선택'),
-            items: ['10대', '20대', '30대', '40대', '50대 이상']
+            items: ['10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상']
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
             onChanged: (v) => setState(() => _ageGroup = v!),
@@ -163,7 +183,20 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
           DropdownButtonFormField<String>(
             initialValue: _job,
             decoration: _inputDecoration(hintText: '직군 선택'),
-            items: ['학생', '직장인', '자영업', '기타']
+            items: [
+              '경영·관리·인사',
+              '기획·전략·마케팅',
+              '개발·데이터 엔지니어',
+              '디자인·UI·UX',
+              '영업·고객상담',
+              '금융·재무·회계',
+              '연구개발·바이오',
+              '미디어·엔터·문화',
+              '의료·보건·복지',
+              '교육·학원·학술',
+              '서비스·식음료·유통',
+              '제조·생산·품질',
+            ]
                 .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                 .toList(),
             onChanged: (v) => setState(() => _job = v!),
