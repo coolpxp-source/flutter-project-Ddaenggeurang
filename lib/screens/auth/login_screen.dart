@@ -40,12 +40,21 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loadLastMethod() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
+    final lastEmail = prefs.getString('lastLoginEmail');
+    if (lastEmail != null && lastEmail.isNotEmpty) _emailCtrl.text = lastEmail;
     setState(() => _lastMethod = prefs.getString('lastLoginMethod'));
   }
 
   Future<void> _rememberMethod(String method) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastLoginMethod', method);
+  }
+
+  /// 로그아웃 후 재로그인 시 이메일을 다시 안 치도록, 마지막으로 로그인에
+  /// 성공한 이메일을 저장해뒀다가 다음 방문 때 입력창에 채워준다.
+  Future<void> _rememberEmail(String email) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastLoginEmail', email);
   }
 
   @override
@@ -95,10 +104,13 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailCtrl.text.trim();
     final pw = _pwCtrl.text;
     if (email.isEmpty || pw.isEmpty) {
+      final message = email.isEmpty && pw.isEmpty
+          ? '이메일과 비밀번호를 입력해주세요'
+          : email.isEmpty
+              ? '이메일을 입력해주세요'
+              : '비밀번호를 입력해주세요';
       await DdaengModal.alert(context,
-          title: '입력값을 확인해주세요',
-          message: '이메일과 비밀번호를 모두 입력해주세요',
-          type: ModalType.warning);
+          title: '입력값을 확인해주세요', message: message, type: ModalType.warning);
       return;
     }
 
@@ -107,6 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = await _auth.signInWithEmail(email, pw);
       if (user != null) {
         unawaited(_rememberMethod('email'));
+        unawaited(_rememberEmail(email));
         unawaited(LoginHistoryService().record(uid: user.uid, method: 'email'));
       }
       await _afterAuthSuccess(user);
@@ -445,7 +458,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: const Text(
-                              '통장 만들기',
+                              '회원가입하기',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
