@@ -7,6 +7,8 @@ import '../../models/expense_model.dart';
 import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+import '../../utils/korean_amount.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
 
@@ -136,24 +138,28 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   Future<void> _saveExpense() async {
     if (_isSaving) return;
     if (_amountController.text.trim().isEmpty || _selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('금액과 소분류 카테고리를 모두 선택해주세요.')));
+      await DdaengModal.alert(context,
+          title: '입력을 확인해주세요', message: '금액과 소분류 카테고리를 모두 선택해주세요.', type: ModalType.warning);
       return;
     }
     if (_selectedNature == ExpenseNature.variable && _selectedEmotion == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('변동비 지출은 감정 태그를 선택해야 합니다.')));
+      await DdaengModal.alert(context,
+          title: '입력을 확인해주세요', message: '변동비 지출은 감정 태그를 선택해야 합니다.', type: ModalType.warning);
       return;
     }
 
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인된 사용자가 없습니다.\n로그인 후 다시 시도해주세요.')));
+      await DdaengModal.alert(context,
+          title: '로그인이 필요해요', message: '로그인된 사용자가 없습니다.\n로그인 후 다시 시도해주세요.', type: ModalType.warning);
       return;
     }
 
     final amountText = _amountController.text.replaceAll(',', '').trim();
     final int? amount = int.tryParse(amountText);
     if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('올바른 지출 금액을 입력해주세요.')));
+      await DdaengModal.alert(context,
+          title: '입력을 확인해주세요', message: '올바른 지출 금액을 입력해주세요.', type: ModalType.warning);
       return;
     }
 
@@ -181,12 +187,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('지출 내역이 성공적으로 저장되었습니다.')));
+      await DdaengModal.alert(context, title: '저장 완료', message: '지출 내역이 성공적으로 저장되었습니다.', type: ModalType.success);
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (error) {
       debugPrint('지출 저장 오류: $error');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $error'), backgroundColor: Colors.red));
+      await DdaengModal.alert(context, title: '저장에 실패했어요', message: '$error', type: ModalType.danger);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -208,7 +215,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF0E6D8), width: 1.2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -334,28 +341,63 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _amountController,
-                    enabled: !_isSaving,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyFormatter()],
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                    cursorColor: Colors.white,
-                    decoration: const InputDecoration(
-                      prefixText: '₩ ',
-                      prefixStyle: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IntrinsicWidth(
+                        child: TextField(
+                          controller: _amountController,
+                          enabled: !_isSaving,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyFormatter()],
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                          cursorColor: Colors.white,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '원',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _amountController,
+                    builder: (context, value, _) {
+                      final amount =
+                          int.tryParse(value.text.replaceAll(',', '')) ?? 0;
+                      final label = koreanAmountText(amount);
+                      if (label.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -8,6 +8,8 @@ import '../../utils/formatters.dart';
 import '../../models/income_model.dart';
 import '../../services/income_service.dart';
 import '../../models/transaction_item.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+import '../../utils/korean_amount.dart';
 
 /// expense_input_screen.dart와 통일한 팔레트.
 
@@ -110,11 +112,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
 
   Future<void> _saveIncome() async {
     if (_currentAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('수입 금액을 입력해주세요!')));
+      await DdaengModal.alert(context, title: '입력을 확인해주세요', message: '수입 금액을 입력해주세요!', type: ModalType.warning);
       return;
     }
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('소분류 카테고리를 선택해주세요!')));
+      await DdaengModal.alert(context, title: '입력을 확인해주세요', message: '소분류 카테고리를 선택해주세요!', type: ModalType.warning);
       return;
     }
 
@@ -138,13 +140,14 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         await _incomeService.updateIncome(widget.editItem!.id, newIncome.toFirestore());
       }
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('수입 내역이 저장되었습니다!')));
-        Navigator.pop(context, true);
-      }
+      if (!mounted) return;
+      await DdaengModal.alert(context, title: '저장 완료', message: '수입 내역이 저장되었습니다!', type: ModalType.success);
+      if (!mounted) return;
+      Navigator.pop(context, true);
     } catch (e) {
       debugPrint('🔥 저장 에러: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+      if (!mounted) return;
+      await DdaengModal.alert(context, title: '저장에 실패했어요', message: '$e', type: ModalType.danger);
     }
   }
 
@@ -157,7 +160,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -277,28 +280,55 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _amountController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyFormatter()],
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                    cursorColor: Colors.white,
-                    decoration: const InputDecoration(
-                      prefixText: '₩ ',
-                      prefixStyle: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IntrinsicWidth(
+                        child: TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyFormatter()],
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                          cursorColor: Colors.white,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '원',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
                   ),
+                  if (_currentAmount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          koreanAmountText(_currentAmount),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ),
+                    ),
                   if (_selectedCategoryName == '프리랜서' && _currentAmount > 0) ...[
                     const SizedBox(height: 10),
                     Text(
