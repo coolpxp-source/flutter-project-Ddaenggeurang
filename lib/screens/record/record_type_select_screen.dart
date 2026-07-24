@@ -124,7 +124,7 @@ class RecordTypeSelectScreen extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           const Text(
-            '기록하고 싶은 메뉴를 선택하세요!',
+            '기록하고 싶은\n메뉴를 선택하세요!',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15.5,
