@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:simple_icons/simple_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 
 import '../../models/subscription_model.dart';
@@ -28,10 +29,57 @@ class SubscriptionListScreen extends StatefulWidget {
 
 class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   final SubscriptionService _service = SubscriptionService();
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _alertSectionKey = GlobalKey();
 
   bool _paymentAlert = true;
   bool _trialAlert = true;
   bool _annualAlert = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAlertSettings();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAlertSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      _paymentAlert =
+          prefs.getBool('subscription_payment_alert_${widget.userId}') ?? true;
+      _trialAlert =
+          prefs.getBool('subscription_trial_alert_${widget.userId}') ?? true;
+      _annualAlert =
+          prefs.getBool('subscription_annual_alert_${widget.userId}') ?? false;
+    });
+  }
+
+  Future<void> _saveAlertSetting(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('subscription_${key}_${widget.userId}', value);
+  }
+
+  void _openAlertSettings() {
+    final targetContext = _alertSectionKey.currentContext;
+
+    if (targetContext != null) {
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.12,
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,16 +98,19 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
-        actions: const [
+        actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16),
-            child: CircleAvatar(
-              radius: 17,
-              backgroundColor: _mainSoftColor,
-              child: Icon(
+            padding: const EdgeInsets.only(right: 10),
+            child: IconButton(
+              tooltip: '알림 설정으로 이동',
+              onPressed: _openAlertSettings,
+              style: IconButton.styleFrom(
+                backgroundColor: _mainSoftColor,
+                foregroundColor: _mainColor,
+              ),
+              icon: const Icon(
                 Icons.notifications_rounded,
-                size: 18,
-                color: _mainColor,
+                size: 19,
               ),
             ),
           ),
@@ -94,6 +145,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           next == null ? 0 : _daysUntilPayment(next.paymentDay);
 
           return ListView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
             children: [
               _SummaryCard(
@@ -121,40 +173,64 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              _SectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '알림 설정',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF222222),
+              KeyedSubtree(
+                key: _alertSectionKey,
+                child: _SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(
+                            Icons.notifications_active_rounded,
+                            size: 19,
+                            color: _mainColor,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '알림 설정',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF222222),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    _AlertSwitch(
-                      title: '결제 하루 전 알림',
-                      value: _paymentAlert,
-                      onChanged: (value) {
-                        setState(() => _paymentAlert = value);
-                      },
-                    ),
-                    _AlertSwitch(
-                      title: '무료 체험 종료 알림',
-                      value: _trialAlert,
-                      onChanged: (value) {
-                        setState(() => _trialAlert = value);
-                      },
-                    ),
-                    _AlertSwitch(
-                      title: '연간 결제 경고',
-                      value: _annualAlert,
-                      onChanged: (value) {
-                        setState(() => _annualAlert = value);
-                      },
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      const Text(
+                        '설정값은 사용자별로 저장됩니다.',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF999999),
+                        ),
+                      ),
+                      _AlertSwitch(
+                        title: '결제 하루 전 알림',
+                        value: _paymentAlert,
+                        onChanged: (value) {
+                          setState(() => _paymentAlert = value);
+                          _saveAlertSetting('payment_alert', value);
+                        },
+                      ),
+                      _AlertSwitch(
+                        title: '무료 체험 종료 알림',
+                        value: _trialAlert,
+                        onChanged: (value) {
+                          setState(() => _trialAlert = value);
+                          _saveAlertSetting('trial_alert', value);
+                        },
+                      ),
+                      _AlertSwitch(
+                        title: '연간 결제 경고',
+                        value: _annualAlert,
+                        onChanged: (value) {
+                          setState(() => _annualAlert = value);
+                          _saveAlertSetting('annual_alert', value);
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -236,49 +312,115 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   }
 
   Future<void> _confirmDelete(SubscriptionModel subscription) async {
-    final result = await showDialog<bool>(
+    final result = await showModalBottomSheet<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: const Text(
-          '구독 삭제',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF222222),
-          ),
-        ),
-        content: Text(
-          '${subscription.name} 구독을 삭제하시겠습니까?',
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF555555),
-          ),
-        ),
-        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF999999),
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
             ),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE0483C),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8E5E8),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFECEA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: Color(0xFFE0483C),
+                    size: 29,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '구독을 삭제할까요?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF222222),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${subscription.name} 구독 정보가 목록에서 삭제됩니다.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: Color(0xFF777777),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF666666),
+                          side: const BorderSide(color: Color(0xFFE5E2E5)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          '취소',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          backgroundColor: const Color(0xFFE0483C),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          '삭제하기',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('삭제'),
           ),
-        ],
-      ),
+        );
+      },
     );
 
     if (result != true) return;
@@ -291,21 +433,43 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('구독이 삭제되었습니다.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('${subscription.name} 구독이 삭제되었습니다.'),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF333333),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('구독 삭제 중 오류가 발생했습니다.\n$e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('구독 삭제 중 오류가 발생했습니다.\n$e'),
+            backgroundColor: const Color(0xFFE0483C),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
     }
   }
 }
@@ -467,7 +631,7 @@ class _PaymentAlertCard extends StatelessWidget {
   }
 }
 
-class _CalendarCard extends StatelessWidget {
+class _CalendarCard extends StatefulWidget {
   final List<SubscriptionModel> subscriptions;
 
   const _CalendarCard({
@@ -475,96 +639,314 @@ class _CalendarCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final paymentDays =
-    subscriptions.map((item) => item.paymentDay).toSet();
+  State<_CalendarCard> createState() => _CalendarCardState();
+}
 
-    final dates = List.generate(
-      7,
-          (index) => now.add(Duration(days: index - 2)),
-    );
+class _CalendarCardState extends State<_CalendarCard> {
+  late DateTime _focusedMonth;
+  DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _focusedMonth = DateTime(now.year, now.month);
+    _selectedDate = DateTime(now.year, now.month, now.day);
+  }
+
+  void _moveMonth(int amount) {
+    setState(() {
+      _focusedMonth = DateTime(
+        _focusedMonth.year,
+        _focusedMonth.month + amount,
+      );
+      _selectedDate = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final paymentMap = <int, List<SubscriptionModel>>{};
+
+    for (final item in widget.subscriptions) {
+      paymentMap.putIfAbsent(item.paymentDay, () => []).add(item);
+    }
+
+    final firstDay = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
+    final lastDay = DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
+    final leadingEmptyCount = firstDay.weekday % 7;
+    final totalCellCount =
+        ((leadingEmptyCount + lastDay.day + 6) ~/ 7) * 7;
+
+    final selectedItems = _selectedDate == null
+        ? const <SubscriptionModel>[]
+        : paymentMap[_selectedDate!.day] ?? const <SubscriptionModel>[];
 
     return _SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '결제 캘린더 · ${now.month}월',
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF222222),
-            ),
+          Row(
+            children: [
+              const Icon(
+                Icons.calendar_month_rounded,
+                color: _mainColor,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  '결제 캘린더',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF222222),
+                  ),
+                ),
+              ),
+              _CalendarArrowButton(
+                icon: Icons.chevron_left_rounded,
+                onTap: () => _moveMonth(-1),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                '${_focusedMonth.year}.${_focusedMonth.month.toString().padLeft(2, '0')}',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF333333),
+                ),
+              ),
+              const SizedBox(width: 5),
+              _CalendarArrowButton(
+                icon: Icons.chevron_right_rounded,
+                onTap: () => _moveMonth(1),
+              ),
+            ],
           ),
-          const SizedBox(height: 14),
-          SizedBox(
-            height: 70,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: dates.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, index) {
-                final date = dates[index];
-                final isToday =
-                    date.year == now.year &&
-                        date.month == now.month &&
-                        date.day == now.day;
+          const SizedBox(height: 16),
+          const Row(
+            children: [
+              _WeekLabel('일', Color(0xFFE65B67)),
+              _WeekLabel('월', Color(0xFF8E8E93)),
+              _WeekLabel('화', Color(0xFF8E8E93)),
+              _WeekLabel('수', Color(0xFF8E8E93)),
+              _WeekLabel('목', Color(0xFF8E8E93)),
+              _WeekLabel('금', Color(0xFF8E8E93)),
+              _WeekLabel('토', Color(0xFF4F7DF3)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: totalCellCount,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisExtent: 48,
+            ),
+            itemBuilder: (context, index) {
+              final dayNumber = index - leadingEmptyCount + 1;
 
-                return Container(
-                  width: 46,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+              if (dayNumber < 1 || dayNumber > lastDay.day) {
+                return const SizedBox.shrink();
+              }
+
+              final date = DateTime(
+                _focusedMonth.year,
+                _focusedMonth.month,
+                dayNumber,
+              );
+              final now = DateTime.now();
+              final isToday =
+                  date.year == now.year &&
+                      date.month == now.month &&
+                      date.day == now.day;
+              final isSelected =
+                  _selectedDate != null &&
+                      date.year == _selectedDate!.year &&
+                      date.month == _selectedDate!.month &&
+                      date.day == _selectedDate!.day;
+              final hasPayment = paymentMap.containsKey(dayNumber);
+
+              return GestureDetector(
+                onTap: () => setState(() => _selectedDate = date),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 170),
+                  margin: const EdgeInsets.all(3),
                   decoration: BoxDecoration(
-                    color: isToday
+                    color: isSelected
                         ? _mainColor
-                        : const Color(0xFFF6F7FA),
-                    borderRadius: BorderRadius.circular(14),
-                    border: paymentDays.contains(date.day) && !isToday
+                        : isToday
+                        ? _mainSoftColor
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(13),
+                    border: isToday && !isSelected
                         ? Border.all(color: _mainBorderSoftColor)
                         : null,
                   ),
-                  child: Column(
+                  child: Stack(
+                    alignment: Alignment.center,
                     children: [
                       Text(
-                        _weekDay(date.weekday),
+                        '$dayNumber',
                         style: TextStyle(
-                          color: isToday
-                              ? Colors.white70
-                              : const Color(0xFF9A9DA5),
-                          fontSize: 10,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${date.day}',
-                        style: TextStyle(
-                          color: isToday
+                          fontSize: 12,
+                          fontWeight:
+                          isSelected || isToday ? FontWeight.w800 : FontWeight.w600,
+                          color: isSelected
                               ? Colors.white
-                              : const Color(0xFF33353A),
-                          fontWeight: FontWeight.bold,
+                              : const Color(0xFF3A3A3A),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      CircleAvatar(
-                        radius: 2.5,
-                        backgroundColor: paymentDays.contains(date.day)
-                            ? (isToday ? Colors.white : _mainColor)
-                            : Colors.transparent,
-                      ),
+                      if (hasPayment)
+                        Positioned(
+                          bottom: 5,
+                          child: Container(
+                            width: 5,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.white : _mainColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                );
-              },
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: _selectedDate == null
+                ? const SizedBox.shrink()
+                : Container(
+              key: ValueKey(_selectedDate),
+              width: double.infinity,
+              padding: const EdgeInsets.all(13),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F7FA),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: selectedItems.isEmpty
+                  ? Text(
+                '${_selectedDate!.month}월 ${_selectedDate!.day}일에는 예정된 결제가 없어요.',
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF888888),
+                ),
+              )
+                  : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_selectedDate!.month}월 ${_selectedDate!.day}일 결제 예정',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF555555),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...selectedItems.map(
+                        (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: const BoxDecoration(
+                              color: _mainColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              item.name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${formatAmount(item.amount)}원',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: _mainColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  static String _weekDay(int weekday) {
-    const days = ['월', '화', '수', '목', '금', '토', '일'];
-    return days[weekday - 1];
+class _CalendarArrowButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CalendarArrowButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 29,
+        height: 29,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F2F5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Icon(
+          icon,
+          size: 18,
+          color: const Color(0xFF666666),
+        ),
+      ),
+    );
+  }
+}
+
+class _WeekLabel extends StatelessWidget {
+  final String text;
+  final Color color;
+
+  const _WeekLabel(this.text, this.color);
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Center(
+        child: Text(
+          text,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1094,32 +1476,82 @@ class _ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: _mainSoftColor,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: _mainBorderSoftColor),
-      ),
-      child: const Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: _mainColor,
-            child: Icon(Icons.auto_graph_rounded, color: Colors.white),
-          ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '구독 소비 리포트\n이번 달 구독료 변화를 확인해 보세요.',
-              style: TextStyle(
-                color: Color(0xFFC63A5C),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+        onTap: () => showModalBottomSheet<void>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (sheetContext) => SafeArea(
+            top: false,
+            child: Container(
+              margin: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(26),
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 4),
+                  Icon(
+                    Icons.auto_graph_rounded,
+                    size: 34,
+                    color: _mainColor,
+                  ),
+                  SizedBox(height: 14),
+                  Text(
+                    '구독 소비 리포트',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    '월별 구독료 비교 기능은 다음 업데이트에서 제공될 예정이에요.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      height: 1.45,
+                      fontSize: 13,
+                      color: Color(0xFF777777),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: _mainColor),
-        ],
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: _mainSoftColor,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: _mainBorderSoftColor),
+          ),
+          child: const Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: _mainColor,
+                child: Icon(Icons.auto_graph_rounded, color: Colors.white),
+              ),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '구독 소비 리포트\n이번 달 구독료 변화를 확인해 보세요.',
+                  style: TextStyle(
+                    color: Color(0xFFC63A5C),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded, color: _mainColor),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -511,7 +511,7 @@ class _TravelExpenseInputScreenState
         final bool selectedMemberExists =
         members.any(
               (TravelMemberModel member) =>
-          member.memberId == _selectedPayerId,
+          member.userId == _selectedPayerId,
         );
 
         if (!selectedMemberExists) {
@@ -608,13 +608,13 @@ class _TravelExpenseInputScreenState
                       children: members.map(
                             (TravelMemberModel member) {
                           final bool isSelected =
-                              member.memberId ==
+                              member.userId ==
                                   _selectedPayerId;
 
                           return ListTile(
                             onTap: () => Navigator.pop(
                               context,
-                              member.memberId,
+                              member.userId,
                             ),
                             title: Text(
                               member.displayName,
@@ -677,11 +677,11 @@ class _TravelExpenseInputScreenState
 
     final TravelMemberModel member = members.firstWhere(
           (TravelMemberModel member) =>
-      member.memberId == selectedId,
+      member.userId == selectedId,
     );
 
     setState(() {
-      _selectedPayerId = member.memberId;
+      _selectedPayerId = member.userId;
       _selectedPayerName = member.displayName;
     });
   }

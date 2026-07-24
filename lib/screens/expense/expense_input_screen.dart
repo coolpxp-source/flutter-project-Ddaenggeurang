@@ -2,11 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
-import 'package:flutter/services.dart';
 import '../../models/expense_model.dart';
 import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
 
@@ -46,17 +46,27 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
     if (widget.editItem != null) {
       final item = widget.editItem!;
-      _amountController.text = item.amount.toString();
+      // 수정 화면에서도 기존 금액을 천 단위 쉼표 형식으로 표시합니다.
+      _amountController.text = comma(item.amount);
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _selectedEmotion = item.emotionTag;
     }
+
+    // 금액이 변경될 때마다 한글 금액 표시도 갱신합니다.
+    _amountController.addListener(_refreshAmount);
 
     _loadCategoriesFromDB().then((_) {
       if (widget.editItem != null) {
         _fetchOriginalExpense(widget.editItem!.id);
       }
     });
+  }
+
+  void _refreshAmount() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _fetchOriginalExpense(String docId) async {
@@ -136,24 +146,44 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   Future<void> _saveExpense() async {
     if (_isSaving) return;
     if (_amountController.text.trim().isEmpty || _selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('금액과 소분류 카테고리를 모두 선택해주세요.')));
+      await DdaengModal.alert(
+        context,
+        title: '입력 내용을 확인해 주세요',
+        message: '금액과 소분류 카테고리를 모두 선택해 주세요.',
+        type: ModalType.warning,
+      );
       return;
     }
     if (_selectedNature == ExpenseNature.variable && _selectedEmotion == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('변동비 지출은 감정 태그를 선택해야 합니다.')));
+      await DdaengModal.alert(
+        context,
+        title: '감정 태그를 선택해 주세요',
+        message: '변동비 지출에는 감정 태그가 필요합니다.',
+        type: ModalType.warning,
+      );
       return;
     }
 
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('로그인된 사용자가 없습니다.\n로그인 후 다시 시도해주세요.')));
+      await DdaengModal.alert(
+        context,
+        title: '로그인이 필요해요',
+        message: '로그인 후 다시 시도해 주세요.',
+        type: ModalType.warning,
+      );
       return;
     }
 
-    final amountText = _amountController.text.replaceAll(',', '').trim();
-    final int? amount = int.tryParse(amountText);
-    if (amount == null || amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('올바른 지출 금액을 입력해주세요.')));
+    // 공용 함수가 쉼표가 포함된 입력값을 안전하게 숫자로 변환합니다.
+    final int amount = parseAmount(_amountController.text);
+    if (amount <= 0) {
+      await DdaengModal.alert(
+        context,
+        title: '금액을 확인해 주세요',
+        message: '0원보다 큰 지출 금액을 입력해 주세요.',
+        type: ModalType.warning,
+      );
       return;
     }
 
@@ -181,12 +211,24 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       }
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('지출 내역이 성공적으로 저장되었습니다.')));
+      await DdaengModal.alert(
+        context,
+        title: widget.editItem == null
+            ? '지출 내역을 저장했어요'
+            : '지출 내역을 수정했어요',
+        type: ModalType.success,
+      );
+      if (!mounted) return;
       Navigator.pop(context, true);
     } catch (error) {
       debugPrint('지출 저장 오류: $error');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $error'), backgroundColor: Colors.red));
+      await DdaengModal.alert(
+        context,
+        title: '지출 내역을 저장하지 못했어요',
+        message: '$error',
+        type: ModalType.danger,
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -194,6 +236,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   @override
   void dispose() {
+    _amountController.removeListener(_refreshAmount);
     _amountController.dispose();
     _memoController.dispose();
     super.dispose();
@@ -355,6 +398,18 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       border: InputBorder.none,
                       isDense: true,
                       contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // 숫자로 입력한 금액을 한글로 함께 보여 줍니다.
+                  Text(
+                    koreanAmount(
+                      parseAmount(_amountController.text),
+                    ),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.9),
                     ),
                   ),
                 ],

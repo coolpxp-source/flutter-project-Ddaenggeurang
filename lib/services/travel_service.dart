@@ -46,8 +46,8 @@ class TravelService {
         // 초대 수락 전 회원
         'pendingMemberIds': <String>[],
 
-        // 생성자 포함 최대 8명
-        'maxMembers': 8,
+        // 생성자 포함 최대 10명
+        'maxMembers': 10,
 
         'isDeleted': false,
         'deletedAt': null,
