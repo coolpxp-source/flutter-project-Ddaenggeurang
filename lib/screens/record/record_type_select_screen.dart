@@ -14,65 +14,69 @@ class RecordTypeSelectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.ink,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: AppColors.ink),
           onPressed: () => Navigator.pop(context),
         ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.black87,
       ),
-      backgroundColor: AppColors.bg,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 12),
-              _buildSpeechBubble('기록하고 싶은\n메뉴를 선택하세요!'),
-              const SizedBox(height: 16),
-              const _MascotFace(),
-              const SizedBox(height: 32),
+              _buildHeroBanner(),
+              const SizedBox(height: 24),
 
-              _RecordTypeButton(
+              _RecordTypeCard(
                 title: '지출',
                 subtitle: '고정 / 변동 / 기타',
-                color: AppColors.expense.withValues(alpha: 0.18),
-                textColor: AppColors.expenseDeep,
+                icon: Icons.storefront_rounded,
+                color: AppColors.expenseDeep,
+                iconBg: AppColors.expense.withValues(alpha: 0.15),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const ExpenseInputScreen()),
                 ),
               ),
               const SizedBox(height: 12),
-              _RecordTypeButton(
+              _RecordTypeCard(
                 title: '수입',
                 subtitle: '월급 / 용돈 / 기타',
-                color: AppColors.incomeSoft,
-                textColor: AppColors.income,
+                icon: Icons.account_balance_wallet_rounded,
+                color: AppColors.income,
+                iconBg: AppColors.incomeSoft,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const IncomeInputScreen()),
                 ),
               ),
               const SizedBox(height: 12),
-              _RecordTypeButton(
+              _RecordTypeCard(
                 title: '저축',
                 subtitle: '적금 / 예금 / 투자',
-                color: AppColors.savingSoft,
-                textColor: AppColors.saving,
+                icon: Icons.savings_rounded,
+                color: AppColors.saving,
+                iconBg: AppColors.savingSoft,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const SavingInputScreen()),
                 ),
               ),
               const SizedBox(height: 12),
-              _RecordTypeButton(
+              _RecordTypeCard(
                 title: '퉁치기 / 한번에 기록하기',
                 subtitle: '밀린 내역을 한꺼번에',
-                color: AppColors.utilitySoft,
-                textColor: AppColors.utility,
+                icon: Icons.auto_awesome_rounded,
+                color: AppColors.utility,
+                iconBg: AppColors.utilitySoft,
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const BulkRecordScreen()),
@@ -85,59 +89,71 @@ class RecordTypeSelectScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSpeechBubble(String text) {
+  // 다른 입력 화면들의 히어로 카드(그라데이션)와 통일한 안내 배너
+  Widget _buildHeroBanner() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
       decoration: BoxDecoration(
-        color: AppColors.expense.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-          color: AppColors.expenseDeep,
-          height: 1.4,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFC168), Color(0xFFFF7A45), Color(0xFFFF5C7A)],
+          stops: [0.0, 0.55, 1.0],
         ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6A66).withValues(alpha: 0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const Text('🐶', style: TextStyle(fontSize: 28)),
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            '기록하고 싶은 메뉴를 선택하세요!',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// 마스코트(강아지) 자리 — 실제 캐릭터 이미지/애니메이션으로 교체 예정
-/// TODO: assets/coach 쪽 실제 마스코트 이미지 or Lottie로 교체
-class _MascotFace extends StatelessWidget {
-  const _MascotFace();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 96,
-      height: 96,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFBC02D),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: const Text('🐶', style: TextStyle(fontSize: 48)),
-    );
-  }
-}
-
-class _RecordTypeButton extends StatelessWidget {
+/// 다른 입력 화면의 _sectionCard와 동일한 톤(흰 배경 + boxShadow)의 선택 카드
+class _RecordTypeCard extends StatelessWidget {
   final String title;
   final String subtitle;
+  final IconData icon;
   final Color color;
-  final Color textColor;
+  final Color iconBg;
   final VoidCallback onTap;
 
-  const _RecordTypeButton({
+  const _RecordTypeCard({
     required this.title,
     required this.subtitle,
+    required this.icon,
     required this.color,
-    required this.textColor,
+    required this.iconBg,
     required this.onTap,
   });
 
@@ -145,20 +161,45 @@ class _RecordTypeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 18),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
         ),
-        child: Column(
+        child: Row(
           children: [
-            Text(title,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-            const SizedBox(height: 2),
-            Text(subtitle, style: TextStyle(fontSize: 12, color: textColor.withValues(alpha: 0.75))),
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: iconBg,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 22, color: color),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(fontSize: 12, color: AppColors.inkSub),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: AppColors.inkSub.withValues(alpha: 0.5)),
           ],
         ),
       ),
