@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../services/subscription_service.dart';
 
 // 앱 공통 핑크 테마 컬러 (구독관리 도메인)
 const Color _mainColor = Color(0xFFFF6F91);
+const Color _mainSoftColor = Color(0xFFFFE3EC);
+const Color _mainBorderSoftColor = Color(0xFFFFD3E0);
 
 class SubscriptionAddScreen extends StatefulWidget {
   final String userId;
@@ -21,18 +24,30 @@ class SubscriptionAddScreen extends StatefulWidget {
 class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _nameController =
-  TextEditingController();
+  final TextEditingController _amountController = TextEditingController();
+  final TextEditingController _customServiceController = TextEditingController();
+  final SubscriptionService _subscriptionService = SubscriptionService();
 
-  final TextEditingController _amountController =
-  TextEditingController();
+  static const List<String> _serviceOptions = [
+    '넷플릭스',
+    '티빙',
+    '디즈니+',
+    '웨이브',
+    '왓챠',
+    '쿠팡플레이',
+    '유튜브 프리미엄',
+    '스포티파이',
+    '멜론 뮤직',
+    '지니 뮤직',
+    'Apple Music',
+    '쿠팡 와우',
+    '네이버 플러스 멤버십',
+    'ChatGPT Plus',
+    '기타(직접 입력)',
+  ];
 
-  final TextEditingController _paymentDayController =
-  TextEditingController();
-
-  final SubscriptionService _subscriptionService =
-  SubscriptionService();
-
+  String? _selectedService;
+  int? _selectedPaymentDay;
   bool _isSaving = false;
 
   /// 입력한 구독 정보를 Firestore에 저장
@@ -41,20 +56,15 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
       return;
     }
 
-    final String name =
-    _nameController.text.trim();
-
+    final String? name = _selectedService == '기타(직접 입력)'
+        ? _customServiceController.text.trim()
+        : _selectedService;
     final int? amount = int.tryParse(
-      _amountController.text
-          .replaceAll(',', '')
-          .trim(),
+      _amountController.text.replaceAll(',', '').trim(),
     );
+    final int? paymentDay = _selectedPaymentDay;
 
-    final int? paymentDay = int.tryParse(
-      _paymentDayController.text.trim(),
-    );
-
-    if (amount == null || paymentDay == null) {
+    if (name == null || amount == null || paymentDay == null) {
       return;
     }
 
@@ -74,28 +84,51 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('구독이 저장되었습니다.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '$name · ${_formatAmount(amount)}원 · 매월 $paymentDay일',
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF333333),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
 
-      // 저장 성공 후 목록 화면으로 돌아감
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '구독 저장 중 오류가 발생했습니다.\n$e',
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '구독 저장 중 오류가 발생했습니다.\n$e',
+            ),
+            backgroundColor: const Color(0xFFE0483C),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            margin: const EdgeInsets.all(16),
           ),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -105,20 +138,84 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
     }
   }
 
+  Future<void> _selectPaymentDay() async {
+    final now = DateTime.now();
+    final initialDate = DateTime(
+      now.year,
+      now.month,
+      (_selectedPaymentDay ?? now.day).clamp(
+        1,
+        DateTime(now.year, now.month + 1, 0).day,
+      ),
+    );
+
+    final selectedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year + 3),
+      locale: const Locale('ko', 'KR'),
+      helpText: '매월 결제일 선택',
+      cancelText: '취소',
+      confirmText: '선택',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _mainColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF222222),
+            ),
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: Colors.white,
+              headerBackgroundColor: _mainColor,
+              headerForegroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              dayShape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            dialogTheme: DialogThemeData(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (selectedDate == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedPaymentDay = selectedDate.day;
+    });
+
+    _formKey.currentState?.validate();
+  }
+
+
   @override
   void dispose() {
-    _nameController.dispose();
     _amountController.dispose();
-    _paymentDayController.dispose();
-
+    _customServiceController.dispose();
     super.dispose();
   }
 
-  /// 공통 입력창 디자인 (다른 화면들과 동일한 톤)
   InputDecoration _inputDecoration({
     required String hintText,
     required IconData prefixIcon,
     String? suffixText,
+    Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hintText,
@@ -131,6 +228,7 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
         color: _mainColor,
       ),
       suffixText: suffixText,
+      suffixIcon: suffixIcon,
       suffixStyle: const TextStyle(
         color: Color(0xFF555555),
         fontSize: 13,
@@ -140,7 +238,7 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(
         horizontal: 16,
-        vertical: 16,
+        vertical: 17,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -177,7 +275,6 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
     );
   }
 
-  /// 입력 영역 제목 (아이콘 + 텍스트)
   Widget _buildSectionTitle(
       String title, {
         required IconData icon,
@@ -235,8 +332,9 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
                   vertical: 20,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFE3EC),
+                  color: _mainSoftColor,
                   borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: _mainBorderSoftColor),
                 ),
                 child: Row(
                   children: [
@@ -269,34 +367,78 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
                 ),
               ),
               const SizedBox(height: 26),
-
               _buildSectionTitle(
                 '구독 서비스명',
                 icon: Icons.subscriptions_rounded,
               ),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _nameController,
-                textInputAction: TextInputAction.next,
+              DropdownButtonFormField<String>(
+                value: _selectedService,
+                isExpanded: true,
+                menuMaxHeight: 330,
                 decoration: _inputDecoration(
-                  hintText: '예: 넷플릭스',
+                  hintText: '구독 서비스를 선택하세요',
                   prefixIcon: Icons.subscriptions_rounded,
                 ),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  color: _mainColor,
+                ),
+                items: _serviceOptions
+                    .map(
+                      (service) => DropdownMenuItem<String>(
+                    value: service,
+                    child: Text(
+                      service,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                  ),
+                )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _selectedService = value;
+                    if (value != '기타(직접 입력)') {
+                      _customServiceController.clear();
+                    }
+                  });
+                },
                 validator: (value) {
-                  if (value == null ||
-                      value.trim().isEmpty) {
-                    return '구독 서비스명을 입력하세요.';
+                  if (value == null || value.isEmpty) {
+                    return '구독 서비스를 선택하세요.';
                   }
-
-                  if (value.trim().length > 30) {
-                    return '서비스명은 30자 이하로 입력하세요.';
-                  }
-
                   return null;
                 },
               ),
+              if (_selectedService == '기타(직접 입력)') ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _customServiceController,
+                  textInputAction: TextInputAction.next,
+                  decoration: _inputDecoration(
+                    hintText: '구독 서비스명을 직접 입력하세요',
+                    prefixIcon: Icons.edit_rounded,
+                  ),
+                  validator: (value) {
+                    if (_selectedService != '기타(직접 입력)') {
+                      return null;
+                    }
+                    if (value == null || value.trim().isEmpty) {
+                      return '구독 서비스명을 입력하세요.';
+                    }
+                    if (value.trim().length > 30) {
+                      return '서비스명은 30자 이하로 입력하세요.';
+                    }
+                    return null;
+                  },
+                ),
+              ],
               const SizedBox(height: 24),
-
               _buildSectionTitle(
                 '월 결제 금액',
                 icon: Icons.payments_rounded,
@@ -305,18 +447,19 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
               TextFormField(
                 controller: _amountController,
                 keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
+                textInputAction: TextInputAction.done,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  _ThousandsSeparatorInputFormatter(),
+                ],
                 decoration: _inputDecoration(
-                  hintText: '예: 17000',
+                  hintText: '예: 17,000',
                   suffixText: '원',
                   prefixIcon: Icons.payments_rounded,
                 ),
                 validator: (value) {
                   final int? amount = int.tryParse(
-                    value
-                        ?.replaceAll(',', '')
-                        .trim() ??
-                        '',
+                    value?.replaceAll(',', '').trim() ?? '',
                   );
 
                   if (amount == null) {
@@ -331,57 +474,65 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
                 },
               ),
               const SizedBox(height: 24),
-
               _buildSectionTitle(
                 '매월 결제일',
                 icon: Icons.calendar_month_rounded,
               ),
               const SizedBox(height: 10),
-              TextFormField(
-                controller: _paymentDayController,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) {
-                  if (!_isSaving) {
-                    _saveSubscription();
+              FormField<int>(
+                initialValue: _selectedPaymentDay,
+                validator: (_) {
+                  if (_selectedPaymentDay == null) {
+                    return '캘린더에서 결제일을 선택하세요.';
                   }
-                },
-                decoration: _inputDecoration(
-                  hintText: '1~31',
-                  suffixText: '일',
-                  prefixIcon: Icons.calendar_month_rounded,
-                ),
-                validator: (value) {
-                  final int? paymentDay =
-                  int.tryParse(
-                    value?.trim() ?? '',
-                  );
-
-                  if (paymentDay == null) {
-                    return '결제일을 숫자로 입력하세요.';
-                  }
-
-                  if (paymentDay < 1 ||
-                      paymentDay > 31) {
-                    return '결제일은 1일부터 31일 사이로 입력하세요.';
-                  }
-
                   return null;
+                },
+                builder: (field) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: _selectPaymentDay,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InputDecorator(
+                          decoration: _inputDecoration(
+                            hintText: '캘린더에서 결제일 선택',
+                            prefixIcon: Icons.calendar_month_rounded,
+                            suffixIcon: const Icon(
+                              Icons.chevron_right_rounded,
+                              color: _mainColor,
+                            ),
+                          ).copyWith(
+                            errorText: field.errorText,
+                          ),
+                          child: Text(
+                            _selectedPaymentDay == null
+                                ? '결제일을 선택하세요'
+                                : '매월 $_selectedPaymentDay일',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: _selectedPaymentDay == null
+                                  ? const Color(0xFFAAAAAA)
+                                  : const Color(0xFF333333),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
                 },
               ),
               const SizedBox(height: 30),
-
               SizedBox(
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-                  onPressed:
-                  _isSaving ? null : _saveSubscription,
+                  onPressed: _isSaving ? null : _saveSubscription,
                   style: ElevatedButton.styleFrom(
                     elevation: 0,
                     backgroundColor: _mainColor,
-                    disabledBackgroundColor:
-                    const Color(0xFFFFC1D2),
+                    disabledBackgroundColor: const Color(0xFFFFC1D2),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(17),
@@ -391,8 +542,7 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
                       ? const SizedBox(
                     width: 23,
                     height: 23,
-                    child:
-                    CircularProgressIndicator(
+                    child: CircularProgressIndicator(
                       strokeWidth: 2.4,
                       color: Colors.white,
                     ),
@@ -412,4 +562,38 @@ class _SubscriptionAddScreenState extends State<SubscriptionAddScreen> {
       ),
     );
   }
+}
+
+class _ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
+    final digits = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+
+    if (digits.isEmpty) {
+      return const TextEditingValue();
+    }
+
+    final number = int.tryParse(digits);
+
+    if (number == null) {
+      return oldValue;
+    }
+
+    final formatted = _formatAmount(number);
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
+String _formatAmount(int amount) {
+  return amount.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (match) => '${match[1]},',
+  );
 }

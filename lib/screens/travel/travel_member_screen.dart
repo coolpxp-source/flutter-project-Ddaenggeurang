@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../models/travel_member_model.dart';
 import '../../services/travel_member_service.dart';
 
+/// 여행 최대 참여 인원
+const int _maxMemberCount = 10;
+
 /// 여행 화면에서 사용하는 공통 색상
 const Color _mainColor = Color(0xFF4F7DF3);
 const Color _mainSoftColor = Color(0xFFE8EFFE);
@@ -35,10 +38,8 @@ class TravelMemberScreen extends StatefulWidget {
   }
 }
 
-class _TravelMemberScreenState
-    extends State<TravelMemberScreen> {
-  final TravelMemberService _memberService =
-  TravelMemberService();
+class _TravelMemberScreenState extends State<TravelMemberScreen> {
+  final TravelMemberService _memberService = TravelMemberService();
 
   /// 중복 작업을 방지하기 위한 로딩 상태
   bool _isProcessing = false;
@@ -97,8 +98,6 @@ class _TravelMemberScreenState
   }
 
   /// 공통 안내 모달
-  ///
-  /// 기존 SnackBar 대신 성공·실패 내용을 모달로 보여준다.
   Future<void> _showResultDialog({
     required String title,
     required String message,
@@ -147,8 +146,7 @@ class _TravelMemberScreenState
                 Navigator.of(dialogContext).pop();
               },
               style: FilledButton.styleFrom(
-                backgroundColor:
-                isError ? _errorColor : _mainColor,
+                backgroundColor: isError ? _errorColor : _mainColor,
                 minimumSize: const Size(100, 44),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -178,10 +176,8 @@ class _TravelMemberScreenState
               BuildContext context,
               StateSetter setDialogState,
               ) {
-            /// 이메일 검색 및 여행 초대 실행
             Future<void> inviteMember() async {
-              final String email =
-              emailController.text.trim();
+              final String email = emailController.text.trim();
 
               if (email.isEmpty) {
                 await _showResultDialog(
@@ -198,8 +194,7 @@ class _TravelMemberScreenState
 
               try {
                 final TravelUserSearchResult result =
-                await _memberService
-                    .inviteMemberByEmail(
+                await _memberService.inviteMemberByEmail(
                   travelId: widget.travelId,
                   email: email,
                 );
@@ -267,8 +262,7 @@ class _TravelMemberScreenState
                       controller: emailController,
                       autofocus: true,
                       enabled: !isInviting,
-                      keyboardType:
-                      TextInputType.emailAddress,
+                      keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.done,
                       autocorrect: false,
                       decoration: _emailDecoration(),
@@ -295,20 +289,17 @@ class _TravelMemberScreenState
                     Navigator.of(dialogContext).pop();
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor:
-                    const Color(0xFF999999),
+                    foregroundColor: const Color(0xFF999999),
                   ),
                   child: const Text('취소'),
                 ),
                 FilledButton(
-                  onPressed:
-                  isInviting ? null : inviteMember,
+                  onPressed: isInviting ? null : inviteMember,
                   style: FilledButton.styleFrom(
                     backgroundColor: _mainColor,
                     minimumSize: const Size(90, 44),
                     shape: RoundedRectangleBorder(
-                      borderRadius:
-                      BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
                   child: isInviting
@@ -413,8 +404,7 @@ class _TravelMemberScreenState
 
       await _showResultDialog(
         title: '내보내기 완료',
-        message:
-        '${member.displayName}님을 여행에서 내보냈습니다.',
+        message: '${member.displayName}님을 여행에서 내보냈습니다.',
       );
     } catch (error) {
       await _showResultDialog(
@@ -527,12 +517,6 @@ class _TravelMemberScreenState
 
   @override
   Widget build(BuildContext context) {
-    /*
-     * 참여자 목록을 실시간으로 받는다.
-     *
-     * TravelMemberService는 travels 문서의 memberIds를 기준으로
-     * 초대를 수락한 회원만 반환한다.
-     */
     return StreamBuilder<List<TravelMemberModel>>(
       stream: _memberService.watchMembers(
         widget.travelId,
@@ -544,16 +528,9 @@ class _TravelMemberScreenState
         final List<TravelMemberModel> members =
             snapshot.data ?? <TravelMemberModel>[];
 
-        /*
-         * 현재 사용자가 여행 생성자인지 확인한다.
-         *
-         * 생성자에게만 회원 초대 버튼과
-         * 참여자 내보내기 메뉴를 표시한다.
-         */
         final bool isCurrentUserOwner = members.any(
               (TravelMemberModel member) {
-            return member.userId ==
-                widget.currentUserId &&
+            return member.userId == widget.currentUserId &&
                 member.isOwner;
           },
         );
@@ -565,8 +542,7 @@ class _TravelMemberScreenState
             centerTitle: true,
             backgroundColor: _backgroundColor,
             surfaceTintColor: Colors.transparent,
-            foregroundColor:
-            const Color(0xFF222222),
+            foregroundColor: const Color(0xFF222222),
             title: const Text(
               '여행 참여자',
               style: TextStyle(
@@ -575,11 +551,6 @@ class _TravelMemberScreenState
               ),
             ),
           ),
-
-          /*
-           * 여행 생성자에게만 초대 버튼을 표시한다.
-           * 일반 참여자는 다른 회원을 초대할 수 없다.
-           */
           floatingActionButton: isCurrentUserOwner
               ? FloatingActionButton.extended(
             onPressed: _isProcessing
@@ -589,8 +560,7 @@ class _TravelMemberScreenState
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius:
-              BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(17),
             ),
             icon: const Icon(
               Icons.person_add_alt_1_rounded,
@@ -607,8 +577,7 @@ class _TravelMemberScreenState
           body: _buildBody(
             snapshot: snapshot,
             members: members,
-            isCurrentUserOwner:
-            isCurrentUserOwner,
+            isCurrentUserOwner: isCurrentUserOwner,
           ),
         );
       },
@@ -616,8 +585,7 @@ class _TravelMemberScreenState
   }
 
   Widget _buildBody({
-    required AsyncSnapshot<List<TravelMemberModel>>
-    snapshot,
+    required AsyncSnapshot<List<TravelMemberModel>> snapshot,
     required List<TravelMemberModel> members,
     required bool isCurrentUserOwner,
   }) {
@@ -632,8 +600,7 @@ class _TravelMemberScreenState
       );
     }
 
-    if (snapshot.connectionState ==
-        ConnectionState.waiting &&
+    if (snapshot.connectionState == ConnectionState.waiting &&
         !snapshot.hasData) {
       return const Center(
         child: CircularProgressIndicator(
@@ -652,7 +619,7 @@ class _TravelMemberScreenState
           children: <Widget>[
             _MemberSummary(
               memberCount: members.length,
-              maxMemberCount: 8,
+              maxMemberCount: _maxMemberCount,
             ),
             Expanded(
               child: ListView.separated(
@@ -677,23 +644,15 @@ class _TravelMemberScreenState
                   members[index];
 
                   final bool isCurrentUser =
-                      member.userId ==
-                          widget.currentUserId;
+                      member.userId == widget.currentUserId;
 
                   return _MemberCard(
                     member: member,
                     isCurrentUser: isCurrentUser,
-
-                    // 생성자만 다른 참여자를 내보낼 수 있다.
                     canRemove:
-                    isCurrentUserOwner &&
-                        !member.isOwner,
-
-                    // 생성자가 아닌 본인은 여행에서 나갈 수 있다.
+                    isCurrentUserOwner && !member.isOwner,
                     canLeave:
-                    isCurrentUser &&
-                        !member.isOwner,
-
+                    isCurrentUser && !member.isOwner,
                     onRemove: () {
                       _confirmRemoveMember(member);
                     },
@@ -704,7 +663,6 @@ class _TravelMemberScreenState
             ),
           ],
         ),
-
         if (_isProcessing)
           const Positioned.fill(
             child: ColoredBox(
@@ -733,8 +691,7 @@ class _MemberSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool isFull =
-        memberCount >= maxMemberCount;
+    final bool isFull = memberCount >= maxMemberCount;
 
     return Container(
       width: double.infinity,
@@ -770,8 +727,7 @@ class _MemberSummary extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 const Text(
                   '현재 여행 참여자',
@@ -865,8 +821,7 @@ class _MemberCard extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Row(
                   children: <Widget>[
@@ -901,8 +856,7 @@ class _MemberCard extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: _mainSoftColor,
-                          borderRadius:
-                          BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                         child: const Text(
                           '생성자',
@@ -930,8 +884,6 @@ class _MemberCard extends StatelessWidget {
               ],
             ),
           ),
-
-          // 생성자 또는 현재 회원에게 필요한 메뉴만 표시한다.
           if (canRemove || canLeave)
             PopupMenuButton<String>(
               icon: const Icon(
@@ -939,8 +891,7 @@ class _MemberCard extends StatelessWidget {
                 color: Color(0xFF999999),
               ),
               shape: RoundedRectangleBorder(
-                borderRadius:
-                BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(14),
               ),
               color: Colors.white,
               onSelected: (String value) {
@@ -1101,8 +1052,7 @@ class _ErrorView extends StatelessWidget {
                 backgroundColor: _mainColor,
                 minimumSize: const Size(130, 46),
                 shape: RoundedRectangleBorder(
-                  borderRadius:
-                  BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14),
                 ),
               ),
               icon: const Icon(

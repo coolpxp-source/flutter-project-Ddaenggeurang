@@ -30,7 +30,6 @@ import '../../widgets/common/attendance_roulette_dialog.dart';
 import '../../widgets/expense/category_icon_map.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
-import '../../widgets/common/placeholder_screen.dart';
 import '../../widgets/common/spotlight_tour.dart';
 import '../record/record_type_select_screen.dart';
 import '../community/community_home_screen.dart';
@@ -1030,12 +1029,15 @@ class _QuickActionsGrid extends StatelessWidget {
             .then((_) => HomeRefreshService.requestRefresh()),
       ),
       _QuickActionButton(
-        label: '영수증',
-        icon: Icons.camera_alt_outlined,
+        label: '월간 브리핑',
+        icon: Icons.analytics_rounded,
         bg: _C.mintSoft,
         fg: _C.mint,
         onTap: (context) => Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '영수증 촬영 업로드'))),
+          MaterialPageRoute(
+            builder: (_) => const MonthlyBriefingScreen(),
+          ),
+        ),
       ),
       _QuickActionButton(
         label: '구독관리',
@@ -1996,12 +1998,26 @@ class _CategorySpendingCardState extends State<_CategorySpendingCard> {
                                 fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
                       ]
                           : [
-                        Text(koreanAmount(total),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            '${comma(total)}원',
                             textAlign: TextAlign.center,
-                            style: _displayNumber(fontSize: 16, color: _C.ink)),
-                        const Text('총 지출',
-                            style: TextStyle(
-                                fontSize: 9.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                            style: _displayNumber(
+                              fontSize: 15,
+                              color: _C.ink,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          '총 지출',
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w600,
+                            color: _C.inkSub,
+                          ),
+                        ),
                       ],
                     ),
                   ],
