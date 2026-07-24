@@ -3,6 +3,25 @@ import '../models/community_post_model.dart';
 import '../models/community_stat_model.dart';
 import '../models/post_comment_model.dart';
 
+/// 또래 평균 조회 결과
+class PeerAverages {
+  final double savingRate;
+  final double expenseAmount;
+  final double incomeAmount;
+  final int sampleSize;
+
+  /// 'exact' | 'ageGroupOnly' | 'all' | 'none'
+  final String matchLevel;
+
+  PeerAverages({
+    required this.savingRate,
+    required this.expenseAmount,
+    required this.incomeAmount,
+    required this.sampleSize,
+    required this.matchLevel,
+  });
+}
+
 class CommunityService {
   final _db = FirebaseFirestore.instance;
 
@@ -17,6 +36,9 @@ class CommunityService {
   }
 
   // 또래 비교: 같은 ageGroup+job 그룹 평균 저축률
+  //
+  // 표본이 부족한 상태에서 조건이 너무 좁으면 항상 0%만 나오는 문제가 있어
+  // getPeerAverages()로 대체하는 것을 권장. 기존 호출부 호환을 위해 유지.
   Future<double> getPeerAverageSavingRate({
     required String ageGroup,
     required String job,
@@ -33,6 +55,65 @@ class CommunityService {
           (sum, d) => sum + (d['savingRate'] ?? 0),
     );
     return total / snap.docs.length;
+  }
+
+  /// 또래 평균 저축률/지출/수입을 한 번에 조회
+  Future<PeerAverages> getPeerAverages({
+    required String ageGroup,
+    required String job,
+  }) async {
+    QuerySnapshot<Map<String, dynamic>> snap = await _db
+        .collection('communityStats')
+        .where('ageGroup', isEqualTo: ageGroup)
+        .where('job', isEqualTo: job)
+        .get();
+
+    String matchLevel = 'exact';
+
+    if (snap.docs.isEmpty) {
+      snap = await _db
+          .collection('communityStats')
+          .where('ageGroup', isEqualTo: ageGroup)
+          .get();
+      matchLevel = 'ageGroupOnly';
+    }
+
+    if (snap.docs.isEmpty) {
+      snap = await _db.collection('communityStats').limit(200).get();
+      matchLevel = 'all';
+    }
+
+    if (snap.docs.isEmpty) {
+      return PeerAverages(
+        savingRate: 0,
+        expenseAmount: 0,
+        incomeAmount: 0,
+        sampleSize: 0,
+        matchLevel: 'none',
+      );
+    }
+
+    final stats = snap.docs.map((d) => CommunityStat.fromFirestore(d)).toList();
+
+    double average(num Function(CommunityStat stat) select) {
+      final total = stats.fold<num>(0, (sum, stat) => sum + select(stat));
+      return total / stats.length;
+    }
+
+    return PeerAverages(
+      savingRate: average((s) => s.savingRate),
+      expenseAmount: average((s) => s.expenseAmount),
+      incomeAmount: average((s) => s.incomeAmount),
+      sampleSize: stats.length,
+      matchLevel: matchLevel,
+    );
+  }
+
+  /// 현재 로그인 유저의 공유된 저축비율 통계 (없으면 null — 아직 공유 안 한 상태)
+  Future<CommunityStat?> getMyStat(String userId) async {
+    final doc = await _db.collection('communityStats').doc(userId).get();
+    if (!doc.exists) return null;
+    return CommunityStat.fromFirestore(doc);
   }
 
   // 내 저축 비율 공유/갱신 (61_저축비율공유)
