@@ -25,6 +25,9 @@ class TransactionService {
       for (var doc in basicCats.docs) {
         categoryNames[doc.id] = doc.data()['name'] ?? '기타';
       }
+      // 카테고리 프린트
+      print('📋 로드된 카테고리 개수: ${categoryNames.length}');
+      print('📋 기타수입 매핑 확인: ${categoryNames['cAvBzfvshGl5OOAuLel2']}');
       // 커스텀 카테고리 긁어오기
       final customCats = await _db
           .collection('customCategories')
