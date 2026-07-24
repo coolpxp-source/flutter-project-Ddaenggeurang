@@ -71,6 +71,9 @@ class SavingModel {
   /// 카테고리가 투자 계열일 때만 값 있음
   final InvestmentDetail? investmentDetail;
 
+  /// 매달 반복되는 적립/투자인지 여부 (예: 매달 자동이체 적금, 정기 매수)
+  final bool isRecurring;
+
   // 상태 관리 필드 2개
   final SavingStatus status;
   final int? returnedAmount; // 만기/해지/매도 시 돌려받은 최종 금액 (이익/손실 포함)
@@ -88,6 +91,7 @@ class SavingModel {
     required this.amount,
     this.memo,
     this.investmentDetail,
+    this.isRecurring = false,
     // 저축 상태 기본값은 '진행중(active)'으로 설정
     this.status = SavingStatus.active,
     this.returnedAmount,
@@ -110,6 +114,7 @@ class SavingModel {
           ? InvestmentDetail.fromMap(
           Map<String, dynamic>.from(d['investmentDetail']))
           : null,
+      isRecurring: d['isRecurring'] ?? false,
       // 저축 상태와 최종 금액 불러오기
       status: SavingStatus.fromCode(d['status']),
       returnedAmount: (d['returnedAmount'] as num?)?.toInt(),
@@ -127,6 +132,7 @@ class SavingModel {
     'amount': amount,
     'memo': memo,
     'investmentDetail': investmentDetail?.toMap(),
+    'isRecurring': isRecurring,
     // 저축 상태와 최종 금액 저장하기
     'status': status.code,
     'returnedAmount': returnedAmount,
@@ -145,6 +151,7 @@ class SavingModel {
     int? amount,
     String? memo,
     InvestmentDetail? investmentDetail,
+    bool? isRecurring,
     SavingStatus? status,
     int? returnedAmount,
     bool? isDeleted,
@@ -158,6 +165,7 @@ class SavingModel {
       amount: amount ?? this.amount,
       memo: memo ?? this.memo,
       investmentDetail: investmentDetail ?? this.investmentDetail,
+      isRecurring: isRecurring ?? this.isRecurring,
       status: status ?? this.status,
       returnedAmount: returnedAmount ?? this.returnedAmount,
       isDeleted: isDeleted ?? this.isDeleted,

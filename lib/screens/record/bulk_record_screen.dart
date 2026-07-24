@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/category_model.dart' show TransactionType;
 import '../../models/expense_model.dart';
@@ -42,16 +43,13 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   Future<void> _onTapParse() async {
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인 후 이용 가능합니다.')),
-      );
+      await DdaengModal.alert(context, title: '로그인이 필요해요', message: '로그인 후 이용 가능합니다.', type: ModalType.warning);
       return;
     }
 
     if (_textController.text.trim().isEmpty && _attachedPhotoCount == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('텍스트를 입력하거나 사진을 첨부해주세요')),
-      );
+      await DdaengModal.alert(context,
+          title: '입력을 확인해주세요', message: '텍스트를 입력하거나 사진을 첨부해주세요.', type: ModalType.warning);
       return;
     }
 
@@ -105,9 +103,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       debugPrint('AI 파싱 에러: $e');
       setState(() => _isParsing = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('AI 분석 실패: $e')),
-        );
+        await DdaengModal.alert(context, title: 'AI 분석에 실패했어요', message: '$e', type: ModalType.danger);
       }
     }
   }
@@ -117,9 +113,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
   Future<void> _saveAll() async {
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인된 사용자가 없습니다.')),
-      );
+      await DdaengModal.alert(context, title: '로그인이 필요해요', message: '로그인된 사용자가 없습니다.', type: ModalType.warning);
       return;
     }
 
@@ -182,17 +176,16 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
       if (mounted) {
         // 💡 테스트 후 결과만 확인할 수 있게 화면은 닫지 않음
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('테스트 완료! DB 저장은 차단되었으니 콘솔(Run) 창을 확인하세요.')),
-        );
+        await DdaengModal.alert(context,
+            title: '테스트 완료',
+            message: 'DB 저장은 차단되었으니 콘솔(Run) 창을 확인하세요.',
+            type: ModalType.info);
         // Navigator.pop(context, true);
       }
     } catch (e) {
       debugPrint('🔥 일괄 저장 에러: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('저장 실패: $e'), backgroundColor: Colors.red),
-        );
+        await DdaengModal.alert(context, title: '저장에 실패했어요', message: '$e', type: ModalType.danger);
       }
     }
   }
@@ -206,7 +199,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -431,8 +424,8 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(color: AppColors.cardBorder, width: 1.2),
         borderRadius: BorderRadius.circular(14),
+        boxShadow: AppColors.cardShadow,
       ),
       child: ExpansionTile(
         tilePadding: EdgeInsets.zero,

@@ -276,7 +276,7 @@ class TransactionDetailScreen extends StatelessWidget {
                           await FirebaseFirestore.instance.collection('incomes').add({
                             'userId': FirebaseAuth.instance.currentUser?.uid ?? '',
                             'amount': returnedAmount,
-                            'incomeSource': 'etc', // 수입의 '기타 수입'으로 자동 분류
+                            'categoryId': 'cAvBzfvshGl5OOAuLel2', // 수입의 '기타 수입'으로 자동 분류
                             'date': Timestamp.now(), // 👈 현재(오늘) 시간으로 기록!
                             'memo': memoText,
                             'isDeleted': false,

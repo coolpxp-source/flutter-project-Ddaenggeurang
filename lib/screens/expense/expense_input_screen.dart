@@ -7,6 +7,7 @@ import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../utils/korean_amount.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
 
@@ -161,7 +162,6 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         message: '변동비 지출에는 감정 태그가 필요합니다.',
         type: ModalType.warning,
       );
-      return;
     }
 
     final User? currentUser = FirebaseAuth.instance.currentUser;
@@ -251,7 +251,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF0E6D8), width: 1.2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -377,28 +377,63 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _amountController,
-                    enabled: !_isSaving,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyFormatter()],
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                    cursorColor: Colors.white,
-                    decoration: const InputDecoration(
-                      prefixText: '₩ ',
-                      prefixStyle: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IntrinsicWidth(
+                        child: TextField(
+                          controller: _amountController,
+                          enabled: !_isSaving,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyFormatter()],
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                          cursorColor: Colors.white,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '원',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _amountController,
+                    builder: (context, value, _) {
+                      final amount =
+                          int.tryParse(value.text.replaceAll(',', '')) ?? 0;
+                      final label = koreanAmountText(amount);
+                      if (label.isEmpty) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withValues(alpha: 0.85),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 6),
                   // 숫자로 입력한 금액을 한글로 함께 보여 줍니다.

@@ -25,6 +25,9 @@ class TransactionService {
       for (var doc in basicCats.docs) {
         categoryNames[doc.id] = doc.data()['name'] ?? '기타';
       }
+      // 카테고리 프린트
+      print('📋 로드된 카테고리 개수: ${categoryNames.length}');
+      print('📋 기타수입 매핑 확인: ${categoryNames['cAvBzfvshGl5OOAuLel2']}');
       // 커스텀 카테고리 긁어오기
       final customCats = await _db
           .collection('customCategories')
@@ -81,7 +84,7 @@ class TransactionService {
         type: 'income',
         date: income.date,
         amount: income.amount,
-        title: income.categoryId,
+        title: categoryNames[income.categoryId] ?? income.categoryId,
         subtitle: income.memo,
       ));
     }
@@ -94,7 +97,7 @@ class TransactionService {
         type: 'saving',
         date: saving.date,
         amount: saving.amount,
-        title: saving.categoryId, // '적금', '투자' 등 카테고리명
+        title: categoryNames[saving.categoryId] ?? saving.categoryId,
         subtitle: saving.memo,
         accountName: saving.accountName, // 구체적인 계좌명 적용
         savingStatus: saving.status.code
