@@ -8,7 +8,6 @@ import '../../widgets/common/bottom_nav_bar.dart';
 import 'ranking_screen.dart';
 import 'post_detail_screen.dart';
 import 'post_write_screen.dart';
-import 'package:circular_menu/circular_menu.dart';
 import '../market/market_home_screen.dart';
 import '../../widgets/common/app_header.dart';
 import '../../widgets/common/app_drawer.dart';
@@ -47,6 +46,59 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// 글쓰기 카테고리 선택 바텀시트 (기존 원형 메뉴 대체)
+  ///
+  /// 아이콘만 있던 CircularMenu는 라벨이 없어서 뭘 뜻하는지 알기 어렵다는
+  /// 피드백을 받아, 텍스트 라벨이 붙은 바텀시트 방식으로 교체함
+  void _openWriteSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  child: Text('어떤 이야기를 남길까요?',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ),
+                ..._writeCategories.map((cat) {
+                  return ListTile(
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: _categoryColorLight(cat),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(_categoryIcon(cat), color: _categoryColor(cat), size: 18),
+                    ),
+                    title: Text(cat, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => PostWriteScreen(initialCategory: cat)),
+                      );
+                    },
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -120,253 +172,237 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
         ],
       ),
 
-      body: CircularMenu(
-        alignment: Alignment.bottomRight,
-        radius: 90,
-        toggleButtonColor: _green,
-        toggleButtonIconColor: Colors.white,
-        toggleButtonSize: 30,
-        toggleButtonPadding: 18,
-        toggleButtonMargin: 20,
-        toggleButtonBoxShadow: [
-          BoxShadow(
-            color: _green.withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        items: _writeCategories.map((cat) {
-          return CircularMenuItem(
-            icon: _categoryIcon(cat),
-            color: _categoryColor(cat),
-            iconColor: Colors.white,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PostWriteScreen(initialCategory: cat),
-                ),
-              );
-            },
-          );
-        }).toList(),
-        backgroundWidget: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // 히어로 배너 → 또래비교 이동 카드
-            GestureDetector(
-              onTap: () async {
-                final uid = FirebaseAuth.instance.currentUser!.uid;
-                final myStat = await CommunityService().getMyStat(uid);
+      body: Stack(
+        children: [
+          ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // 히어로 배너 → 또래비교 이동 카드
+              GestureDetector(
+                onTap: () async {
+                  final uid = FirebaseAuth.instance.currentUser!.uid;
+                  final myStat = await CommunityService().getMyStat(uid);
 
-                if (myStat == null) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('저축비율을 먼저 공유해주세요.'),
-                        action: SnackBarAction(
-                          label: '공유하기',
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+                  if (myStat == null) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('저축비율을 먼저 공유해주세요.'),
+                          action: SnackBarAction(
+                            label: '공유하기',
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+                            ),
                           ),
+                        ),
+                      );
+                    }
+                    return;
+                  }
+
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PeerCompareScreen(
+                          ageGroup: myStat.ageGroup,
+                          job: myStat.job,
                         ),
                       ),
                     );
                   }
-                  return;
-                }
-
-                if (context.mounted) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PeerCompareScreen(
-                        ageGroup: myStat.ageGroup,
-                        job: myStat.job,
-                      ),
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_gradientStart, _gradientEnd],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  );
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_gradientStart, _gradientEnd],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  borderRadius: BorderRadius.circular(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('내 또래는 어떻게 쓰고 있을까?',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                            const SizedBox(height: 4),
+                            Text('저축·지출·수입까지 또래와 비교해보세요 →',
+                                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
+                          ],
+                        ),
+                      ),
+                      const CircleAvatar(radius: 20, backgroundColor: Colors.white24),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 카테고리 탭
+              SizedBox(
+                height: 82,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _categories.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (context, i) {
+                    final cat = _categories[i];
+                    final selected = cat == _selectedCategory;
+                    final catColor = _categoryColor(cat);
+                    final catColorLight = _categoryColorLight(cat);
+
+                    return GestureDetector(
+                      onTap: () => setState(() => _selectedCategory = cat),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              color: selected ? catColor : catColorLight,
+                              shape: BoxShape.circle,
+                              boxShadow: selected
+                                  ? [
+                                BoxShadow(
+                                  color: catColor.withOpacity(0.3),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ]
+                                  : [],
+                            ),
+                            child: Icon(
+                              _categoryIcon(cat),
+                              color: selected ? Colors.white : catColor,
+                              size: 22,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            cat,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                              color: selected ? catColor : Colors.grey[600],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 검색바
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: [
+                    Icon(Icons.search, color: Colors.grey[500], size: 20),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('내 또래는 어떻게 쓰고 있을까?',
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                          const SizedBox(height: 4),
-                          Text('저축·지출·수입까지 또래와 비교해보세요 →',
-                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
-                        ],
+                      child: TextField(
+                        controller: _searchController,
+                        style: const TextStyle(fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: '궁금한 주제나 태그를 검색해보세요',
+                          hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onChanged: (value) => setState(() => _searchQuery = value.trim()),
                       ),
                     ),
-                    const CircleAvatar(radius: 20, backgroundColor: Colors.white24),
+                    if (_searchQuery.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                        child: Icon(Icons.close, color: Colors.grey[400], size: 18),
+                      ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            // 카테고리 탭
-            SizedBox(
-              height: 82,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (context, i) {
-                  final cat = _categories[i];
-                  final selected = cat == _selectedCategory;
-                  final catColor = _categoryColor(cat);
-                  final catColorLight = _categoryColorLight(cat);
+              // 랭킹 TOP3 배너
+              _buildRankingBanner(),
+              const SizedBox(height: 16),
 
-                  return GestureDetector(
-                    onTap: () => setState(() => _selectedCategory = cat),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: selected ? catColor : catColorLight,
-                            shape: BoxShape.circle,
-                            boxShadow: selected
-                                ? [
-                              BoxShadow(
-                                color: catColor.withOpacity(0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                                : [],
-                          ),
-                          child: Icon(
-                            _categoryIcon(cat),
-                            color: selected ? Colors.white : catColor,
-                            size: 22,
-                          ),
+              // 피드
+              StreamBuilder<List<CommunityPost>>(
+                stream: _service.getPosts(category: _selectedCategory),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
+                  }
+                  final posts = snapshot.data!;
+
+                  // 검색어로 본문/해시태그 필터링
+                  final filteredPosts = _searchQuery.isEmpty
+                      ? posts
+                      : posts.where((p) {
+                    final query = _searchQuery.toLowerCase();
+                    final matchesContent = p.content.toLowerCase().contains(query);
+                    final matchesHashtag =
+                    p.hashtags.any((tag) => tag.toLowerCase().contains(query));
+                    return matchesContent || matchesHashtag;
+                  }).toList();
+
+                  if (filteredPosts.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Center(
+                        child: Text(
+                          _searchQuery.isEmpty ? '아직 게시글이 없어요' : '검색 결과가 없어요',
+                          style: TextStyle(color: Colors.grey[500]),
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          cat,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                            color: selected ? catColor : Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: filteredPosts.map((p) => _buildPostCard(p)).toList(),
                   );
                 },
               ),
+            ],
+          ),
+
+          // 글쓰기 FAB (기존 CircularMenu 대체)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              backgroundColor: _green,
+              onPressed: _openWriteSheet,
+              child: const Icon(Icons.edit_rounded, color: Colors.white),
             ),
-            const SizedBox(height: 12),
-
-            // 검색바
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search, color: Colors.grey[500], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: '궁금한 주제나 태그를 검색해보세요',
-                        hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onChanged: (value) => setState(() => _searchQuery = value.trim()),
-                    ),
-                  ),
-                  if (_searchQuery.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _searchController.clear();
-                        setState(() => _searchQuery = '');
-                      },
-                      child: Icon(Icons.close, color: Colors.grey[400], size: 18),
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 랭킹 TOP3 배너
-            _buildRankingBanner(),
-            const SizedBox(height: 16),
-
-            // 피드
-            StreamBuilder<List<CommunityPost>>(
-              stream: _service.getPosts(category: _selectedCategory),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Center(child: CircularProgressIndicator()),
-                  );
-                }
-                final posts = snapshot.data!;
-
-                // 검색어로 본문/해시태그 필터링
-                final filteredPosts = _searchQuery.isEmpty
-                    ? posts
-                    : posts.where((p) {
-                  final query = _searchQuery.toLowerCase();
-                  final matchesContent = p.content.toLowerCase().contains(query);
-                  final matchesHashtag =
-                  p.hashtags.any((tag) => tag.toLowerCase().contains(query));
-                  return matchesContent || matchesHashtag;
-                }).toList();
-
-                if (filteredPosts.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Center(
-                      child: Text(
-                        _searchQuery.isEmpty ? '아직 게시글이 없어요' : '검색 결과가 없어요',
-                        style: TextStyle(color: Colors.grey[500]),
-                      ),
-                    ),
-                  );
-                }
-                return Column(
-                  children: filteredPosts.map((p) => _buildPostCard(p)).toList(),
-                );
-              },
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavBar(
         currentTab: NavTab.community,
@@ -732,6 +768,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
     );
   }
 }
+
 class _RightTailClipper extends CustomClipper<Path> {
   @override
   Path getClip(Size size) {
