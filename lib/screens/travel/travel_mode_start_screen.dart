@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../models/travel_model.dart';
+import '../../services/travel_member_service.dart';
 import '../../services/travel_service.dart';
 import 'travel_expense_input_screen.dart';
+import 'travel_invitation_screen.dart';
 
 class TravelModeStartScreen extends StatefulWidget {
   const TravelModeStartScreen({
@@ -30,6 +32,10 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
 
   // 여행 정보 Firestore 저장 서비스
   final TravelService _travelService = TravelService();
+
+  // 현재 사용자에게 도착한 여행 초대를 조회하는 서비스
+  final TravelMemberService _memberService =
+  TravelMemberService();
 
   // 여행 시작일
   DateTime? _startDate;
@@ -261,14 +267,15 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
         return;
       }
 
-      // 여행 저장 성공 메시지
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(
-            content: Text('여행 모드가 시작되었습니다.'),
-          ),
-        );
+      // 여행 저장 성공 결과를 스낵바 대신 모달로 표시
+      await _showMessage(
+        '여행 모드가 시작되었습니다.',
+        title: '여행 생성 완료',
+      );
+
+      if (!mounted) {
+        return;
+      }
 
       // 저장 상태를 먼저 해제
       setState(() {
@@ -374,6 +381,99 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return result.toString();
   }
 
+  /// 숫자 금액을 한글 금액으로 변환
+  ///
+  /// 예: 500000 → 오십만 원
+  String _formatMoneyKorean(int amount) {
+    if (amount == 0) {
+      return '영 원';
+    }
+
+    if (amount < 0) {
+      return '마이너스 ${_formatMoneyKorean(-amount)}';
+    }
+
+    const List<String> numberNames = <String>[
+      '',
+      '일',
+      '이',
+      '삼',
+      '사',
+      '오',
+      '육',
+      '칠',
+      '팔',
+      '구',
+    ];
+
+    const List<String> smallUnits = <String>[
+      '',
+      '십',
+      '백',
+      '천',
+    ];
+
+    const List<String> largeUnits = <String>[
+      '',
+      '만',
+      '억',
+      '조',
+    ];
+
+    String convertGroup(int group) {
+      final StringBuffer buffer = StringBuffer();
+
+      for (int position = 3; position >= 0; position--) {
+        final int divisor = _powerOfTen(position);
+        final int digit = (group ~/ divisor) % 10;
+
+        if (digit == 0) {
+          continue;
+        }
+
+        // 십, 백, 천 앞의 '일'은 생략한다.
+        if (!(digit == 1 && position > 0)) {
+          buffer.write(numberNames[digit]);
+        }
+
+        buffer.write(smallUnits[position]);
+      }
+
+      return buffer.toString();
+    }
+
+    final List<String> groups = <String>[];
+    int remaining = amount;
+    int groupIndex = 0;
+
+    while (remaining > 0) {
+      final int group = remaining % 10000;
+
+      if (group > 0) {
+        groups.insert(
+          0,
+          '${convertGroup(group)}${largeUnits[groupIndex]}',
+        );
+      }
+
+      remaining ~/= 10000;
+      groupIndex++;
+    }
+
+    return '${groups.join()} 원';
+  }
+
+  /// 정수 거듭제곱 계산
+  int _powerOfTen(int exponent) {
+    int result = 1;
+
+    for (int index = 0; index < exponent; index++) {
+      result *= 10;
+    }
+
+    return result;
+  }
+
   /// 시작일과 종료일을 포함한 총 여행 일수
   int get _travelDays {
     if (_startDate == null || _endDate == null) {
@@ -398,15 +498,133 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
     return budget ~/ _travelDays;
   }
 
-  /// SnackBar 메시지 표시
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+  /// 성공 및 오류 메시지를 모달로 표시
+  ///
+  /// 기존 SnackBar를 사용하지 않고 사용자가 확인 버튼을
+  /// 누를 때까지 내용을 확인할 수 있도록 한다.
+  Future<void> _showMessage(
+      String message, {
+        String title = '확인해주세요',
+      }) async {
+    if (!mounted) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          icon: const Icon(
+            Icons.info_outline_rounded,
+            color: Color(0xFF4F7DF3),
+            size: 38,
+          ),
+          title: Text(
+            title,
+            style: const TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF222222),
+            ),
+          ),
+          content: Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              height: 1.5,
+              color: Color(0xFF555555),
+            ),
+          ),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF4F7DF3),
+                minimumSize: const Size(100, 44),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// AppBar의 받은 여행 초대 버튼
+  ///
+  /// 초대가 있으면 아이콘 우측 상단에 개수를 표시한다.
+  Widget _buildInvitationButton() {
+    return StreamBuilder<List<TravelModel>>(
+      stream: _memberService.watchMyInvitations(),
+      builder: (
+          BuildContext context,
+          AsyncSnapshot<List<TravelModel>> snapshot,
+          ) {
+        final int invitationCount =
+            snapshot.data?.length ?? 0;
+
+        return IconButton(
+          tooltip: '받은 여행 초대',
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) {
+                  return const TravelInvitationScreen();
+                },
+              ),
+            );
+          },
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              const Icon(
+                Icons.mark_email_unread_outlined,
+              ),
+              if (invitationCount > 0)
+                Positioned(
+                  right: -7,
+                  top: -7,
+                  child: Container(
+                    constraints: const BoxConstraints(
+                      minWidth: 18,
+                      minHeight: 18,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                    ),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE0483C),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      invitationCount > 99
+                          ? '99+'
+                          : '$invitationCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -426,6 +644,10 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: <Widget>[
+          _buildInvitationButton(),
+          const SizedBox(width: 8),
+        ],
       ),
       body: SafeArea(
         child: Form(
@@ -479,6 +701,25 @@ class _TravelModeStartScreenState extends State<TravelModeStartScreen> {
               ),
               const SizedBox(height: 10),
               _buildBudgetField(),
+
+              // 숫자로 입력한 예산을 한글 금액으로 함께 표시
+              if ((_parseBudget(_budgetController.text) ?? 0) >
+                  0) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _formatMoneyKorean(
+                    _parseBudget(
+                      _budgetController.text,
+                    ) ??
+                        0,
+                  ),
+                  style: const TextStyle(
+                    color: Color(0xFF4F7DF3),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
 
               _buildSummaryCard(),

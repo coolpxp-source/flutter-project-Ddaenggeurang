@@ -1,19 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TravelMemberModel {
-  /// Firestore 참여자 문서 ID
+  /// 화면 및 목록에서 사용할 참여자 식별값
   final String memberId;
 
   /// 참여자가 속한 여행 ID
   final String travelId;
 
-  /// 앱 회원 UID
-  ///
-  /// 앱 회원이 아닌 참여자는 빈 문자열로 저장한다.
+  /// Firebase Authentication 회원 UID
   final String userId;
 
-  /// 참여자 이름
+  /// 참여자 이름 또는 닉네임
   final String name;
+
+  /// 회원 이메일
+  final String email;
 
   /// 여행 생성자 여부
   final bool isOwner;
@@ -30,15 +31,50 @@ class TravelMemberModel {
   const TravelMemberModel({
     required this.memberId,
     required this.travelId,
-    this.userId = '',
+    required this.userId,
     required this.name,
+    this.email = '',
     this.isOwner = false,
     required this.createdAt,
     this.isDeleted = false,
     this.deletedAt,
   });
 
-  /// Firestore 문서를 TravelMemberModel로 변환
+  /// 정상적인 앱 회원 참여자인지 확인
+  bool get isRegisteredMember {
+    return userId.trim().isNotEmpty;
+  }
+
+  /// 여행 생성자가 아닌 일반 참여자인지 확인
+  bool get canLeave {
+    return !isOwner && !isDeleted;
+  }
+
+  /// 화면에 표시할 참여자 이름
+  String get displayName {
+    final String trimmedName = name.trim();
+
+    if (trimmedName.isNotEmpty) {
+      return trimmedName;
+    }
+
+    final String trimmedEmail = email.trim();
+
+    if (trimmedEmail.isNotEmpty) {
+      return trimmedEmail;
+    }
+
+    return '회원';
+  }
+
+  /// 참여자 데이터 검증
+  bool get isValid {
+    return memberId.trim().isNotEmpty &&
+        travelId.trim().isNotEmpty &&
+        userId.trim().isNotEmpty &&
+        displayName.isNotEmpty;
+  }
+
   factory TravelMemberModel.fromFirestore(
       DocumentSnapshot<Map<String, dynamic>> document,
       ) {
@@ -46,7 +82,8 @@ class TravelMemberModel {
 
     if (data == null) {
       throw StateError(
-        '여행 참여자 문서 데이터가 존재하지 않습니다: ${document.id}',
+        '여행 참여자 문서 데이터가 존재하지 않습니다: '
+            '${document.id}',
       );
     }
 
@@ -54,21 +91,55 @@ class TravelMemberModel {
       memberId: document.id,
       travelId: _toString(data['travelId']),
       userId: _toString(data['userId']),
-      name: _toString(data['name']),
+      name: _readName(data),
+      email: _toString(data['email']),
       isOwner: _toBool(data['isOwner']),
       createdAt: _toDateTime(data['createdAt']),
       isDeleted: _toBool(data['isDeleted']),
-      deletedAt: _toNullableDateTime(data['deletedAt']),
+      deletedAt:
+      _toNullableDateTime(data['deletedAt']),
     );
   }
 
-  /// TravelMemberModel을 Firestore 데이터로 변환
+  /// users 문서와 travels 문서를 이용해 참여자 모델 생성
+  factory TravelMemberModel.fromUserDocument({
+    required String travelId,
+    required String ownerId,
+    required DocumentSnapshot<Map<String, dynamic>>
+    userDocument,
+    DateTime? joinedAt,
+  }) {
+    final Map<String, dynamic> data =
+        userDocument.data() ?? <String, dynamic>{};
+
+    final String userId = userDocument.id;
+
+    return TravelMemberModel(
+      memberId: '${travelId}_$userId',
+      travelId: travelId,
+      userId: userId,
+      name: _readName(data),
+      email: _toString(data['email']),
+      isOwner: userId == ownerId,
+      createdAt: joinedAt ?? DateTime.now(),
+      isDeleted: false,
+      deletedAt: null,
+    );
+  }
+
   Map<String, dynamic> toFirestore() {
+    if (userId.trim().isEmpty) {
+      throw StateError(
+        '비회원은 여행 참여자로 저장할 수 없습니다.',
+      );
+    }
+
     return <String, dynamic>{
-      'memberId': memberId,
+      'memberId': memberId.trim(),
       'travelId': travelId.trim(),
       'userId': userId.trim(),
       'name': name.trim(),
+      'email': email.trim().toLowerCase(),
       'isOwner': isOwner,
       'createdAt': Timestamp.fromDate(createdAt),
       'isDeleted': isDeleted,
@@ -78,12 +149,26 @@ class TravelMemberModel {
     };
   }
 
-  /// 모델 일부 값 변경
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'memberId': memberId,
+      'travelId': travelId,
+      'userId': userId,
+      'name': name,
+      'email': email,
+      'isOwner': isOwner,
+      'createdAt': createdAt,
+      'isDeleted': isDeleted,
+      'deletedAt': deletedAt,
+    };
+  }
+
   TravelMemberModel copyWith({
     String? memberId,
     String? travelId,
     String? userId,
     String? name,
+    String? email,
     bool? isOwner,
     DateTime? createdAt,
     bool? isDeleted,
@@ -95,6 +180,7 @@ class TravelMemberModel {
       travelId: travelId ?? this.travelId,
       userId: userId ?? this.userId,
       name: name ?? this.name,
+      email: email ?? this.email,
       isOwner: isOwner ?? this.isOwner,
       createdAt: createdAt ?? this.createdAt,
       isDeleted: isDeleted ?? this.isDeleted,
@@ -104,33 +190,25 @@ class TravelMemberModel {
     );
   }
 
-  /// Map 데이터로 변환
-  Map<String, dynamic> toMap() {
-    return <String, dynamic>{
-      'memberId': memberId,
-      'travelId': travelId,
-      'userId': userId,
-      'name': name,
-      'isOwner': isOwner,
-      'createdAt': createdAt,
-      'isDeleted': isDeleted,
-      'deletedAt': deletedAt,
-    };
-  }
+  static String _readName(
+      Map<String, dynamic> data,
+      ) {
+    final List<dynamic> candidates = <dynamic>[
+      data['name'],
+      data['nickname'],
+      data['displayName'],
+      data['userName'],
+    ];
 
-  /// 참여자 데이터 검증
-  bool get isValid {
-    return travelId.trim().isNotEmpty &&
-        name.trim().isNotEmpty;
-  }
+    for (final dynamic candidate in candidates) {
+      final String value = _toString(candidate);
 
-  /// 화면에 표시할 참여자 이름
-  String get displayName {
-    if (name.trim().isEmpty) {
-      return '이름 없음';
+      if (value.isNotEmpty) {
+        return value;
+      }
     }
 
-    return name.trim();
+    return '';
   }
 
   static String _toString(dynamic value) {
@@ -168,17 +246,22 @@ class TravelMemberModel {
     }
 
     if (value is String) {
-      return DateTime.tryParse(value) ?? DateTime.now();
+      return DateTime.tryParse(value) ??
+          DateTime.now();
     }
 
     if (value is int) {
-      return DateTime.fromMillisecondsSinceEpoch(value);
+      return DateTime.fromMillisecondsSinceEpoch(
+        value,
+      );
     }
 
     return DateTime.now();
   }
 
-  static DateTime? _toNullableDateTime(dynamic value) {
+  static DateTime? _toNullableDateTime(
+      dynamic value,
+      ) {
     if (value == null) {
       return null;
     }
@@ -200,7 +283,9 @@ class TravelMemberModel {
     }
 
     if (value is int) {
-      return DateTime.fromMillisecondsSinceEpoch(value);
+      return DateTime.fromMillisecondsSinceEpoch(
+        value,
+      );
     }
 
     return null;
@@ -213,10 +298,10 @@ class TravelMemberModel {
         'travelId: $travelId, '
         'userId: $userId, '
         'name: $name, '
+        'email: $email, '
         'isOwner: $isOwner, '
         'createdAt: $createdAt, '
-        'isDeleted: $isDeleted, '
-        'deletedAt: $deletedAt'
+        'isDeleted: $isDeleted'
         ')';
   }
 
@@ -231,6 +316,7 @@ class TravelMemberModel {
         other.travelId == travelId &&
         other.userId == userId &&
         other.name == name &&
+        other.email == email &&
         other.isOwner == isOwner &&
         other.createdAt == createdAt &&
         other.isDeleted == isDeleted &&
@@ -244,6 +330,7 @@ class TravelMemberModel {
       travelId,
       userId,
       name,
+      email,
       isOwner,
       createdAt,
       isDeleted,
