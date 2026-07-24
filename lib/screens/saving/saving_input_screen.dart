@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../utils/formatters.dart';
 import '../../models/saving_model.dart';
 import '../../services/saving_service.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+import '../../utils/korean_amount.dart';
 
 /// expense/income_input_screen.dart와 통일한 팔레트.
 
@@ -36,6 +38,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
   String? _selectedCategoryName;
 
   int _currentAmount = 0;
+  bool _isRecurring = false;
 
   @override
   void initState() {
@@ -96,17 +99,18 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
 
   Future<void> _saveSaving() async {
     if (_currentAmount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('저축/투자 금액을 입력해주세요!')));
+      await DdaengModal.alert(context, title: '입력을 확인해주세요', message: '저축/투자 금액을 입력해주세요!', type: ModalType.warning);
       return;
     }
     if (_selectedCategoryId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('소분류 카테고리를 선택해주세요!')));
+      await DdaengModal.alert(context, title: '입력을 확인해주세요', message: '소분류 카테고리를 선택해주세요!', type: ModalType.warning);
       return;
     }
 
     if (_selectedCategoryName == '투자' || _selectedCategoryName == '주식') {
       if (_brokerageController.text.isEmpty || _assetNameController.text.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('증권사명과 종목명을 모두 입력해주세요!')));
+        await DdaengModal.alert(context,
+            title: '입력을 확인해주세요', message: '증권사명과 종목명을 모두 입력해주세요!', type: ModalType.warning);
         return;
       }
     }
@@ -132,21 +136,37 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
         amount: _currentAmount,
         memo: _memoController.text.isEmpty ? null : _memoController.text,
         investmentDetail: investmentDetail,
+        isRecurring: _isRecurring,
       );
 
       await _savingService.addSaving(newSaving);
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('성공적으로 기록되었습니다!')));
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+      await DdaengModal.alert(context, title: '저장 완료', message: '성공적으로 기록되었습니다!', type: ModalType.success);
+      if (!mounted) return;
+      Navigator.pop(context);
     } catch (e) {
       debugPrint('🔥 저장 에러: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('저장 실패: $e')));
+      if (!mounted) return;
+      await DdaengModal.alert(context, title: '저장에 실패했어요', message: '$e', type: ModalType.danger);
     }
   }
 
   // ─────────────────────── 스타일 헬퍼 ───────────────────────
+
+  /// 대분류 선택 시 보여줄 짧은 안내 문구.
+  /// 카테고리명에 공백이 있든 없든("안전자산" / "안전 자산") 모두 매칭되도록
+  /// 부분 문자열(contains)로 판별한다.
+  String? _parentCategoryHint(String? parent) {
+    if (parent == null) return null;
+    if (parent.contains('안전')) {
+      return '적금, 예금처럼 목돈 모으기용으로 분류하면 좋아요!';
+    }
+    if (parent.contains('투자')) {
+      return '주식, 펀드, ETF처럼 수익을 노리는 용도로 분류하면 좋아요!';
+    }
+    return null;
+  }
 
   Widget _sectionCard({required Widget child}) {
     return Container(
@@ -155,7 +175,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.cardBorder, width: 1.2),
+        boxShadow: AppColors.cardShadow,
       ),
       child: child,
     );
@@ -272,28 +292,55 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  TextField(
-                    controller: _amountController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [CurrencyFormatter()],
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                    cursorColor: Colors.white,
-                    decoration: const InputDecoration(
-                      prefixText: '₩ ',
-                      prefixStyle: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      IntrinsicWidth(
+                        child: TextField(
+                          controller: _amountController,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [CurrencyFormatter()],
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                          cursorColor: Colors.white,
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       ),
-                      border: InputBorder.none,
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '원',
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
                   ),
+                  if (_currentAmount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          koreanAmountText(_currentAmount),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -323,6 +370,18 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                       });
                     },
                   ),
+                  if (_parentCategoryHint(_selectedParentCategory) != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8, left: 4),
+                      child: Text(
+                        _parentCategoryHint(_selectedParentCategory)!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.inkSub,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                   _sectionLabel('소분류', icon: Icons.subdirectory_arrow_right_rounded),
                   const SizedBox(height: 10),
@@ -364,6 +423,36 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                       label: '계좌명 (선택)',
                       hint: '예: 국민은행 청년희망적금',
                     ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ── 부가 기능 연결 ──
+            _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sectionLabel('부가 기능 연결 (옵션)',
+                      icon: Icons.settings_suggest_outlined,
+                      iconColor: AppColors.purple,
+                      iconBg: const Color(0xFFEDE9FE)),
+                  const SizedBox(height: 4),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('매달 반복되는 적립/투자인가요?',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                    subtitle: const Text('다음 달부터 자동으로 내역이 생성됩니다.',
+                        style: TextStyle(fontSize: 12, color: AppColors.inkSub)),
+                    value: _isRecurring,
+                    activeColor: AppColors.saving,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: const Color(0xFFE5E8EB),
+                    trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
+                    onChanged: (value) {
+                      setState(() => _isRecurring = value);
+                    },
                   ),
                 ],
               ),

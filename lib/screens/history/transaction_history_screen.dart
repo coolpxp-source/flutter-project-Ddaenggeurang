@@ -389,6 +389,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         : (isExpense ? AppColors.ink : (isSaving ? AppColors.saving : AppColors.utility));
 
     return InkWell(
+      borderRadius: BorderRadius.circular(16),
       onTap: () async {
         // 1. 상세 페이지로 이동하면서 현재 클릭한 item 데이터를 넘겨줍니다.
         await Navigator.push(
@@ -400,47 +401,62 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         // 2. 상세 페이지에서 (수정/삭제 후) 뒤로가기를 눌러 돌아오면 데이터를 다시 불러옵니다!
         _loadMonthlyData();
       },
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 24.0),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12.0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: AppColors.cardShadow,
+        ),
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: iconColor,
-                shape: BoxShape.circle,
+                color: iconColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
               ),
+              alignment: Alignment.center,
               child: Icon(
-                  isExpense ? Icons.storefront : (isSaving ? Icons.savings : Icons.account_balance_wallet),
-                  color: Colors.white
+                isExpense ? Icons.storefront : (isSaving ? Icons.savings : Icons.account_balance_wallet),
+                color: iconColor,
+                size: 22,
               ),
             ),
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    amountText,
+                    item.title,
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: amountColor,
-                      // 4. 완료된 저축이면 금액에 취소선 긋기
-                      decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: isCompletedSaving ? Colors.grey[400] : AppColors.ink,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Text(
-                    '${item.title} ${item.subtitle != null ? '· ${item.subtitle}' : ''}',
+                    item.subtitle ?? '',
                     style: TextStyle(
-                      // 5. 완료된 저축이면 카테고리/메모 글씨도 더 연한 회색으로 변경
                       color: isCompletedSaving ? Colors.grey[400] : AppColors.inkSub,
-                      fontSize: 13,
+                      fontSize: 12,
                     ),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              amountText,
+              style: TextStyle(
+                fontSize: 15.5,
+                fontWeight: FontWeight.bold,
+                color: amountColor,
+                decoration: isCompletedSaving ? TextDecoration.lineThrough : null,
               ),
             ),
           ],

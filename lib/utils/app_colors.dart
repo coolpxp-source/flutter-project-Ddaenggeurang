@@ -10,8 +10,15 @@ class AppColors {
   static const bg = Color(0xFFFFF8F0);
   static const ink = Color(0xFF221A20);      // 제목/본문 (Colors.black 대체)
   static const inkSub = Color(0xFF8A8798);   // 보조 텍스트 (Colors.grey 대체)
-  static const cardBorder = Color(0xFFF0E6D8);
+  static const cardBorder = Color(0xFFF0E6D8); // deprecated: 카드 테두리는 더 이상 쓰지 않음 (cardShadow로 대체)
   static const divider = Color(0xFFEEEEEE);
+
+  /// 카드 공통 그림자 — home_screen.dart와 동일한 스타일.
+  /// 테두리 대신 그림자로만 입체감을 준다. 모든 카드형 Container는 이걸 쓰고
+  /// border는 넣지 않는다.
+  static List<BoxShadow> cardShadow = [
+    BoxShadow(color: ink.withValues(alpha: 0.05), blurRadius: 18, offset: const Offset(0, 8)),
+  ];
 
   // 지출 (expense_input, bulk_record 기준)
   static const expense = Color(0xFFFFA733);
