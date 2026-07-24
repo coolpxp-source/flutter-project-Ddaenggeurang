@@ -17,38 +17,48 @@ class TransactionHistoryScreen extends StatefulWidget {
 class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  // CalendarFormat _calendarFormat = CalendarFormat.week; 1주 보기
-  CalendarFormat _calendarFormat = CalendarFormat.twoWeeks; // 2주 보기
+  CalendarFormat _calendarFormat = CalendarFormat.twoWeeks;
   String _selectedFilter = '전체';
 
-  // 데이터 관리를 위한 변수
   final TransactionService _transactionService = TransactionService();
   List<TransactionItem> _allTransactions = [];
   bool _isLoading = false;
 
-  // 날짜별 스크롤 위치를 기억할 이름표 보관함
   final Map<DateTime, GlobalKey> _dateKeys = {};
+  final ScrollController _listScrollController = ScrollController();
+
+  // 필터별 대표색 — 리스트 아이템/캘린더에서 쓰는 타입 색상과 통일
+  static const Map<String, Color> _filterColors = {
+    '전체': AppColors.ink,
+    '지출': AppColors.expenseDeep,
+    '수입': AppColors.income,
+    '저축': AppColors.saving,
+  };
+
+  static const Map<String, Color> _filterSoftColors = {
+    '전체': Color(0xFFF1F1F3),
+    '지출': Color(0xFFFFF1E0),
+    '수입': AppColors.incomeSoft,
+    '저축': AppColors.savingSoft,
+  };
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _loadMonthlyData(); // 화면 켜질 때 데이터 불러오기
+    _loadMonthlyData();
   }
 
-// 파이어베이스에서 해당 월의 데이터 불러오기
   Future<void> _loadMonthlyData() async {
     setState(() => _isLoading = true);
 
     try {
       final start = DateTime(_focusedDay.year, _focusedDay.month, 1);
       final end = DateTime(_focusedDay.year, _focusedDay.month + 1, 0, 23, 59, 59);
-
-      // 현재 로그인한 유저의 정보 가져오기
       final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
       final data = await _transactionService.getMonthlyTransactions(
-        userId: currentUserId, // 실제유저아이디
+        userId: currentUserId,
         start: start,
         end: end,
       );
@@ -58,17 +68,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         _allTransactions = data;
       });
     } catch (e) {
-      // 에러가 나면 앱이 멈추지 않고 콘솔에 원인을 출력합니다.
       print('⚠️ 데이터 불러오기 실패: $e');
     } finally {
-      // 성공하든 에러가 나든 마지막에 무조건 로딩 스피너를 꺼줍니다.
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  // 필터 조건(전체, 지출, 수입, 저축)에 맞게 데이터 걸러내기
+  @override
+  void dispose() {
+    _listScrollController.dispose();
+    super.dispose();
+  }
+
   List<TransactionItem> get _filteredTransactions {
     if (_selectedFilter == '지출') return _allTransactions.where((e) => e.type == 'expense').toList();
     if (_selectedFilter == '수입') return _allTransactions.where((e) => e.type == 'income').toList();
@@ -76,7 +87,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     return _allTransactions;
   }
 
-  // 달력 날짜 밑에 찍어줄 일별 수입/지출 합계 계산
   Map<DateTime, Map<String, int>> get _dailySums {
     var sums = <DateTime, Map<String, int>>{};
     for (var item in _filteredTransactions) {
@@ -94,7 +104,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     return sums;
   }
 
-  // 하단 리스트뷰를 위해 데이터를 날짜별로 묶기
   Map<DateTime, List<TransactionItem>> get _groupedTransactions {
     var grouped = <DateTime, List<TransactionItem>>{};
     for (var item in _filteredTransactions) {
@@ -115,6 +124,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios, color: AppColors.ink, size: 20),
@@ -128,7 +139,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               onPressed: () {
                 setState(() {
                   _focusedDay = DateTime(_focusedDay.year, _focusedDay.month - 1, 1);
-                  _loadMonthlyData(); // 월 이동 시 데이터 갱신
+                  _loadMonthlyData();
                 });
               },
             ),
@@ -141,7 +152,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               onPressed: () {
                 setState(() {
                   _focusedDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 1);
-                  _loadMonthlyData(); // 월 이동 시 데이터 갱신
+                  _loadMonthlyData();
                 });
               },
             ),
@@ -153,12 +164,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               setState(() {
                 _focusedDay = DateTime.now();
                 _selectedDay = DateTime.now();
-                _loadMonthlyData(); // 오늘로 이동 시 데이터 갱신
+                _loadMonthlyData();
               });
             },
             child: const Text(
               '오늘',
-              style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
+              style: TextStyle(color: AppColors.utility, fontWeight: FontWeight.bold),
             ),
           ),
           IconButton(
@@ -188,7 +199,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           // 카테고리 필터 칩
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -202,20 +213,20 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
           // 스와이프 달력
           TableCalendar(
-            locale: 'ko_KR', // 월,화,수 - 한글로
+            locale: 'ko_KR',
             firstDay: DateTime(2020, 1, 1),
             lastDay: DateTime(2030, 12, 31),
             focusedDay: _focusedDay,
             calendarFormat: _calendarFormat,
             headerVisible: false,
-            rowHeight: 70, // 날짜 밑 금액을 위한 공간
+            rowHeight: 70,
             selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
             onDaySelected: (selectedDay, focusedDay) {
               setState(() {
                 _selectedDay = selectedDay;
                 _focusedDay = focusedDay;
               });
-              _scrollToDate(selectedDay); // 날짜 선택시 해당 내역으로 이동
+              _scrollToDate(selectedDay);
             },
             onPageChanged: (focusedDay) {
               _focusedDay = focusedDay;
@@ -236,8 +247,8 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   alignment: Alignment.topCenter,
                   padding: const EdgeInsets.only(top: 6),
                   child: Container(
-                    width: 28, // 파란 동그라미 너비
-                    height: 28, // 파란 동그라미 높이
+                    width: 28,
+                    height: 28,
                     alignment: Alignment.center,
                     decoration: const BoxDecoration(color: AppColors.utility, shape: BoxShape.circle),
                     child: Text('${date.day}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -263,57 +274,71 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
                 if (sums == null) return const SizedBox();
 
-                return Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 2.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (sums['income']! > 0)
-                          Text('+${CurrencyFormatter.format(sums['income']!)}',
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // 수입은 항상 위쪽 슬롯에 고정 — 지출 유무와 상관없이 위치가 흔들리지 않도록
+                    if (sums['income']! > 0)
+                      Positioned(
+                        bottom: 16,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Text('+${CurrencyFormatter.format(sums['income']!)}',
                               style: const TextStyle(color: AppColors.income, fontSize: 9, fontWeight: FontWeight.w600)),
-                        if (sums['expense']! > 0)
-                          Text('-${CurrencyFormatter.format(sums['expense']!)}',
+                        ),
+                      ),
+                    // 지출은 항상 아래쪽 슬롯에 고정
+                    if (sums['expense']! > 0)
+                      Positioned(
+                        bottom: 2,
+                        left: 0,
+                        right: 0,
+                        child: Center(
+                          child: Text('-${CurrencyFormatter.format(sums['expense']!)}',
                               style: const TextStyle(color: AppColors.expenseNegative, fontSize: 9, fontWeight: FontWeight.w600)),
-                        if (sums['saving']! > 0)
-                          Text('${CurrencyFormatter.format(sums['saving']!)}',
-                              style: const TextStyle(color: AppColors.saving, fontSize: 9, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
-                  ),
+                        ),
+                      ),
+                    if (sums['saving']! > 0)
+                      Positioned(
+                        top: 2,
+                        right: 6,
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.saving,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               },
             ),
           ),
 
-          const Divider(thickness: 1, height: 24, color: Color(0xFFEEEEEE)),
+          const Divider(thickness: 1, height: 24, color: AppColors.divider),
 
           // 지출/수입 내역 리스트
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: AppColors.utility))
                 : groupedData.isEmpty
                 ? const Center(child: Text('내역이 없습니다.', style: TextStyle(color: AppColors.inkSub)))
-
-            // ListView.builder 대신 ListView를 사용
                 : ListView(
+              controller: _listScrollController,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: groupedData.map((entry) {
                 final date = entry.key;
                 final items = entry.value;
 
-                // 해당 날짜의 이름표(Key)가 없으면 새로 발급해서 보관함에 넣습니다.
                 if (!_dateKeys.containsKey(date)) {
                   _dateKeys[date] = GlobalKey();
                 }
 
-                // formatters 안 공통 함수
                 String dateString = DateFormatter.formatDayAndWeekday(date);
-                // 하단은 짧은 요일(예: 15일 (금))
-                // String dateString = DateFormatter.formatDayAndShortWeekday(date);
 
-                // Column을 Container로 감싸고 발급한 이름표(Key)를 달아줍니다!
                 return Container(
                   key: _dateKeys[date],
                   child: Column(
@@ -327,7 +352,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                     ],
                   ),
                 );
-              }).toList(), // map의 결과를 리스트로 변환
+              }).toList(),
             ),
           ),
         ],
@@ -335,9 +360,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  // 필터 칩 위젯
+  // ── 필터 칩: 타입별 대표색 + 선택 시 소프트 배경, 미선택 시 은은한 회색 ──
   Widget _buildFilterChip(String label) {
     final bool isSelected = _selectedFilter == label;
+    final Color mainColor = _filterColors[label] ?? AppColors.ink;
+    final Color softColor = _filterSoftColors[label] ?? const Color(0xFFF1F1F3);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
@@ -349,41 +376,50 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
             _dateKeys.clear();
             _selectedFilter = label;
           });
+          if (_listScrollController.hasClients) {
+            _listScrollController.animateTo(
+              0,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeOut,
+            );
+          }
         },
-        backgroundColor: Colors.grey[100],
-        selectedColor: AppColors.ink,
+        backgroundColor: const Color(0xFFF7F7F9),
+        selectedColor: softColor,
         labelStyle: TextStyle(
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.white : AppColors.inkSub,
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+          color: isSelected ? mainColor : AppColors.inkSub,
         ),
+        side: BorderSide.none,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide.none,
         ),
+        showCheckmark: false,
+        elevation: 0,
+        pressElevation: 0,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),
     );
   }
 
-// 리스트 아이템 UI
+  // 리스트 아이템 UI
   Widget _buildTransactionItem(TransactionItem item) {
     final isExpense = item.type == 'expense';
     final isSaving = item.type == 'saving';
 
-    // 1. 완료/해지/매도된 저축인지 확인 (active가 아니면 true)
     final bool isCompletedSaving = isSaving &&
         item.savingStatus != null &&
         item.savingStatus != 'active';
 
-    // 기호 처리
     final String sign = isExpense ? '-' : (isSaving ? '' : '+');
     final amountText = '$sign${CurrencyFormatter.format(item.amount)}원';
 
-    // 2. 아이콘 배경색 (완료된 저축이면 회색, 아니면 기존 색상)
     final Color iconColor = isCompletedSaving
         ? Colors.grey[400]!
         : (isExpense ? AppColors.expense : (isSaving ? AppColors.saving : AppColors.income));
 
-    // 3. 금액 글씨색 (완료된 저축이면 회색, 아니면 기존 색상)
     final Color amountColor = isCompletedSaving
         ? AppColors.inkSub
         : (isExpense ? AppColors.ink : (isSaving ? AppColors.saving : AppColors.utility));
@@ -391,14 +427,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () async {
-        // 1. 상세 페이지로 이동하면서 현재 클릭한 item 데이터를 넘겨줍니다.
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => TransactionDetailScreen(item: item),
           ),
         );
-        // 2. 상세 페이지에서 (수정/삭제 후) 뒤로가기를 눌러 돌아오면 데이터를 다시 불러옵니다!
         _loadMonthlyData();
       },
       child: Container(
@@ -464,21 +498,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
       ),
     );
   }
-  // 스크롤 이동 함수 추가
-  void _scrollToDate(DateTime selectedDay) {
-    // 달력에서 누른 날짜의 시/분/초를 잘라내어 Key 보관함과 똑같은 형식으로 맞춥니다.
-    final pureDate = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
 
-    // 해당 날짜의 이름표(Key)를 찾습니다.
+  void _scrollToDate(DateTime selectedDay) {
+    final pureDate = DateTime(selectedDay.year, selectedDay.month, selectedDay.day);
     final key = _dateKeys[pureDate];
 
-    // 이름표가 존재한다면(즉, 해당 날짜에 내역이 있다면) 그 위치로 스크롤!
     if (key != null && key.currentContext != null) {
       Scrollable.ensureVisible(
         key.currentContext!,
-        duration: const Duration(milliseconds: 300), // 스크롤 애니메이션 속도
-        curve: Curves.easeInOut, // 부드러운 애니메이션 효과
-        alignment: 0.0, // 0.0으로 설정하면 해당 내역이 화면 맨 위로 올라옵니다.
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        alignment: 0.0,
       );
     }
   }
