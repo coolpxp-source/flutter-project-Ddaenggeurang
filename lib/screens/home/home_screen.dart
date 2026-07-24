@@ -46,6 +46,8 @@ import '../history/transaction_history_screen.dart';
 import '../subscription/subscription_list_screen.dart';
 import '../travel/travel_mode_start_screen.dart';
 import '../budget/budget_vs_expense_screen.dart';
+// 추가: 홈의 카테고리별 지출 카드에서 상세 집계 화면으로 이동하기 위한 import
+import '../category/category_summary_screen.dart';
 import '../../widgets/home/quick_add_fab.dart';
 
 /// 홈 대시보드 전용 팔레트.
@@ -441,90 +443,90 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                   .moveY(begin: 0, end: 14, duration: 3800.ms, curve: Curves.easeInOut),
             ),
             RefreshIndicator(
-          color: _C.amber,
-          onRefresh: () async {},
-          child: SingleChildScrollView(
-            physics:
-            const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-            padding: EdgeInsets.zero,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                KeyedSubtree(
-                  key: _budgetHeroKey,
-                  child: _LiveBudgetSection(
-                      uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+              color: _C.amber,
+              onRefresh: () async {},
+              child: SingleChildScrollView(
+                physics:
+                const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: EdgeInsets.zero,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    KeyedSubtree(
+                      key: _budgetHeroKey,
+                      child: _LiveBudgetSection(
+                          uid: widget.uid, user: user, month: _month, weekAnchor: _selectedDay),
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          KeyedSubtree(key: _quickActionsKey, child: const _QuickActionsGrid()),
+                          const SizedBox(height: 24),
+
+                          KeyedSubtree(
+                            key: _categoryCardKey,
+                            child: _CategorySpendingSection(uid: widget.uid, month: _month),
+                          ),
+                          const SizedBox(height: 28),
+
+                          _MonthHeader(
+                            month: _month,
+                            onPrev: () => setState(
+                                    () => _month = DateTime(_month.year, _month.month - 1)),
+                            onNext: () => setState(
+                                    () => _month = DateTime(_month.year, _month.month + 1)),
+                          ),
+                          const SizedBox(height: 12),
+                          _ModeToggle(
+                            isGroup: _isGroupMode,
+                            onChanged: (v) => setState(() => _isGroupMode = v),
+                          ),
+                          if (_isGroupMode) ...[
+                            const SizedBox(height: 10),
+                            _GroupManageBanner(
+                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                                  builder: (_) => const GroupCreateJoinScreen())),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+
+                          _LiveWeekCalendarStrip(
+                            uid: widget.uid,
+                            month: _month,
+                            selectedDay: _selectedDay,
+                            onSelect: (d) => setState(() => _selectedDay = d),
+                          ),
+                          const SizedBox(height: 20),
+
+                          _CoachBubble(uid: widget.uid, tone: user.coachTone),
+                          const SizedBox(height: 24),
+
+                          _RecentExpensesSection(uid: widget.uid),
+                          const SizedBox(height: 20),
+
+                          _WeeklyEmotionGaugeSection(uid: widget.uid),
+                          const SizedBox(height: 20),
+
+                          _LiveSpendingInsightSection(
+                              uid: widget.uid, nickname: user.nickname, month: _month),
+                          const SizedBox(height: 20),
+
+                          _LiveChallengeSection(uid: widget.uid, tone: user.coachTone),
+                          const SizedBox(height: 20),
+
+                          _LiveWeeklyBriefingSection(uid: widget.uid, tone: user.coachTone),
+                        ]
+                            .animate(interval: 55.ms)
+                            .fadeIn(duration: 320.ms, curve: Curves.easeOut)
+                            .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
+                      ),
+                    ),
+                  ],
                 ),
-
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      KeyedSubtree(key: _quickActionsKey, child: const _QuickActionsGrid()),
-                      const SizedBox(height: 24),
-
-                      KeyedSubtree(
-                        key: _categoryCardKey,
-                        child: _CategorySpendingSection(uid: widget.uid, month: _month),
-                      ),
-                      const SizedBox(height: 28),
-
-                      _MonthHeader(
-                        month: _month,
-                        onPrev: () => setState(
-                                () => _month = DateTime(_month.year, _month.month - 1)),
-                        onNext: () => setState(
-                                () => _month = DateTime(_month.year, _month.month + 1)),
-                      ),
-                      const SizedBox(height: 12),
-                      _ModeToggle(
-                        isGroup: _isGroupMode,
-                        onChanged: (v) => setState(() => _isGroupMode = v),
-                      ),
-                      if (_isGroupMode) ...[
-                        const SizedBox(height: 10),
-                        _GroupManageBanner(
-                          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                              builder: (_) => const GroupCreateJoinScreen())),
-                        ),
-                      ],
-                      const SizedBox(height: 16),
-
-                      _LiveWeekCalendarStrip(
-                        uid: widget.uid,
-                        month: _month,
-                        selectedDay: _selectedDay,
-                        onSelect: (d) => setState(() => _selectedDay = d),
-                      ),
-                      const SizedBox(height: 20),
-
-                      _CoachBubble(uid: widget.uid, tone: user.coachTone),
-                      const SizedBox(height: 24),
-
-                      _RecentExpensesSection(uid: widget.uid),
-                      const SizedBox(height: 20),
-
-                      _WeeklyEmotionGaugeSection(uid: widget.uid),
-                      const SizedBox(height: 20),
-
-                      _LiveSpendingInsightSection(
-                          uid: widget.uid, nickname: user.nickname, month: _month),
-                      const SizedBox(height: 20),
-
-                      _LiveChallengeSection(uid: widget.uid, tone: user.coachTone),
-                      const SizedBox(height: 20),
-
-                      _LiveWeeklyBriefingSection(uid: widget.uid, tone: user.coachTone),
-                    ]
-                        .animate(interval: 55.ms)
-                        .fadeIn(duration: 320.ms, curve: Curves.easeOut)
-                        .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
-                  ),
-                ),
-              ],
-            ),
-          ),
+              ),
             ),
           ],
         );
@@ -608,7 +610,7 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
     final monthStr =
         '${widget.month.year}-${widget.month.month.toString().padLeft(2, '0')}';
     final weekStart =
-        widget.weekAnchor.subtract(Duration(days: widget.weekAnchor.weekday % 7));
+    widget.weekAnchor.subtract(Duration(days: widget.weekAnchor.weekday % 7));
 
     final results = await Future.wait([
       BudgetService().getBudget(userId: widget.uid, month: monthStr),
@@ -646,18 +648,18 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
             const _BudgetStats(total: 0, spent: 0, weekSpent: 0, topCategory: ('지출 없음', 0.0));
         final remaining = stats.total - stats.spent;
         final progress =
-            stats.total == 0 ? 0.0 : (stats.spent / stats.total).clamp(0.0, 1.0);
+        stats.total == 0 ? 0.0 : (stats.spent / stats.total).clamp(0.0, 1.0);
 
         return Column(
           children: [
             _BudgetHero(
-                    user: widget.user,
-                    remaining: remaining,
-                    total: stats.total,
-                    progress: progress,
-                    onBudgetChanged: () => setState(() {
-                          _future = _load();
-                        }))
+                user: widget.user,
+                remaining: remaining,
+                total: stats.total,
+                progress: progress,
+                onBudgetChanged: () => setState(() {
+                  _future = _load();
+                }))
                 .animate()
                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                 .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
@@ -754,153 +756,153 @@ class _BudgetHero extends StatelessWidget {
             ),
           ),
           Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(2.5),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.6),
-                      ),
-                      child: CircleAvatar(
-                        radius: 19,
-                        backgroundColor: Colors.white,
-                        backgroundImage: AssetImage(user.coachTone.imagePath),
-                      ),
-                    )
-                        .animate(onPlay: (c) => c.repeat(reverse: true))
-                        .scaleXY(begin: 1.0, end: 1.05, duration: 1900.ms, curve: Curves.easeInOut),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text('${user.nickname}님, 오늘도 파이팅!',
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2.5),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.6),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.24),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text('Lv.${user.level} · ${user.points}P',
-                          style: const TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+                    child: CircleAvatar(
+                      radius: 19,
+                      backgroundColor: Colors.white,
+                      backgroundImage: AssetImage(user.coachTone.imagePath),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 22),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text('이번 달 남은 예산',
-                                  style: TextStyle(
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white.withValues(alpha: 0.92))),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                borderRadius: BorderRadius.circular(20),
-                                onTap: () => Navigator.of(context)
-                                    .push(MaterialPageRoute(
-                                    builder: (_) => BudgetSettingScreen(userId: user.userId)))
-                                    .then((_) => onBudgetChanged()),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.22),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.settings_outlined, size: 14, color: Colors.white),
+                  )
+                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .scaleXY(begin: 1.0, end: 1.05, duration: 1900.ms, curve: Curves.easeInOut),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text('${user.nickname}님, 오늘도 파이팅!',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.24),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('Lv.${user.level} · ${user.points}P',
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 22),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text('이번 달 남은 예산',
+                                style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white.withValues(alpha: 0.92))),
+                            const SizedBox(width: 6),
+                            InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.of(context)
+                                  .push(MaterialPageRoute(
+                                  builder: (_) => BudgetSettingScreen(userId: user.userId)))
+                                  .then((_) => onBudgetChanged()),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.settings_outlined, size: 14, color: Colors.white),
+                                    const SizedBox(width: 3),
+                                    const Text('예산 설정',
+                                        style: TextStyle(
+                                            fontSize: 11.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white)),
+                                    if (total == 0) ...[
                                       const SizedBox(width: 3),
-                                      const Text('예산 설정',
-                                          style: TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white)),
-                                      if (total == 0) ...[
-                                        const SizedBox(width: 3),
-                                        Container(
-                                          width: 14,
-                                          height: 14,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFFF3B30),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          alignment: Alignment.center,
-                                          child: const Text('!',
-                                              style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w900,
-                                                  color: Colors.white,
-                                                  height: 1)),
+                                      Container(
+                                        width: 14,
+                                        height: 14,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFFF3B30),
+                                          shape: BoxShape.circle,
                                         ),
-                                      ],
+                                        alignment: Alignment.center,
+                                        child: const Text('!',
+                                            style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w900,
+                                                color: Colors.white,
+                                                height: 1)),
+                                      ),
                                     ],
-                                  ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(comma(remaining),
-                                  style: _displayNumber(fontSize: 38, color: Colors.white)),
-                              Padding(
-                                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                                child: Text('원',
-                                    style: GoogleFonts.jua(
-                                        fontSize: 16, color: Colors.white, height: 1)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Text('전체 ${comma(total)}원 중 여유',
-                              style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white)),
-                        ],
-                      ),
-                    ),
-                    InkWell(
-                      borderRadius: BorderRadius.circular(50),
-                      onTap: () => Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => BudgetVsExpenseScreen(userId: user.userId),
+                            ),
+                          ],
                         ),
-                      ),
-                      child: CircularPercentIndicator(
-                        radius: 42,
-                        lineWidth: 9,
-                        percent: progress,
-                        animation: true,
-                        animationDuration: 700,
-                        circularStrokeCap: CircularStrokeCap.round,
-                        backgroundColor: Colors.white.withValues(alpha: 0.28),
-                        progressColor: Colors.white,
-                        center: Text('${(progress * 100).round()}%',
+                        const SizedBox(height: 8),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(comma(remaining),
+                                style: _displayNumber(fontSize: 38, color: Colors.white)),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 4, bottom: 4),
+                              child: Text('원',
+                                  style: GoogleFonts.jua(
+                                      fontSize: 16, color: Colors.white, height: 1)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Text('전체 ${comma(total)}원 중 여유',
                             style: const TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(50),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BudgetVsExpenseScreen(userId: user.userId),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
+                    child: CircularPercentIndicator(
+                      radius: 42,
+                      lineWidth: 9,
+                      percent: progress,
+                      animation: true,
+                      animationDuration: 700,
+                      circularStrokeCap: CircularStrokeCap.round,
+                      backgroundColor: Colors.white.withValues(alpha: 0.28),
+                      progressColor: Colors.white,
+                      center: Text('${(progress * 100).round()}%',
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -974,36 +976,36 @@ class _StatCard extends StatelessWidget {
           ],
         ),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: iconColor,
-              borderRadius: BorderRadius.circular(9),
-              boxShadow: [
-                BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3)),
-              ],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: iconColor,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: [
+                  BoxShadow(color: iconColor.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 3)),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 15, color: Colors.white),
             ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 15, color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-          const SizedBox(height: 2),
-          Text(value,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
-        ],
+            const SizedBox(height: 8),
+            Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+            const SizedBox(height: 2),
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w800, color: _C.ink)),
+          ],
         ),
       ),
     );
@@ -1403,14 +1405,14 @@ class _WeekCalendarStrip extends StatelessWidget {
                                 ? const LinearGradient(colors: [Color(0xFFFFB648), Color(0xFFFF7A45)])
                                 : null,
                             border:
-                                (!isSelected && isToday) ? Border.all(color: _C.pink, width: 1.6) : null,
+                            (!isSelected && isToday) ? Border.all(color: _C.pink, width: 1.6) : null,
                             boxShadow: isSelected
                                 ? [
-                                    BoxShadow(
-                                        color: const Color(0xFFFF7A45).withValues(alpha: 0.4),
-                                        blurRadius: 10,
-                                        offset: const Offset(0, 4)),
-                                  ]
+                              BoxShadow(
+                                  color: const Color(0xFFFF7A45).withValues(alpha: 0.4),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4)),
+                            ]
                                 : null,
                           ),
                           alignment: Alignment.center,
@@ -1426,10 +1428,10 @@ class _WeekCalendarStrip extends StatelessWidget {
                           height: 12,
                           child: (amount != null && amount > 0)
                               ? Text(
-                                  amount >= 10000 ? '${(amount / 10000).toStringAsFixed(1)}만' : '$amount',
-                                  style: const TextStyle(
-                                      fontSize: 9.5, fontWeight: FontWeight.w700, color: _C.mint),
-                                )
+                            amount >= 10000 ? '${(amount / 10000).toStringAsFixed(1)}만' : '$amount',
+                            style: const TextStyle(
+                                fontSize: 9.5, fontWeight: FontWeight.w700, color: _C.mint),
+                          )
                               : null,
                         ),
                       ],
@@ -1509,8 +1511,8 @@ class _CoachBubbleState extends State<_CoachBubble> {
       mood = usedPercent >= 100
           ? _CoachMood.concerned
           : usedPercent >= 70
-              ? _CoachMood.neutral
-              : _CoachMood.happy;
+          ? _CoachMood.neutral
+          : _CoachMood.happy;
     } else {
       mood = _CoachMood.neutral;
     }
@@ -1604,14 +1606,14 @@ class _CoachBubbleState extends State<_CoachBubble> {
                     child: snap.connectionState != ConnectionState.done
                         ? const _CoachBubbleLoading()
                         : Text(
-                            snap.data?.$1 ?? '오늘도 현명한 소비 하고 계신가요?',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              height: 1.45,
-                            ),
-                          ),
+                      snap.data?.$1 ?? '오늘도 현명한 소비 하고 계신가요?',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        height: 1.45,
+                      ),
+                    ),
                   ),
                 ],
               );
@@ -1661,10 +1663,10 @@ class _CoachAvatarWithMood extends StatelessWidget {
       children: [
         mood == _CoachMood.concerned
             ? avatar.animate(onPlay: (c) => c.repeat(reverse: true)).shake(
-                hz: 2.5, duration: 900.ms, curve: Curves.easeInOut, offset: const Offset(1.5, 0))
+            hz: 2.5, duration: 900.ms, curve: Curves.easeInOut, offset: const Offset(1.5, 0))
             : avatar
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scaleXY(begin: 1.0, end: 1.05, duration: 1800.ms, curve: Curves.easeInOut),
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .scaleXY(begin: 1.0, end: 1.05, duration: 1800.ms, curve: Curves.easeInOut),
         Positioned(
           bottom: -4,
           right: -4,
@@ -1695,14 +1697,14 @@ class _CoachBubbleLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Widget bar(double width) => Container(
-          width: width,
-          height: 11,
-          margin: const EdgeInsets.only(bottom: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.35),
-            borderRadius: BorderRadius.circular(6),
-          ),
-        );
+      width: width,
+      height: 11,
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(6),
+      ),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [bar(double.infinity), bar(140)],
@@ -1793,9 +1795,25 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
         final summaries = snap.data ?? const [];
         final slices = summaries
             .map((s) => _CategorySlice(
-                s.categoryName, s.totalAmount, _colorForCategory(s.categoryKey)))
+            s.categoryName, s.totalAmount, _colorForCategory(s.categoryKey)))
             .toList();
-        return _CategorySpendingCard(slices: slices);
+        return _CategorySpendingCard(
+          slices: slices,
+
+          // 추가: 홈 카드의 '전체보기'를 누르면 로그인 회원의
+          // 카테고리별 월간 지출 상세 화면으로 이동한다.
+          onViewAll: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) {
+                  return CategorySummaryScreen(
+                    userId: widget.uid,
+                  );
+                },
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -1803,7 +1821,14 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
 
 class _CategorySpendingCard extends StatefulWidget {
   final List<_CategorySlice> slices;
-  const _CategorySpendingCard({required this.slices});
+
+  // 추가: 카테고리별 지출 상세 화면 이동 콜백
+  final VoidCallback onViewAll;
+
+  const _CategorySpendingCard({
+    required this.slices,
+    required this.onViewAll,
+  });
 
   @override
   State<_CategorySpendingCard> createState() => _CategorySpendingCardState();
@@ -1830,13 +1855,40 @@ class _CategorySpendingCardState extends State<_CategorySpendingCard> {
           borderRadius: BorderRadius.circular(22),
           boxShadow: _C.cardShadow,
         ),
-        child: const Column(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('카테고리별 지출',
-                style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
-            SizedBox(height: 4),
-            Text('이번 달 지출 기록이 아직 없어요',
+            // 추가: 지출 기록이 없어도 상세 화면을 열 수 있는 전체보기 버튼
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '카테고리별 지출',
+                    style: TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: _C.ink,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: widget.onViewAll,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('전체보기'),
+                      SizedBox(width: 2),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('이번 달 지출 기록이 아직 없어요',
                 style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
           ],
         ),
@@ -1860,8 +1912,35 @@ class _CategorySpendingCardState extends State<_CategorySpendingCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('카테고리별 지출',
-              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+          // 추가: 카테고리 도넛 차트 우측에 상세 화면 이동 버튼 표시
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '카테고리별 지출',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w800,
+                    color: _C.ink,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: widget.onViewAll,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('전체보기'),
+                    SizedBox(width: 2),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
           const Text('탭하면 카테고리별 비중을 볼 수 있어요',
               style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
@@ -1907,23 +1986,23 @@ class _CategorySpendingCardState extends State<_CategorySpendingCard> {
                       mainAxisSize: MainAxisSize.min,
                       children: touched != null
                           ? [
-                              Text('${(touched.amount / total * 100).round()}%',
-                                  textAlign: TextAlign.center,
-                                  style: _displayNumber(fontSize: 20, color: touched.color)),
-                              Text(touched.label,
-                                  textAlign: TextAlign.center,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-                            ]
+                        Text('${(touched.amount / total * 100).round()}%',
+                            textAlign: TextAlign.center,
+                            style: _displayNumber(fontSize: 20, color: touched.color)),
+                        Text(touched.label,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                      ]
                           : [
-                              Text(koreanAmount(total),
-                                  textAlign: TextAlign.center,
-                                  style: _displayNumber(fontSize: 16, color: _C.ink)),
-                              const Text('총 지출',
-                                  style: TextStyle(
-                                      fontSize: 9.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-                            ],
+                        Text(koreanAmount(total),
+                            textAlign: TextAlign.center,
+                            style: _displayNumber(fontSize: 16, color: _C.ink)),
+                        const Text('총 지출',
+                            style: TextStyle(
+                                fontSize: 9.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                      ],
                     ),
                   ],
                 ),
@@ -1945,11 +2024,11 @@ class _CategorySpendingCardState extends State<_CategorySpendingCard> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(10),
                                 onTap: () => setState(
-                                    () => _touchedIndex = _touchedIndex == i ? null : i),
+                                        () => _touchedIndex = _touchedIndex == i ? null : i),
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 180),
                                   padding:
-                                      const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                  const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: i == _touchedIndex
                                         ? s.color.withValues(alpha: 0.1)
@@ -2014,7 +2093,7 @@ class _RecentExpensesSection extends StatefulWidget {
 
 class _RecentExpensesSectionState extends State<_RecentExpensesSection> {
   late final Future<List<RecentExpenseEntry>> _future =
-      CategorySummaryService().getRecentExpenses(userId: widget.uid);
+  CategorySummaryService().getRecentExpenses(userId: widget.uid);
 
   @override
   Widget build(BuildContext context) {
@@ -2764,7 +2843,7 @@ class _ChallengeCardState extends State<_ChallengeCard> {
                   builder: (context, snap) {
                     final spent = snap.data ?? 0;
                     final progress =
-                        c.targetAmount == 0 ? 0.0 : (spent / c.targetAmount).clamp(0.0, 1.0);
+                    c.targetAmount == 0 ? 0.0 : (spent / c.targetAmount).clamp(0.0, 1.0);
                     final over = spent > c.targetAmount;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2883,7 +2962,7 @@ class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> 
     if (thisWeekTotal == 0 && lastWeekTotal == 0 && categories.isEmpty) return null;
 
     final wowPercent =
-        lastWeekTotal == 0 ? 0 : (((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100).round();
+    lastWeekTotal == 0 ? 0 : (((thisWeekTotal - lastWeekTotal) / lastWeekTotal) * 100).round();
 
     var noSpendDays = 0;
     for (var i = 0; i < 7; i++) {
@@ -2897,8 +2976,8 @@ class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> 
     final budgetRemainPercent = (budget == null || budget.availableBudget == 0)
         ? 0
         : (((budget.availableBudget - monthSpent) / budget.availableBudget) * 100)
-            .round()
-            .clamp(0, 100);
+        .round()
+        .clamp(0, 100);
 
     final topCategory = categories.isEmpty ? null : categories.first;
 
@@ -3066,15 +3145,15 @@ class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> 
   }
 
   Widget _stat(String label, String value) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70)),
-          const SizedBox(height: 3),
-          Text(value,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white)),
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white70)),
+      const SizedBox(height: 3),
+      Text(value,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Colors.white)),
+    ],
+  );
 }
