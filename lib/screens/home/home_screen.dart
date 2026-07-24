@@ -23,7 +23,6 @@ import '../../services/psychology_test_service.dart';
 import '../../services/spending_challenge_service.dart';
 import '../../models/spending_challenge_model.dart';
 import '../../services/user_service.dart';
-import '../../services/weekly_emotion_service.dart';
 import '../../utils/formatters.dart';
 import '../../widgets/common/app_drawer.dart';
 import '../../widgets/common/attendance_roulette_dialog.dart';
@@ -45,8 +44,6 @@ import '../history/transaction_history_screen.dart';
 import '../subscription/subscription_list_screen.dart';
 import '../travel/travel_mode_start_screen.dart';
 import '../budget/budget_vs_expense_screen.dart';
-// 추가: 홈의 카테고리별 지출 카드에서 상세 집계 화면으로 이동하기 위한 import
-import '../category/category_summary_screen.dart';
 import '../../widgets/home/quick_add_fab.dart';
 
 /// 홈 대시보드 전용 팔레트.
@@ -504,9 +501,6 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                           const SizedBox(height: 24),
 
                           _RecentExpensesSection(uid: widget.uid),
-                          const SizedBox(height: 20),
-
-                          _WeeklyEmotionGaugeSection(uid: widget.uid),
                           const SizedBox(height: 20),
 
                           _LiveSpendingInsightSection(
@@ -1802,15 +1796,12 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
         return _CategorySpendingCard(
           slices: slices,
 
-          // 추가: 홈 카드의 '전체보기'를 누르면 로그인 회원의
-          // 카테고리별 월간 지출 상세 화면으로 이동한다.
+          // 홈 카드의 '전체보기'를 누르면 지출 탭(전체 지출 내역)으로 이동한다.
           onViewAll: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (BuildContext context) {
-                  return CategorySummaryScreen(
-                    userId: widget.uid,
-                  );
+                  return const TransactionHistoryScreen();
                 },
               ),
             );
@@ -2265,182 +2256,6 @@ String _spendingTypeLabel(String? resultType) {
       return '계획 소비형';
     default:
       return '테스트 전';
-  }
-}
-
-// ─────────────────────── 이번 주 감정 온도계 ───────────────────────
-
-/// 이번 주 지출에 붙은 감정 태그(WeeklyEmotionService, 읽기 전용)를 모아
-/// "충동/스트레스" 대 "계획/사교" 비율을 하나의 온도 게이지로 보여준다.
-/// _LiveSpendingInsightSection(월 단위, 스트레스 전용)과 달리 주 단위로 더
-/// 자주 갱신되고, 감정 태그 전반의 균형을 온도라는 은유로 직관적으로 보여준다.
-class _WeeklyEmotionGaugeSection extends StatefulWidget {
-  final String uid;
-  const _WeeklyEmotionGaugeSection({required this.uid});
-
-  @override
-  State<_WeeklyEmotionGaugeSection> createState() => _WeeklyEmotionGaugeSectionState();
-}
-
-class _WeeklyEmotionGaugeSectionState extends State<_WeeklyEmotionGaugeSection> {
-  late Future<Map<String, int>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday % 7));
-    _future = WeeklyEmotionService()
-        .getWeeklyEmotionTotals(userId: widget.uid, weekStart: weekStart);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<Map<String, int>>(
-      future: _future,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const _ShimmerBlock(height: 150, radius: 20);
-        }
-        return _EmotionGaugeCard(totals: snap.data ?? const {});
-      },
-    );
-  }
-}
-
-class _EmotionGaugeCard extends StatelessWidget {
-  final Map<String, int> totals;
-  const _EmotionGaugeCard({required this.totals});
-
-  static const _hotKeys = {'impulsive', 'stress'};
-  static const _coolKeys = {'planned', 'social'};
-
-  @override
-  Widget build(BuildContext context) {
-    final hot = totals.entries
-        .where((e) => _hotKeys.contains(e.key))
-        .fold<int>(0, (sum, e) => sum + e.value);
-    final cool = totals.entries
-        .where((e) => _coolKeys.contains(e.key))
-        .fold<int>(0, (sum, e) => sum + e.value);
-    final tagged = hot + cool;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: _C.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('이번 주 감정 온도',
-              style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
-          const SizedBox(height: 4),
-          Text(
-            tagged == 0
-                ? '이번 주엔 감정 태그가 달린 지출이 아직 없어요'
-                : '충동·스트레스 소비와 계획·사교 소비의 균형을 온도로 보여드려요',
-            style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub),
-          ),
-          const SizedBox(height: 18),
-          if (tagged == 0)
-            Row(
-              children: [
-                Icon(Icons.thermostat_outlined, size: 20, color: _C.inkSub.withValues(alpha: 0.5)),
-                const SizedBox(width: 8),
-                Text('지출에 감정 태그를 남기면 온도가 나타나요',
-                    style: TextStyle(fontSize: 12, color: _C.inkSub.withValues(alpha: 0.8))),
-              ],
-            )
-          else
-            _TemperatureGauge(hotRatio: hot / tagged),
-        ],
-      ),
-    );
-  }
-}
-
-/// hotRatio(0.0~1.0)를 파랑(차분)→빨강(뜨거움) 그라데이션 바 위의 마커 위치로 그린다.
-class _TemperatureGauge extends StatelessWidget {
-  final double hotRatio;
-  const _TemperatureGauge({required this.hotRatio});
-
-  (String, String) get _label {
-    if (hotRatio < 0.3) return ('시원함', '😌');
-    if (hotRatio < 0.6) return ('미지근함', '🙂');
-    return ('뜨거움', '🔥');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final (label, emoji) = _label;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 8),
-            Text('$label · 충동·스트레스 ${(hotRatio * 100).round()}%',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _C.ink)),
-          ],
-        ),
-        const SizedBox(height: 14),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final markerX = (constraints.maxWidth - 16) * hotRatio.clamp(0.0, 1.0);
-            return SizedBox(
-              height: 22,
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    height: 10,
-                    margin: const EdgeInsets.only(top: 6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: const LinearGradient(
-                        colors: [_C.blue, _C.purple, _C.pink, Color(0xFFFF5C5C)],
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: markerX,
-                    top: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _C.ink, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                              color: _C.ink.withValues(alpha: 0.2),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-        const SizedBox(height: 6),
-        const Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('계획·사교', style: TextStyle(fontSize: 10.5, color: _C.inkSub)),
-            Text('충동·스트레스', style: TextStyle(fontSize: 10.5, color: _C.inkSub)),
-          ],
-        ),
-      ],
-    );
   }
 }
 
