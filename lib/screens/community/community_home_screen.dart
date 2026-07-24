@@ -1,3 +1,5 @@
+import 'package:ddaenggeurang/screens/community/peer_compare_screen.dart';
+import 'package:ddaenggeurang/screens/community/saving_share_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
@@ -151,33 +153,69 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
         backgroundWidget: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // 히어로 배너
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [_gradientStart, _gradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('돈 이야기, 편하게 해요',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                        const SizedBox(height: 4),
-                        Text('절약 팁부터 소소한 이야기까지',
-                            style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
-                      ],
+            // 히어로 배너 → 또래비교 이동 카드
+            GestureDetector(
+              onTap: () async {
+                final uid = FirebaseAuth.instance.currentUser!.uid;
+                final myStat = await CommunityService().getMyStat(uid);
+
+                if (myStat == null) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('저축비율을 먼저 공유해주세요.'),
+                        action: SnackBarAction(
+                          label: '공유하기',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PeerCompareScreen(
+                        ageGroup: myStat.ageGroup,
+                        job: myStat.job,
+                      ),
                     ),
+                  );
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_gradientStart, _gradientEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const CircleAvatar(radius: 20, backgroundColor: Colors.white24),
-                ],
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('내 또래는 어떻게 쓰고 있을까?',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                          const SizedBox(height: 4),
+                          Text('저축·지출·수입까지 또래와 비교해보세요 →',
+                              style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
+                        ],
+                      ),
+                    ),
+                    const CircleAvatar(radius: 20, backgroundColor: Colors.white24),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -528,6 +566,23 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                   }),
                 );
               },
+            ),
+            const SizedBox(height: 14),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+                );
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('내 저축비율 공유하고 랭킹 참여하기',
+                      style: TextStyle(fontSize: 12, color: _green, fontWeight: FontWeight.w600)),
+                  Icon(Icons.chevron_right, size: 16, color: _green),
+                ],
+              ),
             ),
           ],
         ),
