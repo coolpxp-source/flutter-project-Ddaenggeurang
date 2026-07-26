@@ -1,0 +1,87 @@
+<svg viewBox="0 0 680 530" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+<defs>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@700;800&display=swap');
+.title-text { font-family: 'Jua', 'Nanum Gothic', sans-serif; font-size: 72px; fill: #2B3A36; }
+.sub-text { font-family: 'Nanum Gothic', sans-serif; font-weight: 800; font-size: 16px; fill: #4A5568; }
+.highlight-text { fill: #3BB18C; }
+@keyframes bounce {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35% { transform: translateY(-55px) scale(0.96, 1.04); }
+  50% { transform: translateY(-60px) scale(1, 1); }
+  65% { transform: translateY(-55px) scale(1.04, 0.96); }
+  85% { transform: translateY(0) scale(1.08, 0.92); }
+}
+@keyframes ringImpact {
+  0%, 78.6% { opacity: 0; transform: scale(0.4); }
+  85% { opacity: 0.55; transform: scale(0.7); }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 1; transform: scale(1); }
+}
+@keyframes eyeOpenK { 0%, 59% { opacity: 1; } 60%, 97% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes eyeClosedK { 0%, 59% { opacity: 0; } 60%, 97% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes t1k { 0% { opacity: 0; } 19.9% { opacity: 0; } 20% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes t2k { 0% { opacity: 0; } 39.9% { opacity: 0; } 40% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes t3k { 0% { opacity: 0; } 59.9% { opacity: 0; } 60% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su1k { 0% { opacity: 0; } 59.9% { opacity: 0; } 60% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su2k { 0% { opacity: 0; } 61.9% { opacity: 0; } 62% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su3k { 0% { opacity: 0; } 63.9% { opacity: 0; } 64% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su4k { 0% { opacity: 0; } 65.9% { opacity: 0; } 66% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su5k { 0% { opacity: 0; } 67.9% { opacity: 0; } 68% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su6k { 0% { opacity: 0; } 69.9% { opacity: 0; } 70% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su7k { 0% { opacity: 0; } 71.9% { opacity: 0; } 72% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su8k { 0% { opacity: 0; } 73.9% { opacity: 0; } 74% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su9k { 0% { opacity: 0; } 75.9% { opacity: 0; } 76% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su10k { 0% { opacity: 0; } 77.9% { opacity: 0; } 78% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su11k { 0% { opacity: 0; } 79.9% { opacity: 0; } 80% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su12k { 0% { opacity: 0; } 81.9% { opacity: 0; } 82% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su13k { 0% { opacity: 0; } 83.9% { opacity: 0; } 84% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su14k { 0% { opacity: 0; } 85.9% { opacity: 0; } 86% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su15k { 0% { opacity: 0; } 87.9% { opacity: 0; } 88% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su16k { 0% { opacity: 0; } 89.9% { opacity: 0; } 90% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes su17k { 0% { opacity: 0; } 91.9% { opacity: 0; } 92% { opacity: 1; } 99% { opacity: 1; } 100% { opacity: 0; } }
+.coin-character { transform-origin: 340px 210px; animation: bounce 1.5s cubic-bezier(0.28, 0.84, 0.42, 1) infinite; }
+.impact-ring { transform-origin: 340px 258px; animation: ringImpact 1.5s cubic-bezier(0.28, 0.84, 0.42, 1) infinite; }
+.sparkle { transform-box: fill-box; transform-origin: center; animation: twinkle 1.5s ease-in-out infinite; }
+.eye-open { animation: eyeOpenK 7.5s linear infinite; }
+.eye-closed { animation: eyeClosedK 7.5s linear infinite; }
+.t1 { animation: t1k 7.5s linear infinite; }
+.t2 { animation: t2k 7.5s linear infinite; }
+.t3 { animation: t3k 7.5s linear infinite; }
+.su1 { animation: su1k 7.5s linear infinite; } .su2 { animation: su2k 7.5s linear infinite; }
+.su3 { animation: su3k 7.5s linear infinite; } .su4 { animation: su4k 7.5s linear infinite; }
+.su5 { animation: su5k 7.5s linear infinite; } .su6 { animation: su6k 7.5s linear infinite; }
+.su7 { animation: su7k 7.5s linear infinite; } .su8 { animation: su8k 7.5s linear infinite; }
+.su9 { animation: su9k 7.5s linear infinite; } .su10 { animation: su10k 7.5s linear infinite; }
+.su11 { animation: su11k 7.5s linear infinite; } .su12 { animation: su12k 7.5s linear infinite; }
+.su13 { animation: su13k 7.5s linear infinite; } .su14 { animation: su14k 7.5s linear infinite; }
+.su15 { animation: su15k 7.5s linear infinite; } .su16 { animation: su16k 7.5s linear infinite; }
+.su17 { animation: su17k 7.5s linear infinite; }
+</style>
+</defs>
+<circle cx="340" cy="260" r="230" fill="#FAFDFB" />
+<circle class="impact-ring" cx="340" cy="258" r="40" fill="none" stroke="#3BB18C" stroke-width="3" />
+<circle class="impact-ring" cx="340" cy="258" r="58" fill="none" stroke="#3BB18C" stroke-width="1.5" />
+<g class="coin-character">
+  <circle cx="340" cy="190" r="62" fill="#F8C648" />
+  <circle cx="340" cy="190" r="52" fill="#FFD753" stroke="#ECA827" stroke-width="3" />
+  <ellipse cx="320" cy="182" rx="6.5" ry="8.5" fill="#212529" transform="rotate(-5 320 182)" />
+  <ellipse class="eye-open" cx="360" cy="180" rx="6.5" ry="8.5" fill="#212529" transform="rotate(5 360 180)" />
+  <path class="eye-closed" d="M366,171 L353,180 L366,189" stroke="#212529" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M 325 194 C 325 214, 355 214, 355 194 Z" fill="#212529" />
+</g>
+<polygon class="sparkle" style="animation-delay:0s" points="270,120 274,132 286,136 274,140 270,152 266,140 254,136 266,132" fill="#3BB18C" />
+<polygon class="sparkle" style="animation-delay:0.35s" points="405,140 408,149 417,152 408,155 405,164 402,155 393,152 402,149" fill="#FFD753" />
+<polygon class="sparkle" style="animation-delay:0.65s" points="400,225 403,233 411,236 403,239 400,247 397,239 389,236 397,233" fill="#3BB18C" />
+<g text-anchor="middle">
+  <text x="340" y="345" class="title-text">
+    <tspan class="t1">땡</tspan><tspan class="t2">그</tspan><tspan class="t3">랑</tspan>
+  </text>
+  <text x="340" y="382" class="sub-text">
+    <tspan class="su1">가</tspan><tspan class="su2">계</tspan><tspan class="su3">부</tspan><tspan class="su4">는</tspan><tspan> </tspan><tspan class="su5">똑</tspan><tspan class="su6">똑</tspan><tspan class="su7">하</tspan><tspan class="su8">게</tspan><tspan class="su9">,</tspan><tspan> </tspan><tspan class="su10 highlight-text">소</tspan><tspan class="su11 highlight-text">비</tspan><tspan class="su12 highlight-text">는</tspan><tspan> </tspan><tspan class="su13 highlight-text">똑</tspan><tspan class="su14 highlight-text">바</tspan><tspan class="su15 highlight-text">르</tspan><tspan class="su16 highlight-text">게</tspan><tspan class="su17 highlight-text">!</tspan>
+  </text>
+</g>
+</svg>
