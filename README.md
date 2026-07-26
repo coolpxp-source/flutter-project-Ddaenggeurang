@@ -1,5 +1,7 @@
 # 🐷 땡그랑 (Ddaenggeurang) 🐷 - AI 소비 분석 & 커뮤니티 플랫폼
-![Ddaenggeurang Header](https://capsule-render.vercel.app/api?type=shark&height=300&color=gradient&text=%EB%95%A1%EA%B7%B8%EB%9E%91&animation=scaleIn)
+<p align="center">
+  <img src="assets/ddaenggeurang_mascot.svg" width="400" alt="땡그랑 마스코트">
+</p>
 
 (시연 영상 링크 추가 예정)
 
