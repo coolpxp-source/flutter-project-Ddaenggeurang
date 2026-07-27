@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 
 class CustomCategoriesScreen extends StatefulWidget {
   const CustomCategoriesScreen({super.key});
@@ -164,40 +165,27 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
     }
   }
 
-  void _showAddCategoryDialog(String transactionType, String parentName, String nature) {
-    final TextEditingController nameController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('[$parentName] 새 카테고리 추가'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(hintText: '예: 마라탕, 통신비 등', border: OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
-          ElevatedButton(
-            onPressed: () async {
-              if (nameController.text.trim().isEmpty) return;
-              Navigator.pop(context);
-
-              await _db.collection('customCategories').add({
-                'userId': _userId,
-                'transactionType': transactionType,
-                'parentName': parentName,
-                'name': nameController.text.trim(),
-                'nature': nature,
-                'isHidden': false,
-                'createdAt': FieldValue.serverTimestamp(),
-              });
-              _loadAllCategories();
-            },
-            child: const Text('추가'),
-          ),
-        ],
-      ),
+  void _showAddCategoryDialog(String transactionType, String parentName, String nature) async {
+    final name = await DdaengModal.prompt(
+      context,
+      title: '[$parentName] 새 카테고리 추가',
+      hintText: '예: 마라탕, 통신비 등',
+      type: ModalType.info,
+      confirmText: '추가',
     );
+
+    if (name == null || name.isEmpty) return;
+
+    await _db.collection('customCategories').add({
+      'userId': _userId,
+      'transactionType': transactionType,
+      'parentName': parentName,
+      'name': name,
+      'nature': nature,
+      'isHidden': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    _loadAllCategories();
   }
 
   @override

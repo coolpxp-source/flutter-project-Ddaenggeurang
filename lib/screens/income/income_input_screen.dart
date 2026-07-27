@@ -9,6 +9,8 @@ import '../../models/income_model.dart';
 import '../../services/income_service.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../widgets/common/amount_calculator_sheet.dart';
+import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
 
 /// expense_input_screen.dart와 통일한 팔레트.
@@ -50,12 +52,30 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _currentAmount = item.amount;
+      _fetchOriginalIncome(item.id);
     }
 
     _amountController.addListener(() {
       final text = _amountController.text.replaceAll(',', '');
       setState(() => _currentAmount = int.tryParse(text) ?? 0);
     });
+  }
+
+  Future<void> _fetchOriginalIncome(String docId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('incomes').doc(docId).get();
+      if (doc.exists && mounted) {
+        final original = IncomeModel.fromFirestore(doc);
+        setState(() {
+          _isRecurring = original.recurringIncomeTemplateId != null;
+          if (original.recurringPayDay != null) {
+            _payDay = original.recurringPayDay!;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('원본 수입 내역 로드 실패: $e');
+    }
   }
 
   @override
@@ -132,6 +152,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         date: _selectedDate,
         memo: _memoController.text,
         recurringIncomeTemplateId: recurringTemplateId,
+        recurringPayDay: _isRecurring ? _payDay : null,
       );
 
       if (widget.editItem == null) {
@@ -166,7 +187,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg, Widget? trailing}) {
     return Row(
       children: [
         if (icon != null) ...[
@@ -182,10 +203,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
@@ -241,6 +265,21 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('수입 기록', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: '금액 계산기',
+            onPressed: () async {
+              final result = await showAmountCalculatorSheet(
+                context,
+                initialAmount: _currentAmount,
+              );
+              if (result != null) {
+                _amountController.text = comma(result);
+              }
+            },
+          ),
+        ],
       ),
       body: _isLoadingCategories
           ? const Center(child: CircularProgressIndicator(color: AppColors.income))
@@ -329,6 +368,15 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         ),
                       ),
                     ),
+                  if (_currentAmount > 0)
+                    Text(
+                      koreanAmount(_currentAmount),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
                   if (_selectedCategoryName == '프리랜서' && _currentAmount > 0) ...[
                     const SizedBox(height: 10),
                     Text(
@@ -375,28 +423,66 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       });
                     },
                   ),
-                  const SizedBox(height: 20),
-                  _sectionLabel('소분류',
-                      icon: Icons.subdirectory_arrow_right_rounded, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
-                    decoration: _fieldDecoration(),
-                    borderRadius: BorderRadius.circular(14),
-                    dropdownColor: Colors.white,
-                    items: childCategories.map((categoryData) {
-                      return DropdownMenuItem<String>(
-                        value: categoryData['id']?.toString(),
-                        child: Text(categoryData['name']?.toString() ?? '이름 없음'),
-                      );
-                    }).toList(),
-                    onChanged: _selectedParentCategory == null || childCategories.isEmpty ? null : (newId) {
-                      setState(() {
-                        _selectedCategoryId = newId;
-                        _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
-                      });
-                    },
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _selectedParentCategory == null
+                        ? const SizedBox.shrink()
+                        : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        _sectionLabel(
+                          '소분류',
+                          icon: Icons.subdirectory_arrow_right_rounded,
+                          iconColor: AppColors.utility,
+                          iconBg: AppColors.utilitySoft,
+                          trailing: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.utility),
+                            tooltip: '소분류 추가',
+                            onPressed: () async {
+                              final newId = await showAddSubCategoryDialog(
+                                context,
+                                transactionType: 'income',
+                                parentName: _selectedParentCategory!,
+                              );
+                              if (newId != null) {
+                                await _loadCategories();
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedCategoryId = newId;
+                                    final matched = _incomeCategories.where((c) => c['id'] == newId);
+                                    _selectedCategoryName = matched.isNotEmpty ? matched.first['name'] : null;
+                                  });
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
+                          hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
+                          decoration: _fieldDecoration(),
+                          borderRadius: BorderRadius.circular(14),
+                          dropdownColor: Colors.white,
+                          items: childCategories.map((categoryData) {
+                            return DropdownMenuItem<String>(
+                              value: categoryData['id']?.toString(),
+                              child: Text(categoryData['name']?.toString() ?? '이름 없음'),
+                            );
+                          }).toList(),
+                          onChanged: childCategories.isEmpty ? null : (newId) {
+                            setState(() {
+                              _selectedCategoryId = newId;
+                              _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -526,7 +612,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                   TextField(
                     controller: _memoController,
                     style: const TextStyle(fontSize: 14, color: AppColors.ink),
-                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                    decoration: _fieldDecoration(hint: '메모 (선택)'),
                   ),
                 ],
               ),

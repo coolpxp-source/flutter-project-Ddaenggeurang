@@ -7,6 +7,8 @@ import '../../services/expense_service.dart';
 import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../widgets/common/amount_calculator_sheet.dart';
+import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
@@ -85,6 +87,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             debugPrint('카테고리 매칭 실패: $e');
           }
           _isInstallment = originalExpense.installmentPlanId != null;
+          if (_isInstallment && originalExpense.installmentTotalMonths != null) {
+            _installmentMonths = originalExpense.installmentTotalMonths!;
+          }
           _isRecurring = originalExpense.recurringPaymentId != null;
           _isTravel = originalExpense.travelId != null;
         });
@@ -200,6 +205,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         nature: _selectedNature,
         emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
         installmentPlanId: _isInstallment ? 'temp_install_id' : null,
+        installmentInstallmentNo: _isInstallment ? 1 : null,
+        installmentTotalMonths: _isInstallment ? _installmentMonths : null,
         recurringPaymentId: _isRecurring ? 'temp_recur_id' : null,
         travelId: _isTravel ? 'temp_travel_id' : null,
       );
@@ -257,7 +264,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg, Widget? trailing}) {
     return Row(
       children: [
         if (icon != null) ...[
@@ -273,10 +280,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
@@ -337,6 +347,21 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           widget.editItem == null ? '지출 기록' : '지출 수정',
           style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: '금액 계산기',
+            onPressed: () async {
+              final result = await showAmountCalculatorSheet(
+                context,
+                initialAmount: parseAmount(_amountController.text),
+              );
+              if (result != null) {
+                _amountController.text = comma(result);
+              }
+            },
+          ),
+        ],
       ),
       body: _isLoadingCategories
           ? const Center(child: CircularProgressIndicator(color: AppColors.expense))
@@ -504,31 +529,62 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       });
                     },
                   ),
-                  const SizedBox(height: 20),
-                  _sectionLabel('소분류',
-                      icon: Icons.subdirectory_arrow_right_rounded,
-                      iconColor: AppColors.utility,
-                      iconBg: AppColors.utilitySoft),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: childCategories.any((category) => category['id'] == _selectedCategoryId)
-                        ? _selectedCategoryId
-                        : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
-                    decoration: _fieldDecoration(),
-                    borderRadius: BorderRadius.circular(14),
-                    dropdownColor: Colors.white,
-                    items: childCategories.map((categoryData) {
-                      return DropdownMenuItem<String>(
-                        value: categoryData['id']?.toString(),
-                        child: Text(categoryData['name']?.toString() ?? '이름 없음'),
-                      );
-                    }).toList(),
-                    onChanged: _isSaving || _selectedParentCategory == null || childCategories.isEmpty
-                        ? null
-                        : (newId) {
-                      setState(() => _selectedCategoryId = newId);
-                    },
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _selectedParentCategory == null
+                        ? const SizedBox.shrink()
+                        : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        _sectionLabel(
+                          '소분류',
+                          icon: Icons.subdirectory_arrow_right_rounded,
+                          iconColor: AppColors.utility,
+                          iconBg: AppColors.utilitySoft,
+                          trailing: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.utility),
+                            tooltip: '소분류 추가',
+                            onPressed: () async {
+                              final newId = await showAddSubCategoryDialog(
+                                context,
+                                transactionType: 'expense',
+                                parentName: _selectedParentCategory!,
+                                nature: _selectedNature.name,
+                              );
+                              if (newId != null) {
+                                await _loadCategoriesFromDB();
+                                if (mounted) setState(() => _selectedCategoryId = newId);
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: childCategories.any((category) => category['id'] == _selectedCategoryId)
+                              ? _selectedCategoryId
+                              : null,
+                          hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
+                          decoration: _fieldDecoration(),
+                          borderRadius: BorderRadius.circular(14),
+                          dropdownColor: Colors.white,
+                          items: childCategories.map((categoryData) {
+                            return DropdownMenuItem<String>(
+                              value: categoryData['id']?.toString(),
+                              child: Text(categoryData['name']?.toString() ?? '이름 없음'),
+                            );
+                          }).toList(),
+                          onChanged: _isSaving || childCategories.isEmpty
+                              ? null
+                              : (newId) {
+                            setState(() => _selectedCategoryId = newId);
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -776,7 +832,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     controller: _memoController,
                     enabled: !_isSaving,
                     style: const TextStyle(fontSize: 14, color: AppColors.ink),
-                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                    decoration: _fieldDecoration(hint: '메모 (선택)'),
                   ),
                 ],
               ),
