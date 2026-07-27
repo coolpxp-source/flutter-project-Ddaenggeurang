@@ -9,6 +9,7 @@ import '../../models/income_model.dart';
 import '../../services/income_service.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../widgets/common/amount_calculator_sheet.dart';
 import '../../utils/korean_amount.dart';
 
 /// expense_input_screen.dart와 통일한 팔레트.
@@ -241,6 +242,21 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('수입 기록', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calculate_outlined),
+            tooltip: '금액 계산기',
+            onPressed: () async {
+              final result = await showAmountCalculatorSheet(
+                context,
+                initialAmount: _currentAmount,
+              );
+              if (result != null) {
+                _amountController.text = comma(result);
+              }
+            },
+          ),
+        ],
       ),
       body: _isLoadingCategories
           ? const Center(child: CircularProgressIndicator(color: AppColors.income))
@@ -329,6 +345,15 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         ),
                       ),
                     ),
+                  if (_currentAmount > 0)
+                    Text(
+                      koreanAmount(_currentAmount),
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
                   if (_selectedCategoryName == '프리랜서' && _currentAmount > 0) ...[
                     const SizedBox(height: 10),
                     Text(
@@ -375,28 +400,40 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       });
                     },
                   ),
-                  const SizedBox(height: 20),
-                  _sectionLabel('소분류',
-                      icon: Icons.subdirectory_arrow_right_rounded, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
-                  const SizedBox(height: 10),
-                  DropdownButtonFormField<String>(
-                    value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
-                    hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
-                    decoration: _fieldDecoration(),
-                    borderRadius: BorderRadius.circular(14),
-                    dropdownColor: Colors.white,
-                    items: childCategories.map((categoryData) {
-                      return DropdownMenuItem<String>(
-                        value: categoryData['id']?.toString(),
-                        child: Text(categoryData['name']?.toString() ?? '이름 없음'),
-                      );
-                    }).toList(),
-                    onChanged: _selectedParentCategory == null || childCategories.isEmpty ? null : (newId) {
-                      setState(() {
-                        _selectedCategoryId = newId;
-                        _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
-                      });
-                    },
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    child: _selectedParentCategory == null
+                        ? const SizedBox.shrink()
+                        : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 20),
+                        _sectionLabel('소분류',
+                            icon: Icons.subdirectory_arrow_right_rounded, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,
+                          hint: const Text('소분류 선택', style: TextStyle(color: AppColors.inkSub)),
+                          decoration: _fieldDecoration(),
+                          borderRadius: BorderRadius.circular(14),
+                          dropdownColor: Colors.white,
+                          items: childCategories.map((categoryData) {
+                            return DropdownMenuItem<String>(
+                              value: categoryData['id']?.toString(),
+                              child: Text(categoryData['name']?.toString() ?? '이름 없음'),
+                            );
+                          }).toList(),
+                          onChanged: childCategories.isEmpty ? null : (newId) {
+                            setState(() {
+                              _selectedCategoryId = newId;
+                              _selectedCategoryName = childCategories.firstWhere((c) => c['id'] == newId)['name'];
+                            });
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
