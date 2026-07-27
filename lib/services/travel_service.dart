@@ -4,6 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../models/travel_model.dart';
 
 class TravelService {
+  // 여행 생성자를 포함한 최대 참여 인원
+  static const int maxTravelMembers = 10;
+
   TravelService({
     FirebaseFirestore? firestore,
   }) : _db = firestore ?? FirebaseFirestore.instance;
@@ -47,7 +50,7 @@ class TravelService {
         'pendingMemberIds': <String>[],
 
         // 생성자 포함 최대 10명
-        'maxMembers': 10,
+        'maxMembers': maxTravelMembers,
 
         'isDeleted': false,
         'deletedAt': null,
@@ -272,10 +275,22 @@ class TravelService {
           throw StateError('이미 초대한 회원입니다.');
         }
 
-        if (!travel.canInviteMember) {
+        // 기존에 최대 8명으로 저장된 여행도 10명 기준으로 계산한다.
+        final Map<String, dynamic> data = snapshot.data()!;
+        final List<dynamic> memberIds =
+            data['memberIds'] as List<dynamic>? ?? <dynamic>[];
+        final List<dynamic> pendingMemberIds =
+            data['pendingMemberIds'] as List<dynamic>? ?? <dynamic>[];
+
+        final Set<String> reservedMemberIds = <String>{
+          ...memberIds.map((dynamic id) => id.toString()),
+          ...pendingMemberIds.map((dynamic id) => id.toString()),
+        };
+
+        if (reservedMemberIds.length >= maxTravelMembers) {
           throw StateError(
             '여행 인원은 생성자를 포함하여 '
-                '${travel.maxMembers}명까지 추가할 수 있습니다.',
+                '$maxTravelMembers명까지 추가할 수 있습니다.',
           );
         }
 
@@ -283,6 +298,8 @@ class TravelService {
           'pendingMemberIds': FieldValue.arrayUnion(
             [normalizedInvitedUserId],
           ),
+          // 예전에 생성된 8명 제한 문서도 자동으로 10명으로 변경
+          'maxMembers': maxTravelMembers,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
@@ -332,9 +349,9 @@ class TravelService {
           throw StateError('유효한 여행 초대가 없습니다.');
         }
 
-        if (travel.memberCount >= travel.maxMembers) {
+        if (travel.memberCount >= maxTravelMembers) {
           throw StateError(
-            '여행 인원이 이미 ${travel.maxMembers}명입니다.',
+            '여행 인원이 이미 $maxTravelMembers명입니다.',
           );
         }
 
@@ -345,6 +362,8 @@ class TravelService {
           'memberIds': FieldValue.arrayUnion(
             [normalizedUserId],
           ),
+          // 예전에 생성된 8명 제한 문서도 자동으로 10명으로 변경
+          'maxMembers': maxTravelMembers,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
