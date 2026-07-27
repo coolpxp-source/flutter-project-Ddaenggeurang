@@ -55,12 +55,19 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${user.coachTone.emoji} 코치 애칭 짓기',
-                  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              Text(
+                '${user.coachTone.emoji} 코치 애칭 짓기',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
               const SizedBox(height: 8),
-              const Text('앞으로 이 이름으로 불러드릴게요',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: _inkSub)),
+              const Text(
+                '앞으로 이 이름으로 불러드릴게요',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: _inkSub),
+              ),
               const SizedBox(height: 20),
               TextFormField(
                 controller: ctrl,
@@ -76,9 +83,14 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
                   hintText: user.coachTone.label,
                   filled: true,
                   fillColor: _bg,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
                   border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -91,8 +103,9 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         foregroundColor: _inkSub,
                         side: const BorderSide(color: Color(0xFFE8ECF3)),
-                        shape:
-                            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('기본 이름으로'),
                     ),
@@ -110,8 +123,9 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
                         backgroundColor: _accent,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        shape:
-                            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: const Text('저장'),
                     ),
@@ -137,59 +151,76 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
         foregroundColor: _ink,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
-        title: const Text('잔소리 캐릭터 설정', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          '잔소리 캐릭터 설정',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
       body: StreamBuilder<UserModel?>(
         stream: _userService.watchUser(_uid),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: _accent));
+            return const Center(
+              child: CircularProgressIndicator(color: _accent),
+            );
           }
           final user = snapshot.data!;
           final selected = user.coachTone;
 
           return ListView(
             padding: const EdgeInsets.all(20),
-            children: [
-              _AffectionCard(tone: selected, affection: user.coachAffection),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _CoachActionButton(
-                      icon: Icons.edit_outlined,
-                      label: '${user.coachDisplayName} 애칭 짓기',
-                      onTap: () => _editNickname(user),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _CoachActionButton(
-                      icon: Icons.back_hand_outlined,
-                      label: '오늘의 가위바위보',
-                      onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const CoachRpsScreen())),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text('코치의 성향에 따라 잔소리 수위가 달라져요',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: _inkSub)),
-              const SizedBox(height: 16),
-              ...CoachTone.values.map((tone) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _CoachCard(
-                  tone: tone,
-                  selected: tone == selected,
-                  disabled: _saving,
-                  onTap: () => _select(tone),
-                ),
-              )),
-            ]
-                .animate(interval: 70.ms)
-                .fadeIn(duration: 360.ms, curve: Curves.easeOut)
-                .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
+            children:
+                [
+                      _AffectionCard(user: user),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _CoachActionButton(
+                              icon: Icons.edit_outlined,
+                              label: '${user.coachDisplayName} 애칭 짓기',
+                              onTap: () => _editNickname(user),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _CoachActionButton(
+                              icon: Icons.back_hand_outlined,
+                              label: '오늘의 가위바위보',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const CoachRpsScreen(),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        '코치의 성향에 따라 잔소리 수위가 달라져요',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: _inkSub,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      ...CoachTone.values.map(
+                        (tone) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _CoachCard(
+                            tone: tone,
+                            selected: tone == selected,
+                            disabled: _saving,
+                            onTap: () => _select(tone),
+                          ),
+                        ),
+                      ),
+                    ]
+                    .animate(interval: 70.ms)
+                    .fadeIn(duration: 360.ms, curve: Curves.easeOut)
+                    .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
           );
         },
       ),
@@ -197,41 +228,23 @@ class _CoachToneSettingScreenState extends State<CoachToneSettingScreen> {
   }
 }
 
-/// 친밀도 30점마다 한 단계씩 — AI상담 한 번에 5점씩 쌓이므로 6번 상담하면
-/// 다음 단계로 넘어간다. 5단계(150점)에서 최고 단계로 고정.
-const _affectionPerLevel = 30;
-const _maxAffectionLevel = 5;
-
-int _affectionLevel(int affection) =>
-    (1 + affection ~/ _affectionPerLevel).clamp(1, _maxAffectionLevel);
-
-String _affectionTitle(int level) {
-  switch (level) {
-    case 1:
-      return '처음 만난 사이';
-    case 2:
-      return '조금씩 친해지는 중';
-    case 3:
-      return '편하게 대화하는 사이';
-    case 4:
-      return '단짝 친구';
-    default:
-      return '영혼의 단짝';
-  }
-}
-
 /// 친밀도 게이지 카드 — AI상담을 쌓을수록 지금 고른 코치와 얼마나 가까워졌는지 보여준다.
+/// 레벨/단계 계산은 마이페이지 홈에서도 똑같이 노출하므로 UserModel에 공유돼 있다.
 class _AffectionCard extends StatelessWidget {
-  final CoachTone tone;
-  final int affection;
-  const _AffectionCard({required this.tone, required this.affection});
+  final UserModel user;
+  const _AffectionCard({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    final level = _affectionLevel(affection);
-    final isMax = level >= _maxAffectionLevel;
-    final intoLevel = affection - (level - 1) * _affectionPerLevel;
-    final progress = isMax ? 1.0 : (intoLevel / _affectionPerLevel).clamp(0.0, 1.0);
+    final tone = user.coachTone;
+    final affection = user.coachAffection;
+    final level = user.coachAffectionLevel;
+    final isMax = level >= UserModel.coachAffectionMaxLevel;
+    final intoLevel =
+        affection - (level - 1) * UserModel.coachAffectionPerLevel;
+    final progress = isMax
+        ? 1.0
+        : (intoLevel / UserModel.coachAffectionPerLevel).clamp(0.0, 1.0);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -239,7 +252,11 @@ class _AffectionCard extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: _ink.withValues(alpha: 0.05), blurRadius: 16, offset: const Offset(0, 6)),
+          BoxShadow(
+            color: _ink.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Row(
@@ -253,13 +270,23 @@ class _AffectionCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('친밀도 Lv.$level',
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800, color: _ink)),
+                    Text(
+                      '친밀도 Lv.$level',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: _ink,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    Text(_affectionTitle(level),
-                        style: const TextStyle(
-                            fontSize: 11.5, fontWeight: FontWeight.w700, color: _inkSub)),
+                    Text(
+                      user.coachAffectionTitle,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: _inkSub,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -274,8 +301,14 @@ class _AffectionCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isMax ? '최고 단계에 도달했어요!' : '다음 단계까지 ${_affectionPerLevel - intoLevel}점',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _inkSub),
+                  isMax
+                      ? '최고 단계에 도달했어요!'
+                      : '다음 단계까지 ${UserModel.coachAffectionPerLevel - intoLevel}점',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: _inkSub,
+                  ),
                 ),
               ],
             ),
@@ -291,7 +324,11 @@ class _CoachActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _CoachActionButton({required this.icon, required this.label, required this.onTap});
+  const _CoachActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -304,18 +341,28 @@ class _CoachActionButton extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(color: _ink.withValues(alpha: 0.045), blurRadius: 12, offset: const Offset(0, 4)),
+            BoxShadow(
+              color: _ink.withValues(alpha: 0.045),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Column(
           children: [
             Icon(icon, size: 18, color: _accent),
             const SizedBox(height: 6),
-            Text(label,
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _ink)),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+                color: _ink,
+              ),
+            ),
           ],
         ),
       ),
@@ -360,19 +407,34 @@ void _showEasterEgg(BuildContext context, CoachTone tone) {
       backgroundColor: Colors.transparent,
       child: Container(
         padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('🎉 히든 대사 발견!',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _accent)),
+            const Text(
+              '🎉 히든 대사 발견!',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: _accent,
+              ),
+            ),
             const SizedBox(height: 14),
             CoachAvatar(imagePath: tone.imagePath, size: 72),
             const SizedBox(height: 14),
-            Text(_hiddenLine(tone),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 13.5, fontWeight: FontWeight.w600, color: _ink, height: 1.5)),
+            Text(
+              _hiddenLine(tone),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: _ink,
+                height: 1.5,
+              ),
+            ),
           ],
         ),
       ),
@@ -439,14 +501,18 @@ class _CoachCard extends StatelessWidget {
                         end: Alignment.bottomRight,
                         colors: selected
                             ? [Colors.white, const Color(0xFFFFF4D6)]
-                            : [const Color(0xFFFFF8E5), const Color(0xFFFFEFC7)],
+                            : [
+                                const Color(0xFFFFF8E5),
+                                const Color(0xFFFFEFC7),
+                              ],
                       ),
                       boxShadow: selected
                           ? [
                               BoxShadow(
-                                  color: _accent.withValues(alpha: 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3)),
+                                color: _accent.withValues(alpha: 0.2),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
                             ]
                           : null,
                     ),
@@ -461,21 +527,34 @@ class _CoachCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(tone.label,
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.w800, color: _ink)),
+                          Text(
+                            tone.label,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: _ink,
+                            ),
+                          ),
                           const SizedBox(width: 6),
-                          Text(tone.title,
-                              style: const TextStyle(
-                                  fontSize: 11.5, fontWeight: FontWeight.w700, color: _inkSub)),
+                          Text(
+                            tone.title,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: _inkSub,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(tone.desc,
-                          style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF4E5968))),
+                      Text(
+                        tone.desc,
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF4E5968),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -499,13 +578,16 @@ class _CoachCard extends StatelessWidget {
                 children: [
                   const Text('💬 ', style: TextStyle(fontSize: 12)),
                   Expanded(
-                    child: Text(_exampleLine(tone),
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFF4E5968),
-                            height: 1.4)),
+                    child: Text(
+                      _exampleLine(tone),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFF4E5968),
+                        height: 1.4,
+                      ),
+                    ),
                   ),
                 ],
               ),

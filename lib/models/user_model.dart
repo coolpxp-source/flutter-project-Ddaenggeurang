@@ -29,26 +29,25 @@ class NotificationSettings {
     bool? fixedExpenseAlert,
     bool? subscriptionAlert,
     bool? cardPointExpiryAlert,
-  }) =>
-      NotificationSettings(
-        fixedExpenseAlert: fixedExpenseAlert ?? this.fixedExpenseAlert,
-        subscriptionAlert: subscriptionAlert ?? this.subscriptionAlert,
-        cardPointExpiryAlert: cardPointExpiryAlert ?? this.cardPointExpiryAlert,
-      );
+  }) => NotificationSettings(
+    fixedExpenseAlert: fixedExpenseAlert ?? this.fixedExpenseAlert,
+    subscriptionAlert: subscriptionAlert ?? this.subscriptionAlert,
+    cardPointExpiryAlert: cardPointExpiryAlert ?? this.cardPointExpiryAlert,
+  );
 }
 
 class UserModel {
   final String userId;
   final String nickname;
   final String email;
-  final String authProvider;   // google | kakao | naver | apple
-  final int salary;            // 월 수입
-  final String ageGroup;       // "20대"
+  final String authProvider; // google | kakao | naver | apple
+  final int salary; // 월 수입
+  final String ageGroup; // "20대"
   final String job;
   final int points;
   final int level;
   final Map<String, String?> equippedItems;
-  final CoachTone coachTone;   // nagCharacterStyle
+  final CoachTone coachTone; // nagCharacterStyle
   final NotificationSettings notificationSettings;
   final String? lastLoginDate; // "yyyy-MM-dd" — 연속 접속 스트릭 계산용
   final int loginStreak;
@@ -68,7 +67,10 @@ class UserModel {
     this.points = 0,
     this.level = 1,
     this.equippedItems = const {
-      'hat': null, 'clothes': null, 'shoes': null, 'accessory': null,
+      'hat': null,
+      'clothes': null,
+      'shoes': null,
+      'accessory': null,
     },
     this.coachTone = CoachTone.ddaengjwi,
     this.notificationSettings = const NotificationSettings(),
@@ -81,7 +83,33 @@ class UserModel {
   });
 
   /// 화면에 코치를 부를 때 쓰는 이름 — 애칭을 지어줬으면 그걸, 아니면 톤 기본 이름.
-  String get coachDisplayName => coachNickname.trim().isEmpty ? coachTone.label : coachNickname.trim();
+  String get coachDisplayName =>
+      coachNickname.trim().isEmpty ? coachTone.label : coachNickname.trim();
+
+  /// 친밀도 30점마다 한 단계씩 — AI상담 한 번에 5점씩 쌓이므로 6번 상담하면
+  /// 다음 단계로 넘어간다. 5단계(150점)에서 최고 단계로 고정.
+  /// coach_tone_setting_screen.dart와 mypage_home_screen.dart가 같은 기준으로
+  /// 노출해야 해서 모델에 두고 공유한다.
+  static const coachAffectionPerLevel = 30;
+  static const coachAffectionMaxLevel = 5;
+
+  int get coachAffectionLevel => (1 + coachAffection ~/ coachAffectionPerLevel)
+      .clamp(1, coachAffectionMaxLevel);
+
+  String get coachAffectionTitle {
+    switch (coachAffectionLevel) {
+      case 1:
+        return '처음 만난 사이';
+      case 2:
+        return '조금씩 친해지는 중';
+      case 3:
+        return '편하게 대화하는 사이';
+      case 4:
+        return '단짝 친구';
+      default:
+        return '영혼의 단짝';
+    }
+  }
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;
@@ -96,10 +124,18 @@ class UserModel {
       points: (d['points'] ?? 0).toInt(),
       level: (d['level'] ?? 1).toInt(),
       equippedItems: Map<String, String?>.from(
-          d['equippedItems'] ?? const {'hat': null, 'clothes': null, 'shoes': null, 'accessory': null}),
+        d['equippedItems'] ??
+            const {
+              'hat': null,
+              'clothes': null,
+              'shoes': null,
+              'accessory': null,
+            },
+      ),
       coachTone: CoachTone.fromCode(d['nagCharacterStyle']),
-      notificationSettings:
-      NotificationSettings.fromMap(d['notificationSettings']),
+      notificationSettings: NotificationSettings.fromMap(
+        d['notificationSettings'],
+      ),
       lastLoginDate: d['lastLoginDate'] as String?,
       loginStreak: (d['loginStreak'] ?? 0).toInt(),
       coachAffection: (d['coachAffection'] ?? 0).toInt(),
