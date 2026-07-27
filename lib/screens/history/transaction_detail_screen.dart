@@ -38,6 +38,85 @@ class TransactionDetailScreen extends StatelessWidget {
         ? const [Color(0xFF2DD4BF), Color(0xFF0D9488)]
         : const [Color(0xFF34D399), Color(0xFF10B981)];
 
+    // ── 지출 전용: 할부/정기결제/여행 등 부가 정보 ──
+    final List<Widget> expenseExtraRows = [];
+    if (isExpense) {
+      if (item.isInstallment) {
+        expenseExtraRows.add(_buildInfoRow(
+          '할부',
+          item.installmentTotalMonths != null ? '총 ${item.installmentTotalMonths}개월 할부' : '할부 결제 진행 중',
+        ));
+      }
+      if (item.isRecurring) {
+        expenseExtraRows.add(_buildInfoRow('정기결제', '매달 자동으로 결제되는 항목'));
+      }
+      if (item.isTravel) {
+        expenseExtraRows.add(_buildInfoRow('여행 지출', '진행 중인 여행 예산에 포함'));
+      }
+    }
+    final Widget? expenseExtraCard = _rowsCard(
+      title: '부가 정보',
+      icon: Icons.label_outline_rounded,
+      iconColor: typeColor,
+      iconBg: typeColor.withValues(alpha: 0.15),
+      rows: expenseExtraRows,
+    );
+
+    // ── 저축 전용: 계좌/반복/환급금액을 한 카드로 통합 ──
+    final List<Widget> savingDetailRows = [];
+    if (isSaving) {
+      if (item.accountName != null && item.accountName!.isNotEmpty) {
+        savingDetailRows.add(_buildInfoRow('저축 계좌', item.accountName!));
+      }
+      if (item.isRecurring) {
+        savingDetailRows.add(_buildInfoRow('반복 여부', '매달 자동으로 적립/투자'));
+      }
+      if (isCompletedSaving && item.returnedAmount != null) {
+        savingDetailRows.add(_buildInfoRow('환급 금액', '${CurrencyFormatter.format(item.returnedAmount!)}원'));
+      }
+    }
+    final Widget? savingDetailCard = _rowsCard(
+      title: '저축 상세',
+      icon: Icons.account_balance_outlined,
+      iconColor: AppColors.saving,
+      iconBg: AppColors.savingSoft,
+      rows: savingDetailRows,
+    );
+
+    // ── 저축 전용: 투자 상세 (증권사/종목명/수량) ──
+    final List<Widget> investmentRows = [];
+    if (isSaving && item.investmentDetail != null) {
+      final inv = item.investmentDetail!;
+      investmentRows.add(_buildInfoRow('증권사', inv.brokerage));
+      investmentRows.add(_buildInfoRow('종목명', inv.assetName));
+      if (inv.quantity != null) {
+        investmentRows.add(_buildInfoRow('매수 수량', '${inv.quantity}'));
+      }
+    }
+    final Widget? investmentCard = _rowsCard(
+      title: '투자 상세',
+      icon: Icons.show_chart_rounded,
+      iconColor: AppColors.saving,
+      iconBg: AppColors.savingSoft,
+      rows: investmentRows,
+    );
+
+    // ── 수입 전용: 정기 수입 여부 ──
+    final List<Widget> incomeExtraRows = [];
+    if (isIncome && item.isRecurring) {
+      incomeExtraRows.add(_buildInfoRow(
+        '정기 수입',
+        item.recurringPayDay != null ? '매달 ${item.recurringPayDay}일 자동 기록' : '매달 자동으로 기록되는 수입',
+      ));
+    }
+    final Widget? incomeExtraCard = _rowsCard(
+      title: '부가 정보',
+      icon: Icons.label_outline_rounded,
+      iconColor: AppColors.income,
+      iconBg: AppColors.incomeSoft,
+      rows: incomeExtraRows,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -194,7 +273,15 @@ class TransactionDetailScreen extends StatelessWidget {
                   _sectionLabel('기본 정보',
                       icon: Icons.event_rounded, iconColor: typeColor, iconBg: typeColor.withValues(alpha: 0.15)),
                   const SizedBox(height: 14),
+                  if (item.parentCategory != null && item.parentCategory!.isNotEmpty) ...[
+                    _buildInfoRow('카테고리', '${item.parentCategory} · ${item.title}'),
+                    const SizedBox(height: 14),
+                  ],
                   _buildInfoRow('일시', DateFormatter.formatDayAndWeekday(item.date)),
+                  if (isExpense && item.nature != null) ...[
+                    const SizedBox(height: 14),
+                    _buildInfoRow('지출 성격', _natureLabel(item.nature)),
+                  ],
                   if (item.subtitle != null && item.subtitle!.isNotEmpty) ...[
                     const SizedBox(height: 14),
                     _buildInfoRow('메모', item.subtitle!),
@@ -202,6 +289,12 @@ class TransactionDetailScreen extends StatelessWidget {
                 ],
               ),
             ),
+
+            // ── 지출 전용: 할부/정기결제/여행 부가 정보 ──
+            if (expenseExtraCard != null) ...[
+              const SizedBox(height: 16),
+              expenseExtraCard,
+            ],
 
             // ── 지출 전용: 감정 태그 ──
             if (isExpense && item.emotionTag != null) ...[
@@ -219,22 +312,22 @@ class TransactionDetailScreen extends StatelessWidget {
               ),
             ],
 
-            // ── 저축 전용: 계좌 정보 ──
-            if (isSaving && item.accountName != null) ...[
+            // ── 저축 전용: 계좌/반복/환급금액 ──
+            if (savingDetailCard != null) ...[
               const SizedBox(height: 16),
-              _sectionCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionLabel('계좌 정보',
-                        icon: Icons.account_balance_outlined,
-                        iconColor: AppColors.saving,
-                        iconBg: AppColors.savingSoft),
-                    const SizedBox(height: 14),
-                    _buildInfoRow('저축 계좌', item.accountName!),
-                  ],
-                ),
-              ),
+              savingDetailCard,
+            ],
+
+            // ── 저축 전용: 투자 상세 ──
+            if (investmentCard != null) ...[
+              const SizedBox(height: 16),
+              investmentCard,
+            ],
+
+            // ── 수입 전용: 정기 수입 부가 정보 ──
+            if (incomeExtraCard != null) ...[
+              const SizedBox(height: 16),
+              incomeExtraCard,
             ],
 
             // ── 수입 전용: 안내 카드 ──
@@ -271,6 +364,43 @@ class TransactionDetailScreen extends StatelessWidget {
   }
 
   // ─────────────────────── 스타일 헬퍼 (다른 입력 화면과 통일) ───────────────────────
+
+  // rows가 비어있으면 카드 자체를 렌더링하지 않음 (선택적 부가 정보 카드용)
+  Widget? _rowsCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required List<Widget> rows,
+  }) {
+    if (rows.isEmpty) return null;
+    return _sectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionLabel(title, icon: icon, iconColor: iconColor, iconBg: iconBg),
+          const SizedBox(height: 14),
+          for (int i = 0; i < rows.length; i++) ...[
+            rows[i],
+            if (i != rows.length - 1) const SizedBox(height: 14),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _natureLabel(String? code) {
+    switch (code) {
+      case 'fixed':
+        return '고정비';
+      case 'variable':
+        return '변동비';
+      case 'other':
+        return '기타';
+      default:
+        return '-';
+    }
+  }
 
   Widget _sectionCard({required Widget child}) {
     return Container(

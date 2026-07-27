@@ -57,6 +57,9 @@ class ExpenseModel {
   /// 할부 회차
   final int? installmentInstallmentNo;
 
+  /// 할부 총 개월수 (예: 3개월 할부 → 3)
+  final int? installmentTotalMonths;
+
   /// 정기결제에서 자동 생성된 경우 원본 정기결제 ID
   final String? recurringPaymentId;
 
@@ -90,6 +93,7 @@ class ExpenseModel {
     this.isQuickInput = false,
     this.installmentPlanId,
     this.installmentInstallmentNo,
+    this.installmentTotalMonths,
     this.recurringPaymentId,
     this.isAmountAdjusted = false,
     this.travelId,
@@ -125,6 +129,7 @@ class ExpenseModel {
       isQuickInput: data['isQuickInput'] == true,
       installmentPlanId: data['installmentPlanId'] as String?,
       installmentInstallmentNo: (data['installmentInstallmentNo'] as num?)?.toInt(),
+      installmentTotalMonths: (data['installmentTotalMonths'] as num?)?.toInt(),
       recurringPaymentId: data['recurringPaymentId'] as String?,
       isAmountAdjusted: data['isAmountAdjusted'] == true,
       travelId: data['travelId'] as String?,
@@ -148,6 +153,7 @@ class ExpenseModel {
       'isQuickInput': isQuickInput,
       'installmentPlanId': installmentPlanId,
       'installmentInstallmentNo': installmentInstallmentNo,
+      'installmentTotalMonths': installmentTotalMonths,
       'recurringPaymentId': recurringPaymentId,
       'isAmountAdjusted': isAmountAdjusted,
       'travelId': travelId,
@@ -172,6 +178,7 @@ class ExpenseModel {
     bool? isQuickInput,
     String? installmentPlanId,
     int? installmentInstallmentNo,
+    int? installmentTotalMonths,
     String? recurringPaymentId,
     bool? isAmountAdjusted,
     String? travelId,
@@ -192,6 +199,7 @@ class ExpenseModel {
       isQuickInput: isQuickInput ?? this.isQuickInput,
       installmentPlanId: installmentPlanId ?? this.installmentPlanId,
       installmentInstallmentNo: installmentInstallmentNo ?? this.installmentInstallmentNo,
+      installmentTotalMonths: installmentTotalMonths ?? this.installmentTotalMonths,
       recurringPaymentId: recurringPaymentId ?? this.recurringPaymentId,
       isAmountAdjusted: isAmountAdjusted ?? this.isAmountAdjusted,
       travelId: travelId ?? this.travelId,

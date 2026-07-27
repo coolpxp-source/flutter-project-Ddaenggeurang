@@ -11,6 +11,9 @@ class IncomeModel {
   final DateTime date;
   final String? memo;
   final String? recurringIncomeTemplateId;
+
+  /// 정기수입일 때 매달 입금되는 날짜 (예: 25일 → 25). recurringIncomeTemplateId가 있을 때만 의미 있음
+  final int? recurringPayDay;
   final bool isDeleted;
   final DateTime? deletedAt;
   final DateTime? createdAt;
@@ -23,6 +26,7 @@ class IncomeModel {
     required this.date,
     this.memo,
     this.recurringIncomeTemplateId,
+    this.recurringPayDay,
     this.isDeleted = false,
     this.deletedAt,
     this.createdAt,
@@ -43,6 +47,7 @@ class IncomeModel {
       date: (d['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       memo: d['memo'] as String?,
       recurringIncomeTemplateId: d['recurringIncomeTemplateId'] as String?,
+      recurringPayDay: (d['recurringPayDay'] as num?)?.toInt(),
       isDeleted: d['isDeleted'] ?? false,
       deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
@@ -56,6 +61,7 @@ class IncomeModel {
     'date': Timestamp.fromDate(date),
     'memo': memo,
     'recurringIncomeTemplateId': recurringIncomeTemplateId,
+    'recurringPayDay': recurringPayDay,
     'isDeleted': isDeleted,
     'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'createdAt': createdAt != null
@@ -71,6 +77,7 @@ class IncomeModel {
     DateTime? date,
     String? memo,
     String? recurringIncomeTemplateId,
+    int? recurringPayDay,
     bool? isDeleted,
     DateTime? deletedAt,
   }) {
@@ -82,6 +89,7 @@ class IncomeModel {
         date: date ?? this.date,
         memo: memo ?? this.memo,
         recurringIncomeTemplateId: recurringIncomeTemplateId ?? this.recurringIncomeTemplateId,
+        recurringPayDay: recurringPayDay ?? this.recurringPayDay,
         isDeleted: isDeleted ?? this.isDeleted,
         deletedAt: deletedAt ?? this.deletedAt,
         createdAt: createdAt

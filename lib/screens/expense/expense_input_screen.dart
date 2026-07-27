@@ -87,6 +87,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             debugPrint('카테고리 매칭 실패: $e');
           }
           _isInstallment = originalExpense.installmentPlanId != null;
+          if (_isInstallment && originalExpense.installmentTotalMonths != null) {
+            _installmentMonths = originalExpense.installmentTotalMonths!;
+          }
           _isRecurring = originalExpense.recurringPaymentId != null;
           _isTravel = originalExpense.travelId != null;
         });
@@ -202,6 +205,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         nature: _selectedNature,
         emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
         installmentPlanId: _isInstallment ? 'temp_install_id' : null,
+        installmentInstallmentNo: _isInstallment ? 1 : null,
+        installmentTotalMonths: _isInstallment ? _installmentMonths : null,
         recurringPaymentId: _isRecurring ? 'temp_recur_id' : null,
         travelId: _isTravel ? 'temp_travel_id' : null,
       );

@@ -52,12 +52,30 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _currentAmount = item.amount;
+      _fetchOriginalIncome(item.id);
     }
 
     _amountController.addListener(() {
       final text = _amountController.text.replaceAll(',', '');
       setState(() => _currentAmount = int.tryParse(text) ?? 0);
     });
+  }
+
+  Future<void> _fetchOriginalIncome(String docId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('incomes').doc(docId).get();
+      if (doc.exists && mounted) {
+        final original = IncomeModel.fromFirestore(doc);
+        setState(() {
+          _isRecurring = original.recurringIncomeTemplateId != null;
+          if (original.recurringPayDay != null) {
+            _payDay = original.recurringPayDay!;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('원본 수입 내역 로드 실패: $e');
+    }
   }
 
   @override
@@ -134,6 +152,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         date: _selectedDate,
         memo: _memoController.text,
         recurringIncomeTemplateId: recurringTemplateId,
+        recurringPayDay: _isRecurring ? _payDay : null,
       );
 
       if (widget.editItem == null) {
