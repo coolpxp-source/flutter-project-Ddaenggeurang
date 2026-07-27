@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/notification_entry_model.dart';
 import '../../services/notification_history_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 
 const _accent = Color(0xFFF5A623);
@@ -18,7 +19,8 @@ class NotificationHistoryScreen extends StatefulWidget {
   const NotificationHistoryScreen({super.key});
 
   @override
-  State<NotificationHistoryScreen> createState() => _NotificationHistoryScreenState();
+  State<NotificationHistoryScreen> createState() =>
+      _NotificationHistoryScreenState();
 }
 
 class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
@@ -59,13 +61,35 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
       case 'nagging':
         return (Icons.record_voice_over_rounded, _purple, _purpleSoft);
       case 'resolution':
-        return (Icons.wb_sunny_rounded, const Color(0xFF00C2A8), const Color(0xFFDBF7F3));
+        return (
+          Icons.wb_sunny_rounded,
+          const Color(0xFF00C2A8),
+          const Color(0xFFDBF7F3),
+        );
       case 'streak':
-        return (Icons.local_fire_department_rounded, const Color(0xFFF04438),
-            const Color(0xFFFEE4E2));
+        return (
+          Icons.local_fire_department_rounded,
+          const Color(0xFFF04438),
+          const Color(0xFFFEE4E2),
+        );
       case 'levelup':
-        return (Icons.military_tech_rounded, const Color(0xFFFFB300),
-            const Color(0xFFFFF3D6));
+        return (
+          Icons.military_tech_rounded,
+          const Color(0xFFFFB300),
+          const Color(0xFFFFF3D6),
+        );
+      case 'budget_warning':
+        return (
+          Icons.savings_outlined,
+          const Color(0xFFF04438),
+          const Color(0xFFFEE4E2),
+        );
+      case 'consult':
+        return (
+          Icons.chat_bubble_outline_rounded,
+          const Color(0xFF2F6BFF),
+          const Color(0xFFEEF4FF),
+        );
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
     }
@@ -106,27 +130,36 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
             ),
           ),
           StreamBuilder<List<NotificationEntry>>(
-        stream: _service.watchHistory(_uid),
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return const Center(
-                child: CircularProgressIndicator(color: _accent, strokeWidth: 2.4));
-          }
-          final items = snap.data!;
-          WidgetsBinding.instance.addPostFrameCallback((_) => _markAllRead(items));
+            stream: _service.watchHistory(_uid),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: _accent,
+                    strokeWidth: 2.4,
+                  ),
+                );
+              }
+              final items = snap.data!;
+              WidgetsBinding.instance.addPostFrameCallback(
+                (_) => _markAllRead(items),
+              );
 
-          if (items.isEmpty) {
-            return const _EmptyHistory();
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
-            itemBuilder: (context, i) =>
-                _NotificationCard(entry: items[i], uid: _uid, visual: _visualFor(items[i].type),
-                    relativeTime: _relativeTime(items[i].date)),
-          );
-        },
+              if (items.isEmpty) {
+                return const _EmptyHistory();
+              }
+              return ListView.separated(
+                padding: const EdgeInsets.all(20),
+                itemCount: items.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                itemBuilder: (context, i) => _NotificationCard(
+                  entry: items[i],
+                  uid: _uid,
+                  visual: _visualFor(items[i].type),
+                  relativeTime: _relativeTime(items[i].date),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -145,14 +178,26 @@ class _EmptyHistory extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.notifications_none_rounded, size: 44, color: _inkSub),
+            const Icon(
+              Icons.notifications_none_rounded,
+              size: 44,
+              color: _inkSub,
+            ),
             const SizedBox(height: 14),
-            const Text('아직 온 알림이 없어요',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink)),
+            const Text(
+              '아직 온 알림이 없어요',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: _ink,
+              ),
+            ),
             const SizedBox(height: 6),
-            const Text('상담 리마인더, 오늘의 잔소리 같은 알림이\n오면 여기에 모여요',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, color: _inkSub, height: 1.5)),
+            const Text(
+              '상담 리마인더, 오늘의 잔소리 같은 알림이\n오면 여기에 모여요',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: _inkSub, height: 1.5),
+            ),
           ],
         ),
       ),
@@ -175,70 +220,102 @@ class _NotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, color, soft) = visual;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: entry.read ? Colors.white : soft.withValues(alpha: 0.5),
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: _ink.withValues(alpha: 0.045), blurRadius: 14, offset: const Offset(0, 5)),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [soft, Color.lerp(soft, Colors.white, 0.15)!],
+        onTap: () => NotificationService.navigateForPayload(entry.type),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: entry.read ? Colors.white : soft.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: _ink.withValues(alpha: 0.045),
+                blurRadius: 14,
+                offset: const Offset(0, 5),
               ),
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: color.withValues(alpha: 0.18), blurRadius: 8, offset: const Offset(0, 3)),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 19, color: color),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(entry.title,
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w800, color: _ink)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [soft, Color.lerp(soft, Colors.white, 0.15)!],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
-                    Text(relativeTime,
-                        style: const TextStyle(
-                            fontSize: 10.5, fontWeight: FontWeight.w600, color: _inkSub)),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(entry.body,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w500, color: _inkSub, height: 1.4)),
-              ],
-            ),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 19, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            entry.title,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                              color: _ink,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          relativeTime,
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: _inkSub,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      entry.body,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                        color: _inkSub,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              InkWell(
+                onTap: () => NotificationHistoryService().delete(uid, entry.id),
+                borderRadius: BorderRadius.circular(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.close_rounded, size: 16, color: _inkSub),
+                ),
+              ),
+            ],
           ),
-          InkWell(
-            onTap: () => NotificationHistoryService().delete(uid, entry.id),
-            borderRadius: BorderRadius.circular(20),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.close_rounded, size: 16, color: _inkSub),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

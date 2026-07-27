@@ -54,6 +54,7 @@ class _DdaengAppState extends State<DdaengApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: NotificationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       title: '땡그랑',
       theme: ThemeData(
@@ -138,6 +139,7 @@ class AppGate extends StatelessWidget {
             unawaited(_maybeCelebrateLevelUp(user.uid, profile));
             unawaited(_maybeWarnBudgetOverage(user.uid, profile));
             _syncAppBadgeForUser(user.uid);
+            _maybeHandleNotificationLaunch();
             return const HomeScreen();
           },
         );
@@ -160,6 +162,17 @@ void _syncAppBadgeForUser(String uid) {
   _badgeSub = NotificationHistoryService()
       .watchUnreadCount(uid)
       .listen((count) => AppBadgeService.instance.setCount(count));
+}
+
+/// 알림을 탭해서 앱이 콜드 스타트로 열린 경우, 보관해둔 payload를 한 번 소비해서
+/// 관련 화면으로 이동한다. NotificationService가 알아서 한 번만 반환하므로(그 뒤엔
+/// null) 프로필 스트림이 다시 갱신돼 이 함수가 재호출돼도 중복 이동하지 않는다.
+void _maybeHandleNotificationLaunch() {
+  final payload = NotificationService.instance.consumePendingLaunchPayload();
+  if (payload == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    NotificationService.navigateForPayload(payload);
+  });
 }
 
 void _cancelAppBadgeSync() {
