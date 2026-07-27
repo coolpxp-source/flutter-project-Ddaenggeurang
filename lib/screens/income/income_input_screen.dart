@@ -10,6 +10,7 @@ import '../../services/income_service.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../../widgets/common/amount_calculator_sheet.dart';
+import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
 
 /// expense_input_screen.dart와 통일한 팔레트.
@@ -47,7 +48,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
 
     if (widget.editItem != null) {
       final item = widget.editItem!;
-      _amountController.text = item.amount.toString();
+      _amountController.text = comma(item.amount);
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _currentAmount = item.amount;
@@ -167,7 +168,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg, Widget? trailing}) {
     return Row(
       children: [
         if (icon != null) ...[
@@ -183,10 +184,13 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
@@ -410,8 +414,34 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 20),
-                        _sectionLabel('소분류',
-                            icon: Icons.subdirectory_arrow_right_rounded, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
+                        _sectionLabel(
+                          '소분류',
+                          icon: Icons.subdirectory_arrow_right_rounded,
+                          iconColor: AppColors.utility,
+                          iconBg: AppColors.utilitySoft,
+                          trailing: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.utility),
+                            tooltip: '소분류 추가',
+                            onPressed: () async {
+                              final newId = await showAddSubCategoryDialog(
+                                context,
+                                transactionType: 'income',
+                                parentName: _selectedParentCategory!,
+                              );
+                              if (newId != null) {
+                                await _loadCategories();
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedCategoryId = newId;
+                                    final matched = _incomeCategories.where((c) => c['id'] == newId);
+                                    _selectedCategoryName = matched.isNotEmpty ? matched.first['name'] : null;
+                                  });
+                                }
+                              }
+                            },
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
                           value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,

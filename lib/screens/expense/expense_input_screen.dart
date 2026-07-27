@@ -8,6 +8,7 @@ import '../../utils/formatters.dart';
 import '../../models/transaction_item.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../../widgets/common/amount_calculator_sheet.dart';
+import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
@@ -258,7 +259,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg, Widget? trailing}) {
     return Row(
       children: [
         if (icon != null) ...[
@@ -274,10 +275,13 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
@@ -530,10 +534,29 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 20),
-                        _sectionLabel('소분류',
-                            icon: Icons.subdirectory_arrow_right_rounded,
-                            iconColor: AppColors.utility,
-                            iconBg: AppColors.utilitySoft),
+                        _sectionLabel(
+                          '소분류',
+                          icon: Icons.subdirectory_arrow_right_rounded,
+                          iconColor: AppColors.utility,
+                          iconBg: AppColors.utilitySoft,
+                          trailing: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.utility),
+                            tooltip: '소분류 추가',
+                            onPressed: () async {
+                              final newId = await showAddSubCategoryDialog(
+                                context,
+                                transactionType: 'expense',
+                                parentName: _selectedParentCategory!,
+                                nature: _selectedNature.name,
+                              );
+                              if (newId != null) {
+                                await _loadCategoriesFromDB();
+                                if (mounted) setState(() => _selectedCategoryId = newId);
+                              }
+                            },
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
                           value: childCategories.any((category) => category['id'] == _selectedCategoryId)

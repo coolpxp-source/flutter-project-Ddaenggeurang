@@ -7,6 +7,7 @@ import '../../models/saving_model.dart';
 import '../../services/saving_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../../widgets/common/amount_calculator_sheet.dart';
+import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
 
 /// expense/income_input_screen.dart와 통일한 팔레트.
@@ -182,7 +183,7 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
     );
   }
 
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
+  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg, Widget? trailing}) {
     return Row(
       children: [
         if (icon != null) ...[
@@ -198,10 +199,13 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
           ),
           const SizedBox(width: 8),
         ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
+          ),
         ),
+        if (trailing != null) trailing,
       ],
     );
   }
@@ -417,7 +421,32 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 20),
-                        _sectionLabel('소분류', icon: Icons.subdirectory_arrow_right_rounded),
+                        _sectionLabel(
+                          '소분류',
+                          icon: Icons.subdirectory_arrow_right_rounded,
+                          trailing: IconButton(
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.utility),
+                            tooltip: '소분류 추가',
+                            onPressed: () async {
+                              final newId = await showAddSubCategoryDialog(
+                                context,
+                                transactionType: 'saving',
+                                parentName: _selectedParentCategory!,
+                              );
+                              if (newId != null) {
+                                await _loadCategories();
+                                if (mounted) {
+                                  setState(() {
+                                    _selectedCategoryId = newId;
+                                    final matched = _savingCategories.where((c) => c['id'] == newId);
+                                    _selectedCategoryName = matched.isNotEmpty ? matched.first['name'] : null;
+                                  });
+                                }
+                              }
+                            },
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
                           value: childCategories.any((category) => category['id'] == _selectedCategoryId) ? _selectedCategoryId : null,

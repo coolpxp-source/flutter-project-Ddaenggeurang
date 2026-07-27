@@ -79,6 +79,69 @@ class DdaengModal {
     return result ?? false;
   }
 
+  /// 텍스트 입력 모달 (취소 / 확인) — 확인 시 입력한 문자열, 취소/빈 값이면 null 반환
+  static Future<String?> prompt(
+      BuildContext context, {
+        required String title,
+        String? message,
+        ModalType type = ModalType.info,
+        String hintText = '',
+        String? initialValue,
+        String cancelText = '취소',
+        String confirmText = '추가',
+        String? emoji,
+        bool barrierDismissible = true,
+      }) {
+    final controller = TextEditingController(text: initialValue);
+
+    void submit(BuildContext ctx) {
+      final trimmed = controller.text.trim();
+      if (trimmed.isEmpty) return;
+      Navigator.pop(ctx, trimmed);
+    }
+
+    return _show<String>(
+      context,
+      title: title,
+      message: message,
+      type: type,
+      emoji: emoji,
+      barrierDismissible: barrierDismissible,
+      extraBuilder: (ctx) => TextField(
+        controller: controller,
+        autofocus: true,
+        textAlign: TextAlign.center,
+        decoration: InputDecoration(
+          hintText: hintText,
+          filled: true,
+          fillColor: const Color(0xFFF7F8FA),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        ),
+        onSubmitted: (_) => submit(ctx),
+      ),
+      actions: (ctx) => [
+        Expanded(
+          child: _OutlinedBtn(
+            label: cancelText,
+            onTap: () => Navigator.pop(ctx),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _FilledBtn(
+            label: confirmText,
+            color: type.main,
+            onTap: () => submit(ctx),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 커스텀 바디를 넣는 모달 (AI 판정, 리워드 등)
   static Future<T?> custom<T>(
       BuildContext context, {
@@ -135,6 +198,7 @@ class DdaengModal {
         required ModalType type,
         String? emoji,
         bool barrierDismissible = true,
+        Widget Function(BuildContext)? extraBuilder,
         required List<Widget> Function(BuildContext) actions,
       }) {
     return custom<T>(
@@ -183,6 +247,11 @@ class DdaengModal {
                     color: Color(0xFF667085),
                   ),
                 ),
+              ],
+
+              if (extraBuilder != null) ...[
+                const SizedBox(height: 18),
+                extraBuilder(ctx),
               ],
 
               const SizedBox(height: 26),
