@@ -48,7 +48,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
 
     if (widget.editItem != null) {
       final item = widget.editItem!;
-      _amountController.text = comma(item.amount);
+      _amountController.text = item.amount.toString();
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _currentAmount = item.amount;
@@ -593,7 +593,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                   TextField(
                     controller: _memoController,
                     style: const TextStyle(fontSize: 14, color: AppColors.ink),
-                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                    decoration: _fieldDecoration(hint: '메모 (선택)'),
                   ),
                 ],
               ),

@@ -827,7 +827,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                     controller: _memoController,
                     enabled: !_isSaving,
                     style: const TextStyle(fontSize: 14, color: AppColors.ink),
-                    decoration: _fieldDecoration(label: '메모 (선택)'),
+                    decoration: _fieldDecoration(hint: '메모 (선택)'),
                   ),
                 ],
               ),
