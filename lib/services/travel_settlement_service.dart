@@ -514,14 +514,12 @@ class TravelSettlementService {
   Future<List<TravelExpenseModel>> _getExpenses(
       String travelId,
       ) async {
-    final String userId = _currentUserId;
+    // 로그인 상태를 확인한다.
+    // Firestore 규칙에서 해당 여행의 참여자인지도 다시 검사한다.
+    _currentUserId;
 
     final QuerySnapshot<Map<String, dynamic>> snapshot =
     await _expenseCollection
-        .where(
-      'userId',
-      isEqualTo: userId,
-    )
         .where(
       'travelId',
       isEqualTo: travelId,
