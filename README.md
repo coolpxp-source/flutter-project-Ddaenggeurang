@@ -2,7 +2,11 @@
 <p align="center">
   <img src="assets/ddaenggeurang_mascot.svg" width="400" alt="땡그랑 마스코트">
 </p>
-
+⚠️ **개발 진행 상황 안내**
+  
+현재 이 프로젝트는 개발이 진행 중이며, main 브랜치에는 프로젝트 소개 문서(README)만 반영되어 있습니다.  
+> **실제 작업 중인 코드는 [`dev` 브랜치](https://github.com/coolpxp-source/flutter-project-Ddaenggeurang/tree/dev)에서 확인하실 수 있습니다.**  
+> (작업 완료 후 main으로 병합될 예정입니다.)  
 (시연 영상 링크 추가 예정)
 
 ## 📚 목차
