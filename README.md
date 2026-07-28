@@ -83,7 +83,7 @@
 |:---:|:---:|:---:|:---:|
 | 임예림 | 지출 입력·기록 + 카드포인트·연말정산 | | |
 | 김은동 | 공통·인증 + 마이페이지 + AI상담 | | |
-| 성기필 | 예산·통계 + 구독·여행 |@SeongGipil |20416rlvf@gmail.com |
+| 성기필 | 예산·통계 + 구독·여행 |@SeongGipil(https://github.com/SeongGiPil) |20416rlvf@gmail.com |
 | 안혜진 | 마켓·거래 + 커뮤니티 | [@coolpxp-source](https://github.com/coolpxp-source) | coolpxp@gmail.com |
 | 이태화 | 공동관리 + 미션·아바타 + 소비심리테스트 | | |
 
