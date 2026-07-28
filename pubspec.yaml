@@ -8,6 +8,7 @@ environment:
   sdk: ^3.12.2
 
 dependencies:
+  firebase_messaging: ^16.4.3
   flutter:
     sdk: flutter
 

@@ -15,6 +15,8 @@ const { defineSecret } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+const { getMessaging } = require("firebase-admin/messaging");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -156,5 +158,43 @@ exports.verifyPasswordChangeOtp = onCall(
     await otpRef.delete();
 
     return { ok: true };
+  }
+);
+
+/**
+ * 누군가 내 게시글에 좋아요를 누르면, 글 작성자에게 푸시 알림을 보낸다.
+ */
+exports.onPostLiked = onDocumentCreated(
+  { document: "communityPosts/{postId}/likedBy/{userId}", region: "asia-northeast3" },
+  async (event) => {
+    const { postId, userId } = event.params;
+
+    const postSnap = await db.collection("communityPosts").doc(postId).get();
+    if (!postSnap.exists) return;
+
+    const post = postSnap.data();
+
+    // 본인이 본인 글에 좋아요 누른 경우는 알림 안 보냄
+    if (post.authorId === userId) return;
+
+    const authorSnap = await db.collection("users").doc(post.authorId).get();
+    const fcmToken = authorSnap.data()?.fcmToken;
+    if (!fcmToken) return;
+
+    // 좋아요 누른 사람 닉네임 조회 (없으면 "누군가"로 대체)
+    const likerSnap = await db.collection("users").doc(userId).get();
+    const likerName = likerSnap.data()?.nickname ?? "누군가";
+
+    await getMessaging().send({
+      token: fcmToken,
+      notification: {
+        title: "새 좋아요 💛",
+        body: `${likerName}님이 회원님의 게시글을 좋아해요`,
+      },
+      data: {
+        type: "post_like",
+        postId: postId,
+      },
+    });
   }
 );
