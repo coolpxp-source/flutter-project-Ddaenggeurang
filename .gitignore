@@ -68,3 +68,5 @@ app.*.map.json
 android/app/google-services.json
 lib/firebase_options.dart
 lib/main_test_*.dart
+
+deploy_log.txt

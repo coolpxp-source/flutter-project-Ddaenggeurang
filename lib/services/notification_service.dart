@@ -283,6 +283,32 @@ class NotificationService {
     );
   }
 
+  /// FCM으로 받은 푸시 알림을 로컬 알림으로 화면에 띄운다.
+  /// (앱이 포그라운드일 땐 FCM이 자동으로 알림을 안 띄워주므로 직접 처리 필요)
+  Future<void> showFcmNotification({
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'fcm_push',
+        '커뮤니티/마켓 알림',
+        channelDescription: '좋아요, 댓글, 찜, 채팅 등 다른 사용자 반응 알림',
+        importance: Importance.high,
+        priority: Priority.high,
+      ),
+    );
+    await _plugin.show(
+      id: 6,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: payload,
+    );
+  }
+
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
   int _subscriptionNotificationId(String subscriptionId) =>
       subscriptionId.hashCode & 0x7fffffff;
