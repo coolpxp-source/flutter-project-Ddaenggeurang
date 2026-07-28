@@ -66,9 +66,6 @@ class ExpenseModel {
   /// 자동 생성 금액을 사용자가 수정했는지 여부
   final bool isAmountAdjusted;
 
-  /// 여행 지출인 경우 여행 문서 ID
-  final String? travelId;
-
   /// 소프트 삭제 여부
   final bool isDeleted;
 
@@ -96,7 +93,6 @@ class ExpenseModel {
     this.installmentTotalMonths,
     this.recurringPaymentId,
     this.isAmountAdjusted = false,
-    this.travelId,
     this.isDeleted = false,
     this.deletedAt,
     this.createdAt,
@@ -132,7 +128,6 @@ class ExpenseModel {
       installmentTotalMonths: (data['installmentTotalMonths'] as num?)?.toInt(),
       recurringPaymentId: data['recurringPaymentId'] as String?,
       isAmountAdjusted: data['isAmountAdjusted'] == true,
-      travelId: data['travelId'] as String?,
       isDeleted: data['isDeleted'] == true,
       deletedAt: _timestampToDateTime(data['deletedAt']),
       createdAt: _timestampToDateTime(data['createdAt']),
@@ -156,7 +151,6 @@ class ExpenseModel {
       'installmentTotalMonths': installmentTotalMonths,
       'recurringPaymentId': recurringPaymentId,
       'isAmountAdjusted': isAmountAdjusted,
-      'travelId': travelId,
       'isDeleted': isDeleted,
       'deletedAt': deletedAt == null ? null : Timestamp.fromDate(deletedAt!),
       'createdAt': createdAt == null
@@ -181,7 +175,6 @@ class ExpenseModel {
     int? installmentTotalMonths,
     String? recurringPaymentId,
     bool? isAmountAdjusted,
-    String? travelId,
     bool? isDeleted,
     DateTime? deletedAt,
     DateTime? createdAt,
@@ -202,7 +195,6 @@ class ExpenseModel {
       installmentTotalMonths: installmentTotalMonths ?? this.installmentTotalMonths,
       recurringPaymentId: recurringPaymentId ?? this.recurringPaymentId,
       isAmountAdjusted: isAmountAdjusted ?? this.isAmountAdjusted,
-      travelId: travelId ?? this.travelId,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
       createdAt: createdAt ?? this.createdAt,

@@ -38,7 +38,7 @@ class TransactionDetailScreen extends StatelessWidget {
         ? const [Color(0xFF2DD4BF), Color(0xFF0D9488)]
         : const [Color(0xFF34D399), Color(0xFF10B981)];
 
-    // ── 지출 전용: 할부/정기결제/여행 등 부가 정보 ──
+    // ── 지출 전용: 할부/정기결제 등 부가 정보 ──
     final List<Widget> expenseExtraRows = [];
     if (isExpense) {
       if (item.isInstallment) {
@@ -49,9 +49,6 @@ class TransactionDetailScreen extends StatelessWidget {
       }
       if (item.isRecurring) {
         expenseExtraRows.add(_buildInfoRow('정기결제', '매달 자동으로 결제되는 항목'));
-      }
-      if (item.isTravel) {
-        expenseExtraRows.add(_buildInfoRow('여행 지출', '진행 중인 여행 예산에 포함'));
       }
     }
     final Widget? expenseExtraCard = _rowsCard(
@@ -290,7 +287,7 @@ class TransactionDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // ── 지출 전용: 할부/정기결제/여행 부가 정보 ──
+            // ── 지출 전용: 할부/정기결제 부가 정보 ──
             if (expenseExtraCard != null) ...[
               const SizedBox(height: 16),
               expenseExtraCard,

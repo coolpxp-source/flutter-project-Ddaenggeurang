@@ -33,7 +33,6 @@ class TransactionItem {
   final int? installmentTotalMonths; // 할부 총 개월수 — 지출만 해당 (isInstallment일 때만 의미 있음)
   final bool isRecurring;       // 정기결제(지출) / 정기수입(수입) / 반복저축(저축) 여부
   final int? recurringPayDay;   // 정기수입일 때 매달 입금일 — 수입만 해당
-  final bool isTravel;          // 여행 지출 태깅 여부 — 지출만 해당
   final TransactionInvestmentDetail? investmentDetail; // 투자 상세 — 저축만 해당
   final int? returnedAmount;    // 만기/해지/매도 시 최종 환급 금액 — 저축만 해당
 
@@ -53,7 +52,6 @@ class TransactionItem {
     this.installmentTotalMonths,
     this.isRecurring = false,
     this.recurringPayDay,
-    this.isTravel = false,
     this.investmentDetail,
     this.returnedAmount,
   });

@@ -80,7 +80,6 @@ class TransactionService {
       isInstallment: expense.installmentPlanId != null,
       installmentTotalMonths: expense.installmentTotalMonths,
       isRecurring: expense.recurringPaymentId != null,
-      isTravel: expense.travelId != null,
     );
   }
 
