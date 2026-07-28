@@ -1,30 +1,45 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
 import '../../widgets/common/ddaeng_modal.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/ai_service.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
 
-/// "밀린 지출을 텍스트로 직접 입력" 전용 화면.
-/// (영수증 촬영은 receipt_upload_screen, 문자 붙여넣기는 sms_paste_screen으로 분리됨)
-class BulkRecordScreen extends StatefulWidget {
-  const BulkRecordScreen({super.key});
+/// "문자내역 붙여넣기" 전용 진입 화면.
+/// 카드/은행 알림 문자를 복사해서 붙여넣으면 AI 파싱 → 확인 화면으로 진행됩니다.
+class SmsPasteScreen extends StatefulWidget {
+  const SmsPasteScreen({super.key});
 
   @override
-  State<BulkRecordScreen> createState() => _BulkRecordScreenState();
+  State<SmsPasteScreen> createState() => _SmsPasteScreenState();
 }
 
-class _BulkRecordScreenState extends State<BulkRecordScreen> {
+class _SmsPasteScreenState extends State<SmsPasteScreen> {
   final _textController = TextEditingController();
   final _aiService = AiService();
-
   bool _isParsing = false;
 
   @override
   void dispose() {
     _textController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data?.text == null || data!.text!.trim().isEmpty) {
+      if (mounted) {
+        await DdaengModal.alert(context,
+            title: '클립보드가 비어있어요', message: '문자 앱에서 내용을 먼저 복사해주세요.', type: ModalType.info);
+      }
+      return;
+    }
+    setState(() {
+      final prefix = _textController.text.trim().isEmpty ? '' : '${_textController.text.trim()}\n';
+      _textController.text = '$prefix${data.text!.trim()}';
+    });
   }
 
   Future<void> _onTapParse() async {
@@ -36,7 +51,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
     if (_textController.text.trim().isEmpty) {
       await DdaengModal.alert(context,
-          title: '입력을 확인해주세요', message: '내역 텍스트를 입력해주세요.', type: ModalType.warning);
+          title: '입력을 확인해주세요', message: '문자 내용을 붙여넣어주세요.', type: ModalType.warning);
       return;
     }
 
@@ -66,45 +81,6 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     }
   }
 
-  // ─────────────────────── 스타일 헬퍼 ───────────────────────
-
-  Widget _sectionCard({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppColors.cardShadow,
-      ),
-      child: child,
-    );
-  }
-
-  Widget _sectionLabel(String text, {IconData? icon, Color? iconColor, Color? iconBg}) {
-    return Row(
-      children: [
-        if (icon != null) ...[
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: iconBg ?? AppColors.expense.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor ?? AppColors.expenseDeep),
-          ),
-          const SizedBox(width: 8),
-        ],
-        Text(
-          text,
-          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -119,7 +95,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
           icon: const Icon(Icons.close),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('한번에 기록하기',
+        title: const Text('문자내역 붙여넣기',
             style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
         centerTitle: true,
       ),
@@ -128,20 +104,39 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── 입력 카드 ──
-            _sectionCard(
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppColors.cardShadow,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionLabel('밀린 내역 직접 입력',
-                      icon: Icons.auto_awesome_rounded,
-                      iconColor: AppColors.expenseDeep,
-                      iconBg: AppColors.expense.withValues(alpha: 0.15)),
+                  Row(
+                    children: [
+                      Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          color: AppColors.expense.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.sms_outlined, size: 14, color: AppColors.expenseDeep),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('카드/은행 알림 문자 붙여넣기',
+                          style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                    ],
+                  ),
                   const SizedBox(height: 4),
                   const Padding(
                     padding: EdgeInsets.only(left: 34),
                     child: Text(
-                      '밀린 지출을 한꺼번에 입력하면 AI가 정리해드려요',
+                      '문자 앱에서 내용을 복사한 뒤 아래에 붙여넣어주세요',
                       style: TextStyle(fontSize: 12, color: AppColors.inkSub),
                     ),
                   ),
@@ -151,7 +146,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                     maxLines: 6,
                     style: const TextStyle(fontSize: 13.5, color: AppColors.ink),
                     decoration: InputDecoration(
-                      hintText: '예: 7월12일 편의점 3,400 메모 계란이랑 마이쮸\n7월13일 카페 5,600 메모 할리스\n7월14일 택시 11,000',
+                      hintText: '예: [Web발신] 신한카드 승인 12,000원 스타벅스 07/28 14:22',
                       hintStyle: const TextStyle(fontSize: 12.5, color: AppColors.inkSub),
                       filled: true,
                       fillColor: AppColors.bg,
@@ -170,12 +165,20 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _pasteFromClipboard,
+                      icon: const Icon(Icons.content_paste_rounded, size: 16),
+                      label: const Text('클립보드에서 붙여넣기'),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.expenseDeep),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
-
-            // ── AI 분리하기 버튼 ──
             SizedBox(
               width: double.infinity,
               height: 54,

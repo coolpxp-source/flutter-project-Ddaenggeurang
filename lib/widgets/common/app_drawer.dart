@@ -4,6 +4,8 @@ import '../../screens/history/transaction_history_screen.dart';
 import 'drawer_menu_item.dart';
 import 'placeholder_screen.dart';
 import '../../screens/record/record_type_select_screen.dart';
+import '../../screens/record/receipt_upload_screen.dart';
+import '../../screens/record/sms_paste_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../screens/subscription/subscription_list_screen.dart';
 import '../../screens/travel/travel_mode_start_screen.dart';
@@ -90,14 +92,14 @@ class AppDrawer extends StatelessWidget {
           DrawerMenuItem(
             icon: Icons.camera_alt_outlined,
             title: '영수증 촬영 업로드',
-            destinationScreen: const PlaceholderScreen(title: '영수증 촬영 업로드'),
+            destinationScreen: const ReceiptUploadScreen(),
             iconColor: AppColors.expenseDeep,
             iconBg: AppColors.expense.withValues(alpha: 0.15),
           ),
           DrawerMenuItem(
             icon: Icons.sms_outlined,
             title: '문자내역 붙여넣기',
-            destinationScreen: const PlaceholderScreen(title: '문자내역 붙여넣기'),
+            destinationScreen: const SmsPasteScreen(),
             iconColor: AppColors.expenseDeep,
             iconBg: AppColors.expense.withValues(alpha: 0.15),
           ),
