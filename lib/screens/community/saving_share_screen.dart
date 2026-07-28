@@ -17,8 +17,28 @@ class SavingShareScreen extends StatefulWidget {
 
 class _SavingShareScreenState extends State<SavingShareScreen> {
   static const _green = Color(0xFFFF8A3D);
+  static const _greenLight = Color(0xFFFFF0E8);
   static const _gradientStart = Color(0xFFFFA351);
   static const _gradientEnd = Color(0xFFFF6B1A);
+
+  static const _ageGroups = [
+    '10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상',
+  ];
+
+  static const _jobs = [
+    '경영·관리·인사',
+    '기획·전략·마케팅',
+    '개발·데이터 엔지니어',
+    '디자인·UI·UX',
+    '영업·고객상담',
+    '금융·재무·회계',
+    '연구개발·바이오',
+    '미디어·엔터·문화',
+    '의료·보건·복지',
+    '교육·학원·학술',
+    '서비스·식음료·유통',
+    '제조·생산·품질',
+  ];
 
   final _communityService = CommunityService();
   final _expenseService = ExpenseService();
@@ -27,8 +47,8 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
 
   final _nicknameController = TextEditingController();
 
-  String _ageGroup = '20대 초반';
-  String _job = '개발·데이터 엔지니어';
+  String _ageGroup = _ageGroups[1];
+  String _job = _jobs[2];
 
   bool _isLoadingMonthly = true;
   bool _isSaving = false;
@@ -43,6 +63,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
   void initState() {
     super.initState();
     _loadMonthlyTotals();
+    _loadProfileDefaults();
   }
 
   @override
@@ -54,6 +75,34 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
   double get _savingRate {
     if (_monthlyIncome <= 0) return 0;
     return (_monthlySaving / _monthlyIncome * 100).clamp(0, 100).toDouble();
+  }
+
+  /// users/{uid} 문서에서 닉네임/연령대/직군을 미리 채워온다.
+  /// 필드가 없거나 값이 목록에 없으면 기존 기본값을 그대로 둔다.
+  Future<void> _loadProfileDefaults() async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
+      final data = doc.data();
+      if (data == null || !mounted) return;
+
+      final nickname = data['nickname'] as String?;
+      final ageGroup = data['ageGroup'] as String?;
+      final job = data['job'] as String?;
+
+      setState(() {
+        if (nickname != null && nickname.trim().isNotEmpty) {
+          _nicknameController.text = nickname.trim();
+        }
+        if (ageGroup != null && _ageGroups.contains(ageGroup)) {
+          _ageGroup = ageGroup;
+        }
+        if (job != null && _jobs.contains(job)) {
+          _job = job;
+        }
+      });
+    } catch (_) {
+      // 프로필 자동완성 실패해도 화면은 그대로 수동 입력으로 진행 가능
+    }
   }
 
   Future<void> _loadMonthlyTotals() async {
@@ -75,11 +124,8 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
 
     final totalExpense = expenses.fold<num>(0, (sum, e) => sum + e.amount);
 
-    // incomes에 실제로 기록된 금액 (수동 입력분)
     final manualIncomeTotal = incomes.fold<num>(0, (sum, i) => sum + i.amount);
 
-    // 반복수입 템플릿은 매달 자동으로 incomes 문서가 생기지 않으므로,
-    // 이미 시작된 활성 템플릿 금액을 이번 달 수입으로 별도 합산
     final activeTemplates = recurringTemplates.where(
           (t) => t.isActive && !t.isDeleted && !t.startDate.isAfter(end),
     );
@@ -87,7 +133,6 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
 
     num totalIncome = manualIncomeTotal + recurringIncomeTotal;
 
-    // 가입 첫 달처럼 incomes/템플릿이 아직 하나도 없는 경우, users.salary를 최초 급여로 사용
     if (totalIncome == 0) {
       final userDoc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
       totalIncome = (userDoc.data()?['salary'] as num?) ?? 0;
@@ -139,6 +184,105 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
     );
   }
 
+  /// 연령대/직군 선택 바텀시트 (화이트 배경, 선택 항목 체크 표시)
+  Future<void> _openPicker({
+    required String title,
+    required List<String> options,
+    required String current,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Text(title,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: options.map((option) {
+                        final isSelected = option == current;
+                        return ListTile(
+                          onTap: () => Navigator.pop(context, option),
+                          title: Text(
+                            option,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? _green : const Color(0xFF333333),
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_rounded, color: _green)
+                              : null,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected != null) onSelected(selected);
+  }
+
+  Widget _buildPickerField({
+    required IconData icon,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: _green),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF999999)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,37 +313,28 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
           const SizedBox(height: 18),
           _buildSectionLabel('연령대', Icons.groups_outlined),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _ageGroup,
-            decoration: _inputDecoration(hintText: '연령대 선택'),
-            items: ['10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상']
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                .toList(),
-            onChanged: (v) => setState(() => _ageGroup = v!),
+          _buildPickerField(
+            icon: Icons.groups_outlined,
+            value: _ageGroup,
+            onTap: () => _openPicker(
+              title: '연령대 선택',
+              options: _ageGroups,
+              current: _ageGroup,
+              onSelected: (v) => setState(() => _ageGroup = v),
+            ),
           ),
           const SizedBox(height: 18),
           _buildSectionLabel('직군', Icons.work_outline_rounded),
           const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _job,
-            decoration: _inputDecoration(hintText: '직군 선택'),
-            items: [
-              '경영·관리·인사',
-              '기획·전략·마케팅',
-              '개발·데이터 엔지니어',
-              '디자인·UI·UX',
-              '영업·고객상담',
-              '금융·재무·회계',
-              '연구개발·바이오',
-              '미디어·엔터·문화',
-              '의료·보건·복지',
-              '교육·학원·학술',
-              '서비스·식음료·유통',
-              '제조·생산·품질',
-            ]
-                .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                .toList(),
-            onChanged: (v) => setState(() => _job = v!),
+          _buildPickerField(
+            icon: Icons.work_outline_rounded,
+            value: _job,
+            onTap: () => _openPicker(
+              title: '직군 선택',
+              options: _jobs,
+              current: _job,
+              onSelected: (v) => setState(() => _job = v),
+            ),
           ),
           const SizedBox(height: 28),
           SizedBox(

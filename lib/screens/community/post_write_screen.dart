@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
 import '../../services/image_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 
 class PostWriteScreen extends StatefulWidget {
   final String initialCategory;
@@ -371,7 +372,14 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
         hashtags: _hashtags,
       );
 
-      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '게시글을 등록했어요',
+          type: ModalType.success,
+        );
+        if (context.mounted) Navigator.pop(context, true);
+      }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

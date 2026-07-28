@@ -25,26 +25,131 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
   static const _green = Color(0xFFFF8A3D);
   static const _greenLight = Color(0xFFFFF0E8);
 
-  late final Future<_PeerCompareData> _future;
+  static const _ageGroups = [
+    '10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상',
+  ];
+
+  static const _jobs = [
+    '경영·관리·인사',
+    '기획·전략·마케팅',
+    '개발·데이터 엔지니어',
+    '디자인·UI·UX',
+    '영업·고객상담',
+    '금융·재무·회계',
+    '연구개발·바이오',
+    '미디어·엔터·문화',
+    '의료·보건·복지',
+    '교육·학원·학술',
+    '서비스·식음료·유통',
+    '제조·생산·품질',
+  ];
+
+  CommunityStat? _myStat;
+  bool _isLoadingMyStat = true;
+
+  // 조회 기준(필터) — 기본값은 내 연령대/직군
+  late String _selectedAgeGroup = widget.ageGroup;
+  late String _selectedJob = widget.job;
+
+  late Future<PeerAverages> _peerAveragesFuture;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _loadMyStat();
+    _peerAveragesFuture = _service.getPeerAverages(
+      ageGroup: _selectedAgeGroup,
+      job: _selectedJob,
+    );
   }
 
-  Future<_PeerCompareData> _load() async {
+  Future<void> _loadMyStat() async {
     final String uid = FirebaseAuth.instance.currentUser!.uid;
+    final stat = await _service.getMyStat(uid);
+    if (!mounted) return;
+    setState(() {
+      _myStat = stat;
+      _isLoadingMyStat = false;
+    });
+  }
 
-    final results = await Future.wait([
-      _service.getMyStat(uid),
-      _service.getPeerAverages(ageGroup: widget.ageGroup, job: widget.job),
-    ]);
+  void _reloadPeerAverages() {
+    setState(() {
+      _peerAveragesFuture = _service.getPeerAverages(
+        ageGroup: _selectedAgeGroup,
+        job: _selectedJob,
+      );
+    });
+  }
 
-    return _PeerCompareData(
-      myStat: results[0] as CommunityStat?,
-      peerAverages: results[1] as PeerAverages,
+  bool get _isDefaultFilter =>
+      _selectedAgeGroup == widget.ageGroup && _selectedJob == widget.job;
+
+  /// 연령대/직군 선택 바텀시트 (저축비율 공유 화면과 동일한 패턴)
+  Future<void> _openPicker({
+    required String title,
+    required List<String> options,
+    required String current,
+    required ValueChanged<String> onSelected,
+  }) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    child: Text(title,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  ),
+                  Flexible(
+                    child: ListView(
+                      shrinkWrap: true,
+                      children: options.map((option) {
+                        final isSelected = option == current;
+                        return ListTile(
+                          onTap: () => Navigator.pop(context, option),
+                          title: Text(
+                            option,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isSelected ? _green : const Color(0xFF333333),
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_rounded, color: _green)
+                              : null,
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
+
+    if (selected != null && selected != current) {
+      onSelected(selected);
+      _reloadPeerAverages();
+    }
   }
 
   @override
@@ -59,22 +164,11 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
         foregroundColor: Colors.black87,
         title: const Text('또래 비교', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ),
-      body: FutureBuilder<_PeerCompareData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator(color: _green));
-          }
-
-          final data = snapshot.data!;
-
-          if (data.myStat == null) {
-            return _buildNoShareYetView();
-          }
-
-          return _buildCompareView(data);
-        },
-      ),
+      body: _isLoadingMyStat
+          ? const Center(child: CircularProgressIndicator(color: _green))
+          : _myStat == null
+          ? _buildNoShareYetView()
+          : _buildCompareView(_myStat!),
     );
   }
 
@@ -106,50 +200,153 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
     );
   }
 
-  Widget _buildCompareView(_PeerCompareData data) {
-    final CommunityStat mine = data.myStat!;
-    final PeerAverages peer = data.peerAverages;
-
+  Widget _buildCompareView(CommunityStat mine) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 30),
       children: [
-        Text('${widget.ageGroup} · ${widget.job} 평균과 비교',
+        Text('어떤 또래와 비교해볼까요?',
             style: TextStyle(fontSize: 13, color: Colors.grey[500])),
-        if (peer.matchLevel != 'exact') ...[
-          const SizedBox(height: 10),
-          _buildMatchLevelNotice(peer),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _buildFilterField(
+                icon: Icons.groups_outlined,
+                value: _selectedAgeGroup,
+                onTap: () => _openPicker(
+                  title: '연령대 선택',
+                  options: _ageGroups,
+                  current: _selectedAgeGroup,
+                  onSelected: (v) => setState(() => _selectedAgeGroup = v),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildFilterField(
+                icon: Icons.work_outline_rounded,
+                value: _selectedJob,
+                onTap: () => _openPicker(
+                  title: '직군 선택',
+                  options: _jobs,
+                  current: _selectedJob,
+                  onSelected: (v) => setState(() => _selectedJob = v),
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (!_isDefaultFilter) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _selectedAgeGroup = widget.ageGroup;
+                  _selectedJob = widget.job;
+                });
+                _reloadPeerAverages();
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.refresh_rounded, size: 13, color: Colors.grey[500]),
+                  const SizedBox(width: 4),
+                  Text('내 또래로 되돌리기',
+                      style: TextStyle(fontSize: 11, color: Colors.grey[500], fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
         ],
-        const SizedBox(height: 18),
-        _buildCompareCard(
-          icon: Icons.savings_rounded,
-          title: '저축률',
-          myValue: mine.savingRate.toDouble(),
-          peerValue: peer.savingRate,
-          unit: '%',
-          higherIsBetter: true,
-          barColor: const Color(0xFF4F7DF3),
-        ),
-        const SizedBox(height: 14),
-        _buildCompareCard(
-          icon: Icons.shopping_bag_rounded,
-          title: '지출',
-          myValue: mine.expenseAmount.toDouble(),
-          peerValue: peer.expenseAmount,
-          unit: '원',
-          higherIsBetter: false,
-          barColor: _pink,
-        ),
-        const SizedBox(height: 14),
-        _buildCompareCard(
-          icon: Icons.account_balance_wallet_rounded,
-          title: '수입',
-          myValue: mine.incomeAmount.toDouble(),
-          peerValue: peer.incomeAmount,
-          unit: '원',
-          higherIsBetter: true,
-          barColor: const Color(0xFF4CAF87),
+        const SizedBox(height: 20),
+        FutureBuilder<PeerAverages>(
+          future: _peerAveragesFuture,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: Center(child: CircularProgressIndicator(color: _green)),
+              );
+            }
+
+            final peer = snapshot.data!;
+
+            return Column(
+              children: [
+                if (peer.matchLevel != 'exact') _buildMatchLevelNotice(peer),
+                if (peer.matchLevel != 'exact') const SizedBox(height: 14),
+                _buildCompareCard(
+                  icon: Icons.savings_rounded,
+                  title: '저축률',
+                  myValue: mine.savingRate.toDouble(),
+                  peerValue: peer.savingRate,
+                  unit: '%',
+                  higherIsBetter: true,
+                  barColor: const Color(0xFF4F7DF3),
+                ),
+                const SizedBox(height: 14),
+                _buildCompareCard(
+                  icon: Icons.shopping_bag_rounded,
+                  title: '지출',
+                  myValue: mine.expenseAmount.toDouble(),
+                  peerValue: peer.expenseAmount,
+                  unit: '원',
+                  higherIsBetter: false,
+                  barColor: _pink,
+                ),
+                const SizedBox(height: 14),
+                _buildCompareCard(
+                  icon: Icons.account_balance_wallet_rounded,
+                  title: '수입',
+                  myValue: mine.incomeAmount.toDouble(),
+                  peerValue: peer.incomeAmount,
+                  unit: '원',
+                  higherIsBetter: true,
+                  barColor: const Color(0xFF4CAF87),
+                ),
+              ],
+            );
+          },
         ),
       ],
+    );
+  }
+
+  Widget _buildFilterField({
+    required IconData icon,
+    required String value,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.grey[200]!),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 16, color: _green),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  value,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF333333)),
+                ),
+              ),
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: Color(0xFF999999)),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -359,11 +556,4 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
           (m) => '${m[1]},',
     );
   }
-}
-
-class _PeerCompareData {
-  final CommunityStat? myStat;
-  final PeerAverages peerAverages;
-
-  _PeerCompareData({required this.myStat, required this.peerAverages});
 }
