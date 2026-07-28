@@ -44,8 +44,15 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     });
   }
 
-  void _toggleLike() {
-    _service.toggleLike(widget.post.postId, _myId, !_isLiked);
+  Future<void> _toggleLike() async {
+    final next = !_isLiked;
+    setState(() => _isLiked = next); // 낙관적 업데이트로 즉각 반응
+    try {
+      await _service.toggleLike(widget.post.postId, _myId, next);
+    } catch (e) {
+      if (mounted) setState(() => _isLiked = !next); // 실패 시 롤백
+      debugPrint('좋아요 처리 실패: $e');
+    }
   }
 
   Color _categoryColor(String cat) {

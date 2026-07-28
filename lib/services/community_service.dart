@@ -211,7 +211,7 @@ class CommunityService {
         .doc(userId);
 
     if (isLiking) {
-      await ref.set({'createdAt': Timestamp.now()});
+      await ref.set({'userId': userId, 'createdAt': Timestamp.now()});
     } else {
       await ref.delete();
     }
@@ -274,6 +274,45 @@ class CommunityService {
       'content': newContent,
       'updatedAt': Timestamp.now(),
     });
+  }
+
+  // 내가 쓴 글
+  Stream<List<CommunityPost>> getMyPosts(String userId) {
+    return _db
+        .collection('communityPosts')
+        .where('authorId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => CommunityPost.fromFirestore(d)).toList());
+  }
+
+// 내가 좋아요한 글의 postId 목록 (likedBy 서브컬렉션을 collectionGroup으로 가로질러 조회)
+  Stream<List<String>> getLikedPostIds(String userId) {
+    return _db
+        .collectionGroup('likedBy')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => d.reference.parent.parent!.id).toList());
+  }
+
+// postId 목록으로 실제 게시글 조회 (whereIn은 10개 제한이 있어 10개씩 나눠 조회)
+  Future<List<CommunityPost>> getPostsByIds(List<String> postIds) async {
+    if (postIds.isEmpty) return [];
+
+    final List<CommunityPost> result = [];
+    for (var i = 0; i < postIds.length; i += 10) {
+      final chunk = postIds.sublist(i, i + 10 > postIds.length ? postIds.length : i + 10);
+      final snap = await _db
+          .collection('communityPosts')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      result.addAll(snap.docs.map((d) => CommunityPost.fromFirestore(d)));
+    }
+
+    // whereIn 결과는 순서가 안 보장되므로, 좋아요한 순서(postIds 순서)대로 재정렬
+    final byId = {for (final p in result) p.postId: p};
+    return postIds.map((id) => byId[id]).whereType<CommunityPost>().toList();
   }
 
 }

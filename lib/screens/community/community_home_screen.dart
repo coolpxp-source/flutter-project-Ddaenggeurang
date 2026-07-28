@@ -1,5 +1,7 @@
+import 'package:ddaenggeurang/screens/community/My%20activity.dart';
 import 'package:ddaenggeurang/screens/community/peer_compare_screen.dart';
 import 'package:ddaenggeurang/screens/community/saving_share_screen.dart';
+import 'package:ddaenggeurang/widgets/common/ddaeng_modal.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/community_service.dart';
@@ -168,6 +170,14 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
               );
             },
           ),
+          IconButton(
+            icon: Icon(Icons.person_outline_rounded, color: Colors.grey[700]),
+            tooltip: '내 활동',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MyActivityScreen()),
+            ),
+          ),
           const SizedBox(width: 4),
         ],
       ),
@@ -185,18 +195,20 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
 
                   if (myStat == null) {
                     if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('저축비율을 먼저 공유해주세요.'),
-                          action: SnackBarAction(
-                            label: '공유하기',
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SavingShareScreen()),
-                            ),
-                          ),
-                        ),
-                      );
+                      await DdaengModal.confirm(
+                        context,
+                        title: '저축비율을 공유해 주세요',
+                        message: '또래와 비교하려면 먼저 저축비율을 공유해야 해요.',
+                        type: ModalType.info,
+                        confirmText: '공유하기',
+                      ).then((confirmed) {
+                        if (confirmed && context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const SavingShareScreen()),
+                          );
+                        }
+                      });
                     }
                     return;
                   }
@@ -466,22 +478,29 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   }
 
   Widget _buildRankingBanner() {
+    // 랭킹 뱃지 컬러 헬퍼 함수 (금/은/동)
+    Color rankBadgeColor(int rank) {
+      if (rank == 1) return const Color(0xFFFFC107);
+      if (rank == 2) return const Color(0xFFB0BEC5);
+      return const Color(0xFFD7CCC0);
+    }
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const RankingScreen()),
       ),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFFBF8),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _green.withOpacity(0.15)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
           boxShadow: [
             BoxShadow(
-              color: _green.withOpacity(0.18),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -491,133 +510,87 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('이번 달', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
-                Text('7.1 - 7.13 기준',
-                    style: TextStyle(color: Colors.grey[400], fontSize: 11)),
+                Row(
+                  children: [
+                    const Text('👑', style: TextStyle(fontSize: 22)),
+                    const SizedBox(width: 8),
+                    const Text('이번 달 저축 챔피언',
+                        style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                Text('7.1 - 7.13 기준', style: TextStyle(color: Colors.grey[500], fontSize: 12)),
               ],
             ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [_gradientStart, _gradientEnd],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('👑', style: TextStyle(fontSize: 15)),
-                ),
-                const SizedBox(width: 8),
-                const Text('최다 저축 랭킹 TOP 3',
-                    style: TextStyle(color: Colors.black87, fontSize: 17, fontWeight: FontWeight.bold)),
-              ],
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 165,
+              child: StreamBuilder(
+                stream: _service.getAmountRanking(limit: 3),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Text('아직 랭킹 데이터가 없어요',
+                          style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+                    );
+                  }
+                  final top3 = snapshot.data!;
+
+                  if (top3.length < 3) {
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: top3.asMap().entries.map((e) {
+                        final rank = e.key + 1;
+                        return Expanded(
+                          child: _buildRankCard(e.value, rank, rankBadgeColor(rank), rank == 1),
+                        );
+                      }).toList(),
+                    );
+                  }
+
+                  final ordered = [top3[1], top3[0], top3[2]];
+                  final ranks = [2, 1, 3];
+
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: List.generate(3, (i) {
+                      final rank = ranks[i];
+                      final isFirst = rank == 1;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isFirst ? 4 : 0),
+                          child: _buildRankCard(ordered[i], rank, rankBadgeColor(rank), isFirst),
+                        ),
+                      );
+                    }),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 20),
-            StreamBuilder(
-              stream: _service.getAmountRanking(limit: 3),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Text('아직 랭킹 데이터가 없어요',
-                      style: TextStyle(color: Colors.grey[400], fontSize: 12));
-                }
-                final top3 = snapshot.data!;
-                if (top3.length < 3) {
-                  return Row(
-                    children: top3
-                        .asMap()
-                        .entries
-                        .map((e) => Expanded(child: _rankBox(e.value, e.key)))
-                        .toList(),
+            Center(
+              child: GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SavingShareScreen()),
                   );
-                }
-
-                final ordered = [top3[1], top3[0], top3[2]];
-                final ranks = [2, 1, 3];
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(3, (i) {
-                    final stat = ordered[i];
-                    final rank = ranks[i];
-                    final isFirst = rank == 1;
-
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(right: i < 2 ? 10 : 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text('${_formatAmount(stat.savingAmount)}원',
-                                style: TextStyle(
-                                    color: isFirst ? _gradientEnd : Colors.grey[700],
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: isFirst ? 15 : 13)),
-                            const SizedBox(height: 8),
-                            Container(
-                              height: isFirst ? 110 : 90,
-                              decoration: BoxDecoration(
-                                gradient: isFirst
-                                    ? const LinearGradient(
-                                  colors: [_gradientStart, _gradientEnd],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                                    : null,
-                                color: isFirst ? null : _greenLight,
-                                borderRadius: BorderRadius.circular(12),
-                                border: isFirst ? null : Border.all(color: _green.withOpacity(0.2)),
-                                boxShadow: isFirst
-                                    ? [
-                                  BoxShadow(
-                                    color: _gradientEnd.withOpacity(0.35),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ]
-                                    : [],
-                              ),
-                              alignment: Alignment.center,
-                              child: Text('$rank',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: isFirst ? Colors.white : _green,
-                                  )),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(stat.nicknameMasked,
-                                style: TextStyle(
-                                    color: isFirst ? Colors.black87 : Colors.grey[600],
-                                    fontSize: 12,
-                                    fontWeight: isFirst ? FontWeight.bold : FontWeight.normal),
-                                overflow: TextOverflow.ellipsis),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                );
-              },
-            ),
-            const SizedBox(height: 14),
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const SavingShareScreen()),
-                );
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('내 저축비율 공유하고 랭킹 참여하기',
-                      style: TextStyle(fontSize: 12, color: _green, fontWeight: FontWeight.w600)),
-                  Icon(Icons.chevron_right, size: 16, color: _green),
-                ],
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: _greenLight,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('내 저축비율 공유하고 랭킹 도전! 💪',
+                          style: TextStyle(fontSize: 13, color: _gradientEnd, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Icon(Icons.arrow_forward_ios, size: 14, color: _gradientEnd),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -626,34 +599,81 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
     );
   }
 
-  Widget _rankBox(dynamic stat, int index) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Column(
-        children: [
-          Container(
-            height: 90,
-            decoration: BoxDecoration(
-              color: _greenLight,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _green.withOpacity(0.2)),
+  Widget _buildRankCard(dynamic stat, int rank, Color badgeColor, bool isFirst) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: double.infinity,
+              height: isFirst ? 110 : (rank == 2 ? 90 : 75),
+              decoration: BoxDecoration(
+                color: isFirst ? Colors.white : Colors.grey[50],
+                borderRadius: BorderRadius.circular(20),
+                border: isFirst
+                    ? Border.all(color: const Color(0xFFFFD700), width: 2)
+                    : Border.all(color: Colors.grey.withOpacity(0.1)),
+                boxShadow: isFirst
+                    ? [
+                  BoxShadow(
+                    color: const Color(0xFFFFD700).withOpacity(0.3),
+                    blurRadius: 15,
+                    offset: const Offset(0, 8),
+                  ),
+                ]
+                    : [],
+              ),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      '${_formatAmount(stat.savingAmount)}원',
+                      style: TextStyle(
+                        color: isFirst ? _gradientEnd : Colors.grey[600],
+                        fontWeight: FontWeight.bold,
+                        fontSize: isFirst ? 15 : 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-            alignment: Alignment.center,
-            child: Text('${index + 1}',
-                style: TextStyle(color: _green, fontWeight: FontWeight.bold, fontSize: 20)),
+            Positioned(
+              top: -12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2)),
+                    ],
+                  ),
+                  child: Text('$rank위',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          stat.nicknameMasked,
+          style: TextStyle(
+            color: isFirst ? Colors.black87 : Colors.grey[700],
+            fontSize: 12,
+            fontWeight: isFirst ? FontWeight.bold : FontWeight.w600,
           ),
-          const SizedBox(height: 8),
-          Text(stat.nicknameMasked, style: TextStyle(color: Colors.grey[700], fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  String _formatAmount(num value) {
-    // 저축률(%)이 아니라 금액(원) 표시가 필요하면 이 함수에서 계산
-    return value.toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-          (m) => '${m[1]},',
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 
@@ -765,6 +785,14 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  String _formatAmount(num value) {
+    // 저축률(%)이 아니라 금액(원) 표시가 필요하면 이 함수에서 계산
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]},',
     );
   }
 }
