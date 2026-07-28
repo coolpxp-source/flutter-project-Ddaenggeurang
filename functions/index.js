@@ -198,3 +198,108 @@ exports.onPostLiked = onDocumentCreated(
     });
   }
 );
+
+/**
+ * 누군가 내 플리마켓 상품을 찜하면, 판매자에게 푸시 알림을 보낸다.
+ */
+exports.onProductFavorited = onDocumentCreated(
+  { document: "users/{userId}/favorites/{productId}", region: "asia-northeast3" },
+  async (event) => {
+    const { userId, productId } = event.params;
+
+    const productSnap = await db.collection("marketProducts").doc(productId).get();
+    if (!productSnap.exists) return;
+
+    const product = productSnap.data();
+
+    // 본인이 본인 상품 찜한 경우는 알림 안 보냄
+    if (product.sellerId === userId) return;
+
+    const sellerSnap = await db.collection("users").doc(product.sellerId).get();
+    const fcmToken = sellerSnap.data()?.fcmToken;
+    if (!fcmToken) return;
+
+    await getMessaging().send({
+      token: fcmToken,
+      notification: {
+        title: "내 상품이 찜됐어요 ❤️",
+        body: `${product.title ?? "내 상품"}에 찜이 달렸어요`,
+      },
+      data: {
+        type: "product_favorite",
+        productId: productId,
+      },
+    });
+  }
+);
+
+
+/**
+ * 누군가 내 게시글에 댓글을 남기면, 글 작성자에게 푸시 알림을 보낸다.
+ */
+exports.onCommentAdded = onDocumentCreated(
+  { document: "communityPosts/{postId}/comments/{commentId}", region: "asia-northeast3" },
+  async (event) => {
+    const { postId } = event.params;
+    const comment = event.data.data();
+
+    const postSnap = await db.collection("communityPosts").doc(postId).get();
+    if (!postSnap.exists) return;
+
+    const post = postSnap.data();
+
+    // 본인 글에 본인이 댓글 단 경우는 알림 안 보냄
+    if (post.authorId === comment.authorId) return;
+
+    const authorSnap = await db.collection("users").doc(post.authorId).get();
+    const fcmToken = authorSnap.data()?.fcmToken;
+    if (!fcmToken) return;
+
+    await getMessaging().send({
+      token: fcmToken,
+      notification: {
+        title: "새 댓글 💬",
+        body: `${comment.authorName}님: ${comment.content}`,
+      },
+      data: {
+        type: "post_comment",
+        postId: postId,
+      },
+    });
+  }
+);
+
+/**
+ * 채팅방에 새 메시지가 오면, 나를 제외한 참여자들에게 푸시 알림을 보낸다.
+ */
+exports.onChatMessageSent = onDocumentCreated(
+  { document: "chats/{chatId}/messages/{messageId}", region: "asia-northeast3" },
+  async (event) => {
+    const { chatId } = event.params;
+    const message = event.data.data();
+
+    const chatSnap = await db.collection("chats").doc(chatId).get();
+    if (!chatSnap.exists) return;
+
+    const participantIds = chatSnap.data().participantIds || [];
+    const recipients = participantIds.filter((id) => id !== message.senderId);
+
+    for (const uid of recipients) {
+      const userSnap = await db.collection("users").doc(uid).get();
+      const fcmToken = userSnap.data()?.fcmToken;
+      if (!fcmToken) continue;
+
+      await getMessaging().send({
+        token: fcmToken,
+        notification: {
+          title: "새 메시지 💬",
+          body: message.text ?? "메시지가 도착했어요",
+        },
+        data: {
+          type: "chat_message",
+          chatId: chatId,
+        },
+      });
+    }
+  }
+);
