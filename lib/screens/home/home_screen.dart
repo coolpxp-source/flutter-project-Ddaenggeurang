@@ -29,6 +29,7 @@ import '../../widgets/common/attendance_roulette_dialog.dart';
 import '../../widgets/expense/category_icon_map.dart';
 import '../../widgets/common/coach_avatar.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
+import '../../widgets/common/placeholder_screen.dart';
 import '../../widgets/common/spotlight_tour.dart';
 import '../record/record_type_select_screen.dart';
 import '../community/community_home_screen.dart';
@@ -42,8 +43,9 @@ import '../group/group_create_join_screen.dart';
 import '../notification/notification_history_screen.dart';
 import '../history/transaction_history_screen.dart';
 import '../subscription/subscription_list_screen.dart';
-import '../travel/travel_mode_start_screen.dart';
 import '../budget/budget_vs_expense_screen.dart';
+// 추가: 홈의 카테고리별 지출 카드에서 상세 집계 화면으로 이동하기 위한 import
+import '../category/category_summary_screen.dart';
 import '../../widgets/home/quick_add_fab.dart';
 
 /// 홈 대시보드 전용 팔레트.
@@ -649,7 +651,10 @@ class _LiveBudgetSectionState extends State<_LiveBudgetSection> {
                 user: widget.user,
                 remaining: remaining,
                 total: stats.total,
-                progress: progress)
+                progress: progress,
+                onBudgetChanged: () => setState(() {
+                  _future = _load();
+                }))
                 .animate()
                 .fadeIn(duration: 380.ms, curve: Curves.easeOut)
                 .slideY(begin: 0.06, end: 0, curve: Curves.easeOutCubic),
@@ -677,12 +682,14 @@ class _BudgetHero extends StatelessWidget {
   final int remaining;
   final int total;
   final double progress;
+  final VoidCallback onBudgetChanged;
 
   const _BudgetHero({
     required this.user,
     required this.remaining,
     required this.total,
     required this.progress,
+    required this.onBudgetChanged,
   });
 
   @override
@@ -802,7 +809,7 @@ class _BudgetHero extends StatelessWidget {
                               onTap: () => Navigator.of(context)
                                   .push(MaterialPageRoute(
                                   builder: (_) => BudgetSettingScreen(userId: user.userId)))
-                                  .then((_) => HomeRefreshService.requestRefresh()),
+                                  .then((_) => onBudgetChanged()),
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
@@ -868,13 +875,11 @@ class _BudgetHero extends StatelessWidget {
                   ),
                   InkWell(
                     borderRadius: BorderRadius.circular(50),
-                    onTap: () => Navigator.of(context)
-                        .push(
-                          MaterialPageRoute(
-                            builder: (_) => BudgetVsExpenseScreen(userId: user.userId),
-                          ),
-                        )
-                        .then((_) => HomeRefreshService.requestRefresh()),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => BudgetVsExpenseScreen(userId: user.userId),
+                      ),
+                    ),
                     child: CircularPercentIndicator(
                       radius: 42,
                       lineWidth: 9,
@@ -1020,17 +1025,12 @@ class _QuickActionsGrid extends StatelessWidget {
             .then((_) => HomeRefreshService.requestRefresh()),
       ),
       _QuickActionButton(
-        label: '월간 브리핑',
-        icon: Icons.analytics_rounded,
+        label: '영수증',
+        icon: Icons.camera_alt_outlined,
         bg: _C.mintSoft,
         fg: _C.mint,
-        onTap: (context) => Navigator.of(context)
-            .push(
-              MaterialPageRoute(
-                builder: (_) => const MonthlyBriefingScreen(),
-              ),
-            )
-            .then((_) => HomeRefreshService.requestRefresh()),
+        onTap: (context) => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const PlaceholderScreen(title: '영수증 촬영 업로드'))),
       ),
       _QuickActionButton(
         label: '구독관리',
@@ -1795,17 +1795,18 @@ class _CategorySpendingSectionState extends State<_CategorySpendingSection> {
         return _CategorySpendingCard(
           slices: slices,
 
-          // 홈 카드의 '전체보기'를 누르면 지출 탭(전체 지출 내역)으로 이동한다.
+          // 추가: 홈 카드의 '전체보기'를 누르면 로그인 회원의
+          // 카테고리별 월간 지출 상세 화면으로 이동한다.
           onViewAll: () {
-            Navigator.of(context)
-                .push(
-                  MaterialPageRoute<void>(
-                    builder: (BuildContext context) {
-                      return const TransactionHistoryScreen();
-                    },
-                  ),
-                )
-                .then((_) => HomeRefreshService.requestRefresh());
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) {
+                  return CategorySummaryScreen(
+                    userId: widget.uid,
+                  );
+                },
+              ),
+            );
           },
         );
       },
@@ -2479,9 +2480,8 @@ class _SpendingTendencyCard extends StatelessWidget {
           const SizedBox(height: 14),
           InkWell(
             borderRadius: BorderRadius.circular(14),
-            onTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const PsychologyTestStartScreen()))
-                .then((_) => HomeRefreshService.requestRefresh()),
+            onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PsychologyTestStartScreen())),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2952,9 +2952,8 @@ class _LiveWeeklyBriefingSectionState extends State<_LiveWeeklyBriefingSection> 
                   const SizedBox(height: 10),
                   InkWell(
                     borderRadius: BorderRadius.circular(8),
-                    onTap: () => Navigator.of(context)
-                        .push(MaterialPageRoute(builder: (_) => const MonthlyBriefingScreen()))
-                        .then((_) => HomeRefreshService.requestRefresh()),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const MonthlyBriefingScreen())),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(vertical: 2),
                       child: Row(
