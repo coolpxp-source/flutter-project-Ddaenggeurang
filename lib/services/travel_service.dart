@@ -1,29 +1,65 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/travel_model.dart';
 
 class TravelService {
-  // 여행 생성자를 포함한 최대 참여 인원
-  static const int maxTravelMembers = 10;
-
   TravelService({
     FirebaseFirestore? firestore,
-  }) : _db = firestore ?? FirebaseFirestore.instance;
+    FirebaseAuth? auth,
+  })  : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
   final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
 
   CollectionReference<Map<String, dynamic>> get _travelCollection {
     return _db.collection('travels');
   }
 
-  /// 여행 생성
-  Future<String> addTravel(TravelModel travel) async {
-    if (travel.userId.trim().isEmpty) {
-      throw ArgumentError('사용자 정보가 없습니다.');
+  /// Firestore 보안 규칙은 request.auth.uid를 기준으로 판단하므로
+  /// 여행 조회와 수정에는 반드시 Firebase Authentication UID를 사용한다.
+  String? _authenticatedUserIdOrNull([String? suppliedUserId]) {
+    final String? currentUserId = _auth.currentUser?.uid;
+
+    if (currentUserId == null || currentUserId.trim().isEmpty) {
+      return null;
     }
 
-    if (travel.title.trim().isEmpty) {
+    final String normalizedSuppliedUserId =
+        suppliedUserId?.trim() ?? '';
+
+    if (normalizedSuppliedUserId.isNotEmpty &&
+        normalizedSuppliedUserId != currentUserId) {
+      debugPrint(
+        '전달된 userId가 Firebase 로그인 UID와 달라 '
+            '로그인 UID를 사용합니다.',
+      );
+    }
+
+    return currentUserId;
+  }
+
+  String _requireAuthenticatedUserId([String? suppliedUserId]) {
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(suppliedUserId);
+
+    if (currentUserId == null) {
+      throw StateError('로그인이 필요합니다.');
+    }
+
+    return currentUserId;
+  }
+
+  /// 여행 생성
+  Future<String> addTravel(TravelModel travel) async {
+    final String currentUserId =
+    _requireAuthenticatedUserId(travel.userId);
+
+    if (travel.title
+        .trim()
+        .isEmpty) {
       throw ArgumentError('여행 제목을 입력해주세요.');
     }
 
@@ -36,21 +72,21 @@ class TravelService {
 
       await document.set({
         'travelId': document.id,
-        'userId': travel.userId,
+        'userId': currentUserId,
         'title': travel.title.trim(),
         'startDate': Timestamp.fromDate(travel.startDate),
         'endDate': Timestamp.fromDate(travel.endDate),
         'budgetAmount': travel.budgetAmount,
         'isActive': travel.isActive,
 
-        // 생성자도 여행 참여자에 포함
-        'memberIds': <String>[travel.userId],
+// 생성자도 여행 참여자에 포함
+        'memberIds': <String>[currentUserId],
 
-        // 초대 수락 전 회원
+// 초대 수락 전 회원
         'pendingMemberIds': <String>[],
 
-        // 생성자 포함 최대 10명
-        'maxMembers': maxTravelMembers,
+// 생성자 포함 최대 10명
+        'maxMembers': 10,
 
         'isDeleted': false,
         'deletedAt': null,
@@ -75,10 +111,11 @@ class TravelService {
   /// 필요해진다. 별도의 색인을 만들지 않아도 동작하도록 Firestore 쿼리에서는
   /// orderBy를 사용하지 않고, 조회 결과를 Flutter에서 시작일 최신순으로 정렬한다.
   Stream<List<TravelModel>> getTravelsByUserId(String userId) {
-    final String normalizedUserId = userId.trim();
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
 
-    // 로그인 UID가 없으면 Firestore를 조회하지 않고 빈 목록을 반환한다.
-    if (normalizedUserId.isEmpty) {
+// 로그인 UID가 없으면 Firestore를 조회하지 않고 빈 목록을 반환한다.
+    if (currentUserId == null) {
       return Stream<List<TravelModel>>.value(
         <TravelModel>[],
       );
@@ -87,24 +124,22 @@ class TravelService {
     return _travelCollection
         .where(
       'memberIds',
-      arrayContains: normalizedUserId,
+      arrayContains: currentUserId,
     )
         .snapshots()
         .map((snapshot) {
       final List<TravelModel> travels = snapshot.docs
           .map(TravelModel.fromFirestore)
-      // 삭제된 여행은 Firestore 복합 조건 대신 앱에서 제외한다.
+// 삭제된 여행은 Firestore 복합 조건 대신 앱에서 제외한다.
           .where(
             (TravelModel travel) => !travel.isDeleted,
       )
           .toList();
 
-      // Firestore orderBy 대신 앱에서 여행 시작일 최신순으로 정렬한다.
+// Firestore orderBy 대신 앱에서 여행 시작일 최신순으로 정렬한다.
       travels.sort(
-            (
-            TravelModel first,
-            TravelModel second,
-            ) {
+            (TravelModel first,
+            TravelModel second,) {
           return second.startDate.compareTo(
             first.startDate,
           );
@@ -119,9 +154,10 @@ class TravelService {
   ///
   /// 이 쿼리도 복합 색인 오류를 방지하기 위해 Flutter에서 최신순으로 정렬한다.
   Stream<List<TravelModel>> getOwnedTravels(String userId) {
-    final String normalizedUserId = userId.trim();
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
 
-    if (normalizedUserId.isEmpty) {
+    if (currentUserId == null) {
       return Stream<List<TravelModel>>.value(
         <TravelModel>[],
       );
@@ -130,7 +166,7 @@ class TravelService {
     return _travelCollection
         .where(
       'userId',
-      isEqualTo: normalizedUserId,
+      isEqualTo: currentUserId,
     )
         .snapshots()
         .map((snapshot) {
@@ -142,10 +178,8 @@ class TravelService {
           .toList();
 
       travels.sort(
-            (
-            TravelModel first,
-            TravelModel second,
-            ) {
+            (TravelModel first,
+            TravelModel second,) {
           return second.startDate.compareTo(
             first.startDate,
           );
@@ -157,23 +191,24 @@ class TravelService {
   }
 
   /// 나에게 온 여행 초대 목록
-  Stream<List<TravelModel>> getPendingInvitations(
-      String userId,
-      ) {
-    if (userId.trim().isEmpty) {
+  Stream<List<TravelModel>> getPendingInvitations(String userId,) {
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
+
+    if (currentUserId == null) {
       return Stream<List<TravelModel>>.value([]);
     }
 
     return _travelCollection
         .where(
       'pendingMemberIds',
-      arrayContains: userId,
+      arrayContains: currentUserId,
     )
         .snapshots()
         .map((snapshot) {
       final travels = snapshot.docs
           .map(TravelModel.fromFirestore)
-      // 삭제된 여행은 앱에서 제외해 복합 색인 생성을 피한다.
+// 삭제된 여행은 앱에서 제외해 복합 색인 생성을 피한다.
           .where(
             (TravelModel travel) => !travel.isDeleted,
       )
@@ -189,7 +224,9 @@ class TravelService {
 
   /// 여행 한 건 조회
   Future<TravelModel?> getTravelById(String travelId) async {
-    if (travelId.trim().isEmpty) {
+    if (travelId
+        .trim()
+        .isEmpty) {
       return null;
     }
 
@@ -227,15 +264,12 @@ class TravelService {
     required String invitedUserId,
   }) async {
     final normalizedTravelId = travelId.trim();
-    final normalizedOwnerId = ownerId.trim();
+    final String normalizedOwnerId =
+    _requireAuthenticatedUserId(ownerId);
     final normalizedInvitedUserId = invitedUserId.trim();
 
     if (normalizedTravelId.isEmpty) {
       throw ArgumentError('여행 정보가 없습니다.');
-    }
-
-    if (normalizedOwnerId.isEmpty) {
-      throw ArgumentError('여행 생성자 정보가 없습니다.');
     }
 
     if (normalizedInvitedUserId.isEmpty) {
@@ -275,22 +309,10 @@ class TravelService {
           throw StateError('이미 초대한 회원입니다.');
         }
 
-        // 기존에 최대 8명으로 저장된 여행도 10명 기준으로 계산한다.
-        final Map<String, dynamic> data = snapshot.data()!;
-        final List<dynamic> memberIds =
-            data['memberIds'] as List<dynamic>? ?? <dynamic>[];
-        final List<dynamic> pendingMemberIds =
-            data['pendingMemberIds'] as List<dynamic>? ?? <dynamic>[];
-
-        final Set<String> reservedMemberIds = <String>{
-          ...memberIds.map((dynamic id) => id.toString()),
-          ...pendingMemberIds.map((dynamic id) => id.toString()),
-        };
-
-        if (reservedMemberIds.length >= maxTravelMembers) {
+        if (!travel.canInviteMember) {
           throw StateError(
             '여행 인원은 생성자를 포함하여 '
-                '$maxTravelMembers명까지 추가할 수 있습니다.',
+                '${travel.maxMembers}명까지 추가할 수 있습니다.',
           );
         }
 
@@ -298,8 +320,6 @@ class TravelService {
           'pendingMemberIds': FieldValue.arrayUnion(
             [normalizedInvitedUserId],
           ),
-          // 예전에 생성된 8명 제한 문서도 자동으로 10명으로 변경
-          'maxMembers': maxTravelMembers,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
@@ -321,10 +341,10 @@ class TravelService {
     required String userId,
   }) async {
     final normalizedTravelId = travelId.trim();
-    final normalizedUserId = userId.trim();
+    final String normalizedUserId =
+    _requireAuthenticatedUserId(userId);
 
-    if (normalizedTravelId.isEmpty ||
-        normalizedUserId.isEmpty) {
+    if (normalizedTravelId.isEmpty) {
       throw ArgumentError('초대 정보가 올바르지 않습니다.');
     }
 
@@ -349,9 +369,9 @@ class TravelService {
           throw StateError('유효한 여행 초대가 없습니다.');
         }
 
-        if (travel.memberCount >= maxTravelMembers) {
+        if (travel.memberCount >= travel.maxMembers) {
           throw StateError(
-            '여행 인원이 이미 $maxTravelMembers명입니다.',
+            '여행 인원이 이미 ${travel.maxMembers}명입니다.',
           );
         }
 
@@ -362,8 +382,6 @@ class TravelService {
           'memberIds': FieldValue.arrayUnion(
             [normalizedUserId],
           ),
-          // 예전에 생성된 8명 제한 문서도 자동으로 10명으로 변경
-          'maxMembers': maxTravelMembers,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       });
@@ -384,19 +402,23 @@ class TravelService {
     required String travelId,
     required String userId,
   }) async {
-    if (travelId.trim().isEmpty || userId.trim().isEmpty) {
+    final String normalizedTravelId = travelId.trim();
+    final String currentUserId =
+    _requireAuthenticatedUserId(userId);
+
+    if (normalizedTravelId.isEmpty) {
       throw ArgumentError('초대 정보가 올바르지 않습니다.');
     }
 
     try {
-      await _travelCollection.doc(travelId).update({
+      await _travelCollection.doc(normalizedTravelId).update({
         'pendingMemberIds': FieldValue.arrayRemove(
-          [userId],
+          [currentUserId],
         ),
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('여행 초대 거절 성공: $userId');
+      debugPrint('여행 초대 거절 성공: $currentUserId');
     } on FirebaseException catch (error, stackTrace) {
       _printFirebaseError(
         '여행 초대 거절 실패',
@@ -413,13 +435,15 @@ class TravelService {
     required String ownerId,
     required String invitedUserId,
   }) async {
+    final String currentUserId =
+    _requireAuthenticatedUserId(ownerId);
     final travel = await getTravelById(travelId);
 
     if (travel == null) {
       throw StateError('여행 정보를 찾을 수 없습니다.');
     }
 
-    if (!travel.isOwner(ownerId)) {
+    if (!travel.isOwner(currentUserId)) {
       throw StateError('여행 생성자만 초대를 취소할 수 있습니다.');
     }
 
@@ -437,7 +461,10 @@ class TravelService {
     required String ownerId,
     required String memberId,
   }) async {
-    if (ownerId == memberId) {
+    final String currentUserId =
+    _requireAuthenticatedUserId(ownerId);
+
+    if (currentUserId == memberId) {
       throw StateError('여행 생성자는 내보낼 수 없습니다.');
     }
 
@@ -447,7 +474,7 @@ class TravelService {
       throw StateError('여행 정보를 찾을 수 없습니다.');
     }
 
-    if (!travel.isOwner(ownerId)) {
+    if (!travel.isOwner(currentUserId)) {
       throw StateError('여행 생성자만 회원을 내보낼 수 있습니다.');
     }
 
@@ -466,25 +493,27 @@ class TravelService {
     required String travelId,
     required String userId,
   }) async {
+    final String currentUserId =
+    _requireAuthenticatedUserId(userId);
     final travel = await getTravelById(travelId);
 
     if (travel == null) {
       throw StateError('여행 정보를 찾을 수 없습니다.');
     }
 
-    if (travel.isOwner(userId)) {
+    if (travel.isOwner(currentUserId)) {
       throw StateError(
         '여행 생성자는 여행에서 나갈 수 없습니다. '
             '여행을 삭제하거나 생성자를 변경해주세요.',
       );
     }
 
-    if (!travel.isMember(userId)) {
+    if (!travel.isMember(currentUserId)) {
       throw StateError('참여 중인 여행이 아닙니다.');
     }
 
     await _travelCollection.doc(travelId).update({
-      'memberIds': FieldValue.arrayRemove([userId]),
+      'memberIds': FieldValue.arrayRemove([currentUserId]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -494,13 +523,20 @@ class TravelService {
     required String travelId,
     required String userId,
   }) async {
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
+
+    if (currentUserId == null) {
+      return false;
+    }
+
     final travel = await getTravelById(travelId);
 
     if (travel == null) {
       return false;
     }
 
-    return travel.canWriteExpense(userId);
+    return travel.canWriteExpense(currentUserId);
   }
 
   /// 정산 조회 권한 확인
@@ -508,31 +544,41 @@ class TravelService {
     required String travelId,
     required String userId,
   }) async {
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
+
+    if (currentUserId == null) {
+      return false;
+    }
+
     final travel = await getTravelById(travelId);
 
     if (travel == null) {
       return false;
     }
 
-    return travel.canViewSettlement(userId);
+    return travel.canViewSettlement(currentUserId);
   }
 
   /// 활성 여행 조회
   Future<TravelModel?> getActiveTravel(String userId) async {
-    if (userId.trim().isEmpty) {
+    final String? currentUserId =
+    _authenticatedUserIdOrNull(userId);
+
+    if (currentUserId == null) {
       return null;
     }
 
     try {
       final snapshot = await _travelCollection
-          .where('memberIds', arrayContains: userId)
+          .where('memberIds', arrayContains: currentUserId)
           .get();
 
       for (final document in snapshot.docs) {
         final TravelModel travel =
         TravelModel.fromFirestore(document);
 
-        // 활성 상태이며 삭제되지 않은 첫 번째 여행을 반환한다.
+// 활성 상태이며 삭제되지 않은 첫 번째 여행을 반환한다.
         if (travel.isActive && !travel.isDeleted) {
           return travel;
         }
@@ -551,11 +597,15 @@ class TravelService {
 
   /// 여행 정보 수정
   Future<void> updateTravel(TravelModel travel) async {
-    if (travel.travelId.trim().isEmpty) {
+    if (travel.travelId
+        .trim()
+        .isEmpty) {
       throw ArgumentError('travelId가 비어 있습니다.');
     }
 
-    if (travel.title.trim().isEmpty) {
+    if (travel.title
+        .trim()
+        .isEmpty) {
       throw ArgumentError('여행 제목을 입력해주세요.');
     }
 
@@ -591,8 +641,10 @@ class TravelService {
     required String userId,
     required String travelId,
   }) async {
-    if (userId.trim().isEmpty ||
-        travelId.trim().isEmpty) {
+    final String currentUserId =
+    _requireAuthenticatedUserId(userId);
+
+    if (travelId.trim().isEmpty) {
       throw ArgumentError('여행 정보가 올바르지 않습니다.');
     }
 
@@ -602,13 +654,13 @@ class TravelService {
       throw StateError('여행 정보를 찾을 수 없습니다.');
     }
 
-    if (!selectedTravel.isParticipant(userId)) {
+    if (!selectedTravel.isParticipant(currentUserId)) {
       throw StateError('참여 중인 여행이 아닙니다.');
     }
 
     try {
       final snapshot = await _travelCollection
-          .where('memberIds', arrayContains: userId)
+          .where('memberIds', arrayContains: currentUserId)
           .get();
 
       final batch = _db.batch();
@@ -617,7 +669,7 @@ class TravelService {
         final TravelModel travel =
         TravelModel.fromFirestore(document);
 
-        // 삭제되지 않은 활성 여행만 비활성화한다.
+// 삭제되지 않은 활성 여행만 비활성화한다.
         if (travel.isActive && !travel.isDeleted) {
           batch.update(document.reference, {
             'isActive': false,
@@ -646,7 +698,9 @@ class TravelService {
 
   /// 여행 비활성화
   Future<void> deactivateTravel(String travelId) async {
-    if (travelId.trim().isEmpty) {
+    if (travelId
+        .trim()
+        .isEmpty) {
       throw ArgumentError('travelId가 비어 있습니다.');
     }
 
@@ -669,7 +723,9 @@ class TravelService {
 
   /// 여행 소프트 삭제
   Future<void> deleteTravel(String travelId) async {
-    if (travelId.trim().isEmpty) {
+    if (travelId
+        .trim()
+        .isEmpty) {
       throw ArgumentError('travelId가 비어 있습니다.');
     }
 
@@ -692,11 +748,9 @@ class TravelService {
     }
   }
 
-  void _printFirebaseError(
-      String title,
+  void _printFirebaseError(String title,
       FirebaseException error,
-      StackTrace stackTrace,
-      ) {
+      StackTrace stackTrace,) {
     debugPrint(title);
     debugPrint('오류 코드: ${error.code}');
     debugPrint('오류 메시지: ${error.message}');
