@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -28,6 +29,7 @@ import 'widgets/common/app_lock_gate.dart';
 import 'widgets/common/brand_loading_dots.dart';
 import 'package:intl/date_symbol_data_local.dart'; // TableCalendar 한글번역팩
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +40,29 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  FirebaseMessaging.onMessage.listen((message) {
+    final notification = message.notification;
+    if (notification != null) {
+      final title = notification.title ?? '';
+      final body = notification.body ?? '';
+
+      NotificationService.instance.showFcmNotification(
+        title: title,
+        body: body,
+        payload: message.data['type'],
+      );
+
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid != null) {
+        NotificationHistoryService().record(
+          uid: uid,
+          title: title,
+          body: body,
+          type: message.data['type'] ?? 'fcm',
+        );
+      }
+    }
+  });
   runApp(const DdaengApp());
 }
 
@@ -138,6 +163,7 @@ class AppGate extends StatelessWidget {
             unawaited(_maybeShowDailyResolution(user.uid));
             unawaited(_maybeCelebrateLevelUp(user.uid, profile));
             unawaited(_maybeWarnBudgetOverage(user.uid, profile));
+            unawaited(_syncFcmToken(user.uid));
             _syncAppBadgeForUser(user.uid);
             _maybeHandleNotificationLaunch();
             return const HomeScreen();
@@ -206,6 +232,30 @@ Future<void> _maybeCelebrateStreakMilestone(String uid, UserModel profile) async
   await NotificationService.instance.showStreakMilestone(title: title, body: body);
   await NotificationHistoryService()
       .record(uid: uid, title: title, body: body, type: 'streak');
+}
+
+Future<void> _syncFcmToken(String uid) async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+    await messaging.requestPermission();
+
+    final token = await messaging.getToken();
+    if (token != null) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'fcmToken': token});
+    }
+
+    messaging.onTokenRefresh.listen((newToken) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .update({'fcmToken': newToken});
+    });
+  } catch (e) {
+    debugPrint('FCM 토큰 동기화 실패: $e');
+  }
 }
 
 /// 접속 캘린더(activityDays)는 이 기능을 배포한 날부터만 기록되기 시작해서,

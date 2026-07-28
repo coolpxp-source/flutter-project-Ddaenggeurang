@@ -13,6 +13,24 @@ const _purple = Color(0xFF6C5CE7);
 const _purpleSoft = Color(0xFFEDE9FE);
 const _amberSoft = Color(0xFFFFF3DE);
 
+/// 알림함 필터 — "전체"는 null(필터 없음), 나머지는 알림 type 값과 매칭
+class _NotificationFilter {
+  final String label;
+  final String? type;
+  const _NotificationFilter(this.label, this.type);
+}
+
+const _filters = [
+  _NotificationFilter('전체', null),
+  _NotificationFilter('좋아요', 'post_like'),
+  _NotificationFilter('댓글', 'post_comment'),
+  _NotificationFilter('채팅', 'chat_message'),
+  _NotificationFilter('찜', 'product_favorite'),
+  _NotificationFilter('다짐', 'resolution'),
+  _NotificationFilter('AI 잔소리', 'nagging'),
+  _NotificationFilter('AI 상담', 'consult'),
+];
+
 /// 알림함 — 앱이 켜져 있을 때 실제로 띄운 로컬 알림(상담 리마인더/오늘의 잔소리)의
 /// 기록. 화면을 열면 안 읽은 알림을 전부 읽음 처리한다.
 class NotificationHistoryScreen extends StatefulWidget {
@@ -27,6 +45,8 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
   final _service = NotificationHistoryService();
   String get _uid => FirebaseAuth.instance.currentUser!.uid;
   bool _markedRead = false;
+
+  String? _selectedType; // null = 전체
 
   Future<void> _markAllRead(List<NotificationEntry> items) async {
     if (_markedRead) return;
@@ -58,37 +78,61 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
 
   (IconData, Color, Color) _visualFor(String type) {
     switch (type) {
+      case 'post_like':
+        return (
+        Icons.favorite_rounded,
+        const Color(0xFFEE5586),
+        const Color(0xFFFFE3EC),
+        );
+      case 'post_comment':
+        return (
+        Icons.mode_comment_rounded,
+        const Color(0xFF5B9BD5),
+        const Color(0xFFEAF2FA),
+        );
+      case 'chat_message':
+        return (
+        Icons.chat_bubble_rounded,
+        const Color(0xFF00A86B),
+        const Color(0xFFE0F7EC),
+        );
+      case 'product_favorite':
+        return (
+        Icons.storefront_rounded,
+        const Color(0xFFFF8A3D),
+        const Color(0xFFFFF0E8),
+        );
       case 'nagging':
         return (Icons.record_voice_over_rounded, _purple, _purpleSoft);
       case 'resolution':
         return (
-          Icons.wb_sunny_rounded,
-          const Color(0xFF00C2A8),
-          const Color(0xFFDBF7F3),
+        Icons.wb_sunny_rounded,
+        const Color(0xFF00C2A8),
+        const Color(0xFFDBF7F3),
         );
       case 'streak':
         return (
-          Icons.local_fire_department_rounded,
-          const Color(0xFFF04438),
-          const Color(0xFFFEE4E2),
+        Icons.local_fire_department_rounded,
+        const Color(0xFFF04438),
+        const Color(0xFFFEE4E2),
         );
       case 'levelup':
         return (
-          Icons.military_tech_rounded,
-          const Color(0xFFFFB300),
-          const Color(0xFFFFF3D6),
+        Icons.military_tech_rounded,
+        const Color(0xFFFFB300),
+        const Color(0xFFFFF3D6),
         );
       case 'budget_warning':
         return (
-          Icons.savings_outlined,
-          const Color(0xFFF04438),
-          const Color(0xFFFEE4E2),
+        Icons.savings_outlined,
+        const Color(0xFFF04438),
+        const Color(0xFFFEE4E2),
         );
       case 'consult':
         return (
-          Icons.chat_bubble_outline_rounded,
-          const Color(0xFF2F6BFF),
-          const Color(0xFFEEF4FF),
+        Icons.chat_bubble_outline_rounded,
+        const Color(0xFF2F6BFF),
+        const Color(0xFFEEF4FF),
         );
       default:
         return (Icons.forum_rounded, _accent, _amberSoft);
@@ -129,39 +173,114 @@ class _NotificationHistoryScreenState extends State<NotificationHistoryScreen> {
               ),
             ),
           ),
-          StreamBuilder<List<NotificationEntry>>(
-            stream: _service.watchHistory(_uid),
-            builder: (context, snap) {
-              if (!snap.hasData) {
-                return const Center(
-                  child: CircularProgressIndicator(
-                    color: _accent,
-                    strokeWidth: 2.4,
-                  ),
-                );
-              }
-              final items = snap.data!;
-              WidgetsBinding.instance.addPostFrameCallback(
-                (_) => _markAllRead(items),
-              );
+          Column(
+            children: [
+              _buildFilterBar(),
+              Expanded(
+                child: StreamBuilder<List<NotificationEntry>>(
+                  stream: _service.watchHistory(_uid),
+                  builder: (context, snap) {
+                    if (!snap.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(
+                          color: _accent,
+                          strokeWidth: 2.4,
+                        ),
+                      );
+                    }
+                    final allItems = snap.data!;
+                    WidgetsBinding.instance.addPostFrameCallback(
+                          (_) => _markAllRead(allItems),
+                    );
 
-              if (items.isEmpty) {
-                return const _EmptyHistory();
-              }
-              return ListView.separated(
-                padding: const EdgeInsets.all(20),
-                itemCount: items.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
-                itemBuilder: (context, i) => _NotificationCard(
-                  entry: items[i],
-                  uid: _uid,
-                  visual: _visualFor(items[i].type),
-                  relativeTime: _relativeTime(items[i].date),
+                    final items = _selectedType == null
+                        ? allItems
+                        : allItems.where((e) => e.type == _selectedType).toList();
+
+                    if (allItems.isEmpty) {
+                      return const _EmptyHistory();
+                    }
+
+                    if (items.isEmpty) {
+                      return _buildEmptyFilterResult();
+                    }
+
+                    return ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      itemCount: items.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (context, i) => _NotificationCard(
+                        entry: items[i],
+                        uid: _uid,
+                        visual: _visualFor(items[i].type),
+                        relativeTime: _relativeTime(items[i].date),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  /// 알림 타입별 필터 칩 (전체/좋아요/댓글/채팅/찜)
+  Widget _buildFilterBar() {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+        itemCount: _filters.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final filter = _filters[i];
+          final selected = _selectedType == filter.type;
+
+          return GestureDetector(
+            onTap: () => setState(() => _selectedType = filter.type),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? _accent : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: selected ? _accent : Colors.grey[300]!,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                filter.label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                  color: selected ? Colors.white : Colors.grey[600],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildEmptyFilterResult() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.filter_list_off_rounded, size: 40, color: _inkSub),
+            const SizedBox(height: 12),
+            const Text(
+              '해당 알림이 없어요',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _ink),
+            ),
+          ],
+        ),
       ),
     );
   }
