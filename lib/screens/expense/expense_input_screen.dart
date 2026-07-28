@@ -10,6 +10,8 @@ import '../../widgets/common/ddaeng_modal.dart';
 import '../../widgets/common/amount_calculator_sheet.dart';
 import '../../widgets/common/add_subcategory_dialog.dart';
 import '../../utils/korean_amount.dart';
+import '../../models/travel_model.dart';
+import '../../services/travel_service.dart';
 
 /// 홈 화면(_C)과 통일한 팔레트.
 
@@ -41,7 +43,11 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   bool _isInstallment = false;
   int _installmentMonths = 3;
   bool _isRecurring = false;
+  // 여행 연결!
   bool _isTravel = false;
+  List<TravelModel> _ongoingTravels = [];
+  String? _selectedTravelId;
+  bool _isLoadingTravels = false;
 
   @override
   void initState() {
@@ -64,6 +70,30 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         _fetchOriginalExpense(widget.editItem!.id);
       }
     });
+
+    // 💡 editItem의 travelId는 _fetchOriginalExpense() 안에서 Firestore 문서를
+    // 읽은 뒤에야 알 수 있으므로, 여기서는 진행 중인 여행 목록만 미리 불러온다.
+    // (_selectedTravelId 세팅은 _fetchOriginalExpense에서 처리)
+    _loadOngoingTravels();
+  }
+
+  Future<void> _loadOngoingTravels() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    setState(() => _isLoadingTravels = true);
+    try {
+      final travels = await TravelService().getTravelsByUserId(userId).first;
+      if (!mounted) return;
+      setState(() {
+        _ongoingTravels = travels.where((t) => t.isActive).toList();
+        _isLoadingTravels = false;
+      });
+    } catch (e) {
+      debugPrint('여행 목록 로드 실패: $e');
+      if (!mounted) return;
+      setState(() => _isLoadingTravels = false);
+    }
   }
 
   void _refreshAmount() {
@@ -91,7 +121,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             _installmentMonths = originalExpense.installmentTotalMonths!;
           }
           _isRecurring = originalExpense.recurringPaymentId != null;
+          // 💡 수정 화면 진입 시 기존에 연결된 여행이 있으면 그대로 선택 상태로 반영
           _isTravel = originalExpense.travelId != null;
+          _selectedTravelId = originalExpense.travelId;
         });
       }
     } catch (e) {
@@ -145,7 +177,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
       _selectedCategoryId = null;
 
       if (newNature != ExpenseNature.variable) _selectedEmotion = null;
-      if (newNature == ExpenseNature.fixed) _isTravel = false;
+      if (newNature == ExpenseNature.fixed) {
+        _isTravel = false;
+        _selectedTravelId = null;
+      }
     });
   }
 
@@ -167,6 +202,17 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         message: '변동비 지출에는 감정 태그가 필요합니다.',
         type: ModalType.warning,
       );
+    }
+
+    // 💡 여행 지출로 설정했는데 연결할 여행을 안 골랐으면 저장 막기
+    if (_isTravel && _selectedTravelId == null) {
+      await DdaengModal.alert(
+        context,
+        title: '여행을 선택해 주세요',
+        message: '연결할 여행을 골라야 저장할 수 있어요.',
+        type: ModalType.warning,
+      );
+      return;
     }
 
     final User? currentUser = FirebaseAuth.instance.currentUser;
@@ -208,7 +254,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         installmentInstallmentNo: _isInstallment ? 1 : null,
         installmentTotalMonths: _isInstallment ? _installmentMonths : null,
         recurringPaymentId: _isRecurring ? 'temp_recur_id' : null,
-        travelId: _isTravel ? 'temp_travel_id' : null,
+        // 💡 더미값 대신 실제로 선택한 여행 ID를 저장
+        travelId: _isTravel ? _selectedTravelId : null,
       );
 
       if (widget.editItem == null) {
@@ -749,10 +796,53 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                         : (value) {
                       setState(() {
                         _isTravel = value;
-                        if (value) _isRecurring = false;
+                        if (value) {
+                          _isRecurring = false;
+                        } else {
+                          _selectedTravelId = null;
+                        }
                       });
                     },
                   ),
+                  // 💡 여행 지출 토글을 켰을 때만 보이는 "어떤 여행에 연결할지" 선택 UI
+                  if (_isTravel) ...[
+                    const SizedBox(height: 12),
+                    if (_isLoadingTravels)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    else if (_ongoingTravels.isEmpty)
+                      const Text(
+                        '진행 중인 여행이 없어요. 먼저 여행을 등록해 주세요.',
+                        style: TextStyle(fontSize: 12, color: AppColors.expenseNegative),
+                      )
+                    else
+                      DropdownButtonFormField<String>(
+                        value: _ongoingTravels.any((t) => t.travelId == _selectedTravelId)
+                            ? _selectedTravelId
+                            : null,
+                        hint: const Text('연결할 여행 선택', style: TextStyle(color: AppColors.inkSub)),
+                        decoration: _fieldDecoration(label: '연결할 여행'),
+                        borderRadius: BorderRadius.circular(14),
+                        dropdownColor: Colors.white,
+                        items: _ongoingTravels.map((travel) {
+                          return DropdownMenuItem<String>(
+                            value: travel.travelId,
+                            child: Text(travel.title),
+                          );
+                        }).toList(),
+                        onChanged: _isSaving
+                            ? null
+                            : (value) => setState(() => _selectedTravelId = value),
+                      ),
+                  ],
                 ],
               ),
             ),
