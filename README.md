@@ -81,7 +81,7 @@
 ## <a name="members"></a>🤝🏼 팀원 구성
 | 이름 | 담당 영역 | GitHub | 이메일 |
 |:---:|:---:|:---:|:---:|
-| 임예림 | 지출 입력·기록 + 카드포인트·연말정산 | | |
+| 임예림 | 지출 입력·기록 + 카드포인트·연말정산 | [@kewiibird-source](https://github.com/kewiibird-source) | kewiibird@gmail.com |
 | 김은동 | 공통·인증 + 마이페이지 + AI상담 | | |
 | 성기필 | 예산·통계 + 구독·여행|  [@SeongGipil](https://github.com/SeongGipil) |20416rlvf@gmail.com |
 | 안혜진 | 마켓·거래 + 커뮤니티 | [@coolpxp-source](https://github.com/coolpxp-source) | coolpxp@gmail.com |
