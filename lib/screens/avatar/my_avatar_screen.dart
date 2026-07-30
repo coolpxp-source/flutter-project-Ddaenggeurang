@@ -68,6 +68,24 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     });
   }
 
+  // 희귀도 값을 한글 이름으로 변환하는 메서드
+  String _rarityLabel(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return '일반';
+      case 'uncommon':
+        return '고급';
+      case 'rare':
+        return '희귀';
+      case 'epic':
+        return '영웅';
+      case 'legendary':
+        return '전설';
+      default:
+        return '일반';
+    }
+  }
+
   Future<void> _selectItem(AvatarItem item) async {
     final isLocked = _level < item.unlockLevel;
 
@@ -83,80 +101,13 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     }
 
     if (!item.isOwned) {
-      await _showPurchaseDialog(item);
+      await _openPointShop();
       return;
     }
 
     await _equipItem(item);
   }
 
-  Future<void> _showPurchaseDialog(AvatarItem item) async {
-    if (_points < item.price) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('포인트가 부족합니다.'),
-        ),
-      );
-      return;
-    }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('아이템 구매'),
-          content: Text(
-            '${item.name}을(를) ${item.price}P에 구매할까요?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-              child: const Text('구매'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true) {
-      return;
-    }
-
-    final success = await _avatarService.purchaseItem(item.id);
-
-    if (!mounted) {
-      return;
-    }
-
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('아이템 구매에 실패했습니다.'),
-        ),
-      );
-      return;
-    }
-
-    await _reloadAvatarData();
-
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${item.name} 구매 완료!'),
-      ),
-    );
-  }
   Future<void> _equipItem(AvatarItem item) async {
     final success = await _avatarService.equipItem(item.id);
 
@@ -241,6 +192,118 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
       default:
         return Icons.star_outline;
     }
+  }
+
+  // 아이템 카드에 실제 이미지를 출력하는 메서드
+  Widget _buildItemImage({
+    required AvatarItem item,
+    required Color pinkColor,
+  }) {
+    final imageUrl = item.imageUrl.trim();
+    final assetPath = item.assetPath.trim();
+
+    if (imageUrl.isNotEmpty) {
+      return _buildItemPreview(
+        item: item,
+        image: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, _, _) {
+            return _buildLocalItemImage(
+              item: item,
+              pinkColor: pinkColor,
+            );
+          },
+        ),
+      );
+    }
+
+    return _buildLocalItemImage(
+      item: item,
+      pinkColor: pinkColor,
+    );
+  }
+
+// 로컬 에셋 또는 슬롯 아이콘을 출력하는 메서드
+  Widget _buildLocalItemImage({
+    required AvatarItem item,
+    required Color pinkColor,
+  }) {
+    final assetPath = item.assetPath.trim();
+
+    if (assetPath.isEmpty) {
+      return Icon(
+        _slotIcon(item.slot),
+        color: pinkColor,
+      );
+    }
+
+    return _buildItemPreview(
+      item: item,
+      image: Image.asset(
+        assetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.none,
+        errorBuilder: (_, _, _) {
+          return Icon(
+            _slotIcon(item.slot),
+            color: pinkColor,
+          );
+        },
+      ),
+    );
+  }
+
+// 1024×1024 에셋을 슬롯별로 확대해 보여주는 메서드
+  Widget _buildItemPreview({
+    required AvatarItem item,
+    required Widget image,
+  }) {
+    double scale;
+    Alignment alignment;
+
+    switch (item.slot) {
+      case 'hair':
+        scale = 2.0;
+        alignment = const Alignment(0, -0.85);
+        break;
+
+      case 'clothes':
+        scale = 3.0;
+        alignment = const Alignment(0, 0.4);
+        break;
+
+      case 'shoes':
+        scale = 3.6;
+        alignment = const Alignment(0, 0.90);
+        break;
+
+      case 'accessory':
+        scale = 3.0;
+        alignment = const Alignment(0, -0.4);
+        break;
+
+      case 'pet':
+        scale = 2.8;
+        alignment = const Alignment(0.9, 0.65);
+        break;
+
+      default:
+        scale = 1;
+        alignment = Alignment.center;
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(15),
+      child: Transform.scale(
+        scale: scale,
+        alignment: alignment,
+        child: SizedBox.expand(
+          child: image,
+        ),
+      ),
+    );
   }
 
   @override
@@ -550,7 +613,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                 crossAxisCount: 3,
                 crossAxisSpacing: 10,
                 mainAxisSpacing: 10,
-                childAspectRatio: 0.73,
+                childAspectRatio: 0.62,
               ),
               itemBuilder: (context, index) {
                 final item = filteredItems[index];
@@ -585,34 +648,23 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                                     : const Color(0xFFFFF0F6),
                                 borderRadius: BorderRadius.circular(15),
                               ),
-                              child: isLocked
-                                  ? const Icon(
-                                Icons.lock_outline,
-                                color: Color(0xFFAEB0B8),
-                              )
-                                  : item.imageUrl.isNotEmpty
-                                  ? ClipRRect(
-                                borderRadius: BorderRadius.circular(15),
-                                child: Image.network(
-                                  item.imageUrl,
-                                  width: 58,
-                                  height: 58,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (
-                                      context,
-                                      error,
-                                      stackTrace,
-                                      ) {
-                                    return Icon(
-                                      _slotIcon(item.slot),
-                                      color: pinkColor,
-                                    );
-                                  },
-                                ),
-                              )
-                                  : Icon(
-                                _slotIcon(item.slot),
-                                color: pinkColor,
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Opacity(
+                                    opacity: isLocked ? 0.55 : 1,
+                                    child: _buildItemImage(
+                                      item: item,
+                                      pinkColor: pinkColor,
+                                    ),
+                                  ),
+                                  if (isLocked)
+                                    const Icon(
+                                      Icons.lock_outline,
+                                      color: Color(0xFF8F929D),
+                                      size: 25,
+                                    ),
+                                ],
                               ),
                             ),
                             if (item.isOwned)
@@ -634,7 +686,16 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                               ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 5),
+                        Text(
+                          _rarityLabel(item.rarity),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF8566FF),
+                          ),
+                        ),
+                        const SizedBox(height: 1),
                         Text(
                           item.name,
                           overflow: TextOverflow.ellipsis,
@@ -643,7 +704,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         Text(
                           isLocked
                               ? 'Lv.${item.unlockLevel}'

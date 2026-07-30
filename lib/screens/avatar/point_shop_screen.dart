@@ -15,15 +15,17 @@ class _PointShopScreenState extends State<PointShopScreen> {
   final AvatarService _avatarService = AvatarService.instance;
 
   final List<String> _slots = [
-    'hat',
+    'hair',
     'clothes',
     'shoes',
     'accessory',
+    'pet',
   ];
+
 
   int _points = 0;
   int _userLevel = 1;
-  String _selectedSlot = 'hat';
+  String _selectedSlot = 'hair';
   bool _isLoading = true;
 
   List<AvatarItem> _items = [];
@@ -139,16 +141,19 @@ class _PointShopScreenState extends State<PointShopScreen> {
     );
   }
 
+  // 슬롯별 아이콘을 반환하는 메서드
   IconData _slotIcon(String slot) {
     switch (slot) {
-      case 'hat':
-        return Icons.checkroom;
+      case 'hair':
+        return Icons.face_retouching_natural;
       case 'clothes':
         return Icons.dry_cleaning;
       case 'shoes':
         return Icons.ice_skating;
       case 'accessory':
         return Icons.auto_awesome;
+      case 'pet':
+        return Icons.pets;
       default:
         return Icons.category_outlined;
     }
@@ -234,11 +239,8 @@ class _PointShopScreenState extends State<PointShopScreen> {
                     ),
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: Icon(
-                    _slotIcon(item.slot),
-                    color: Colors.white,
-                    size: 36,
-                  ),
+                  padding: const EdgeInsets.all(8),
+                  child: _buildPurchaseItemImage(item),
                 ),
                 const SizedBox(height: 18),
                 const Text(
@@ -368,16 +370,62 @@ class _PointShopScreenState extends State<PointShopScreen> {
     }
   }
 
+  // 구매 팝업에 아이템 실제 이미지를 출력하는 메서드
+  Widget _buildPurchaseItemImage(AvatarItem item) {
+    final imageUrl = item.imageUrl.trim();
+    final assetPath = item.assetPath.trim();
+
+    if (imageUrl.isNotEmpty) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.none,
+        errorBuilder: (_, _, _) {
+          return _buildPurchaseAssetOrIcon(item);
+        },
+      );
+    }
+
+    return _buildPurchaseAssetOrIcon(item);
+  }
+
+// 구매 팝업에 로컬 에셋 또는 기본 아이콘을 출력하는 메서드
+  Widget _buildPurchaseAssetOrIcon(AvatarItem item) {
+    if (item.assetPath.trim().isNotEmpty) {
+      return Image.asset(
+        item.assetPath,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.none,
+        errorBuilder: (_, _, _) {
+          return Icon(
+            _slotIcon(item.slot),
+            color: Colors.white,
+            size: 36,
+          );
+        },
+      );
+    }
+
+    return Icon(
+      _slotIcon(item.slot),
+      color: Colors.white,
+      size: 36,
+    );
+  }
+
+  // 슬롯별 한글 이름을 반환하는 메서드
   String _slotLabel(String slot) {
     switch (slot) {
-      case 'hat':
-        return '모자';
+      case 'hair':
+        return '헤어';
       case 'clothes':
-        return '옷';
+        return '의상';
       case 'shoes':
         return '신발';
       case 'accessory':
         return '소품';
+      case 'pet':
+        return '펫';
       default:
         return slot;
     }
@@ -512,7 +560,7 @@ class _PointShopScreenState extends State<PointShopScreen> {
               crossAxisCount: 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
-              childAspectRatio: 0.86,
+              childAspectRatio: 0.74,
             ),
             itemBuilder: (context, index) {
               final item = filteredItems[index];
