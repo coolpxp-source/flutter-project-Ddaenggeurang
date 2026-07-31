@@ -1,4 +1,4 @@
-import '../../models/category_model.dart' show TransactionType;
+import '../../models/transaction_type.dart';
 import '../../models/expense_model.dart' show ExpenseNature;
 
 class ParsedRecordDraft {

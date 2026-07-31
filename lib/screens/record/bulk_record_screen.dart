@@ -6,7 +6,7 @@ import '../../services/ai_service.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
 
-/// "밀린 지출을 텍스트로 직접 입력" 전용 화면.
+/// "한번에 기록하기" 전용 화면.
 /// (영수증 촬영은 receipt_upload_screen, 문자 붙여넣기는 sms_paste_screen으로 분리됨)
 class BulkRecordScreen extends StatefulWidget {
   const BulkRecordScreen({super.key});
@@ -45,7 +45,10 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     try {
       final text = _textController.text.trim();
       final parsedList = await _aiService.parseBulkText(text);
-      final drafts = mapParsedExpensesToDrafts(parsedList);
+      final drafts = await mapParsedExpensesToDrafts(
+        parsedList,
+        userId: currentUser.uid,
+      );
 
       if (!mounted) return;
       setState(() => _isParsing = false);

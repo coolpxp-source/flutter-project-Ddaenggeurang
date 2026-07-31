@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/category_summary_model.dart';
 import '../../services/category_summary_service.dart';
+import '../../widgets/expense/category_icon_map.dart';
 
 /// 일간/주간/월간 카테고리별 지출을 확인하는 화면
 ///
@@ -558,7 +559,7 @@ class _CategorySummaryScreenState extends State<CategorySummaryScreen> {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              _categoryIcon(summary.categoryKey),
+              CategoryIconMap.iconFor(summary.categoryName),
               size: 19,
               color: categoryColor,
             ),
@@ -791,46 +792,6 @@ class _CategorySummaryScreenState extends State<CategorySummaryScreen> {
 
       case CategorySummaryPeriod.month:
         return '${_selectedDate.year}년 ${_selectedDate.month}월';
-    }
-  }
-
-  /// categoryKey에 맞는 대표 아이콘
-  IconData _categoryIcon(String categoryKey) {
-    switch (categoryKey.toLowerCase()) {
-      case 'food':
-      case 'meal':
-        return Icons.restaurant_outlined;
-
-      case 'transport':
-      case 'traffic':
-        return Icons.directions_bus_outlined;
-
-      case 'shopping':
-        return Icons.shopping_bag_outlined;
-
-      case 'culture':
-      case 'entertainment':
-        return Icons.movie_outlined;
-
-      case 'housing':
-      case 'living':
-        return Icons.home_outlined;
-
-      case 'cafe':
-        return Icons.local_cafe_outlined;
-
-      case 'medical':
-      case 'health':
-        return Icons.medical_services_outlined;
-
-      case 'education':
-        return Icons.school_outlined;
-
-      case 'travel':
-        return Icons.flight_outlined;
-
-      default:
-        return Icons.more_horiz_rounded;
     }
   }
 
