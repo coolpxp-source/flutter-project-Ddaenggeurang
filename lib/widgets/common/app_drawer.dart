@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../screens/category/custom_categories.dart';
+import '../../screens/history/installment_recurring_screen.dart';
 import '../../screens/history/transaction_history_screen.dart';
 import 'drawer_menu_item.dart';
 import 'placeholder_screen.dart';
@@ -115,14 +116,14 @@ class AppDrawer extends StatelessWidget {
           const DrawerSectionLabel(label: '자동 등록 관리'),
           DrawerMenuItem(
             icon: Icons.credit_card,
-            title: '할부 관리',
-            destinationScreen: const PlaceholderScreen(title: '할부 관리'),
+            title: '할부/정기결제 관리',
+            destinationScreen: InstallmentRecurringScreen(),
             iconColor: AppColors.utility,
             iconBg: AppColors.utilitySoft,
           ),
           DrawerMenuItem(
             icon: Icons.autorenew,
-            title: '구독/정기결제 관리',
+            title: '구독서비스 관리',
             destinationScreen: SubscriptionListScreen(
               userId: FirebaseAuth.instance.currentUser!.uid,
             ),
@@ -180,15 +181,7 @@ class AppDrawer extends StatelessWidget {
             destinationScreen: CustomCategoriesScreen(),
             iconColor: AppColors.purple,
             iconBg: AppColors.purpleSoft,
-          ),
-          // 감정태그는 보류!! 로컬 AI 학습이슈
-          // DrawerMenuItem(
-          //   icon: Icons.emoji_emotions_outlined,
-          //   title: '감정태그',
-          //   destinationScreen: const PlaceholderScreen(title: '감정태그'),
-          //   iconColor: AppColors.purple,
-          //   iconBg: AppColors.purpleSoft,
-          // ),
+          )
         ],
       ),
     );

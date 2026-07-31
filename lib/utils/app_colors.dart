@@ -25,6 +25,8 @@ class AppColors {
   static const expenseDeep = Color(0xFF8A5200);
   static const expenseNegative = Color(0xFFF04438); // 금액 음수 강조용 (Colors.red 대체)
 
+  static const expenseBox = Color(0xFFFFFFFF);
+
   // 수입 (income_input 기준)
   static const income = Color(0xFF12B76A);
   static const incomeSoft = Color(0xFFD9F1D8);

@@ -1,5 +1,4 @@
 // 지출내역 확인용 입니다
-
 /// 저축(투자) 항목의 증권사/종목/수량 — SavingModel.InvestmentDetail을 화면단에서
 /// 그대로 쓰기보다, TransactionItem은 Firestore 의존성 없이 가볍게 유지하기 위해
 /// 별도의 경량 클래스로 둡니다.
@@ -33,6 +32,9 @@ class TransactionItem {
   final int? installmentTotalMonths; // 할부 총 개월수 — 지출만 해당 (isInstallment일 때만 의미 있음)
   final bool isRecurring;       // 정기결제(지출) / 정기수입(수입) / 반복저축(저축) 여부
   final int? recurringPayDay;   // 정기수입일 때 매달 입금일 — 수입만 해당
+  final String? recurringPaymentId; // 연결된 구독(subscriptions 컬렉션) 문서 ID — 지출만 해당.
+  // isRecurring만으로는 "연결되어 있었다"는 것만 알 수 있고 지금 그 구독이
+  // 활성 상태인지는 알 수 없어서, 상세 화면에서 실시간으로 조회하는 데 씀.
   final TransactionInvestmentDetail? investmentDetail; // 투자 상세 — 저축만 해당
   final int? returnedAmount;    // 만기/해지/매도 시 최종 환급 금액 — 저축만 해당
 
@@ -52,6 +54,7 @@ class TransactionItem {
     this.installmentTotalMonths,
     this.isRecurring = false,
     this.recurringPayDay,
+    this.recurringPaymentId,
     this.investmentDetail,
     this.returnedAmount,
   });

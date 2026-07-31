@@ -40,6 +40,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   bool _isInstallment = false;
   int _installmentMonths = 3;
+  // 할부(isInstallment)와 동일한 성격의 단순 플래그. 별도 구독 컬렉션과는
+  // 연결하지 않는다 — "구독관리"는 넷플릭스/멤버십 같은 진짜 구독 서비스
+  // 전용이고, 여기 "정기결제"는 그냥 "매달 반복되는 지출"이라는 표시일 뿐.
   bool _isRecurring = false;
 
   @override
@@ -192,6 +195,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     setState(() => _isSaving = true);
     try {
       final String userId = currentUser.uid;
+
       final newExpense = ExpenseModel(
         expenseId: widget.editItem != null ? widget.editItem!.id : '',
         userId: userId,
@@ -204,7 +208,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         installmentPlanId: _isInstallment ? 'temp_install_id' : null,
         installmentInstallmentNo: _isInstallment ? 1 : null,
         installmentTotalMonths: _isInstallment ? _installmentMonths : null,
-        recurringPaymentId: _isRecurring ? 'temp_recur_id' : null,
+        // 할부(installmentPlanId)와 동일한 성격의 단순 플래그.
+        // 실제 구독 컬렉션과는 연결하지 않는다 (구독관리는 별개 기능).
+        recurringPaymentId: _isRecurring ? 'recurring' : null,
       );
 
       if (widget.editItem == null) {
