@@ -13,6 +13,9 @@ import 'post_write_screen.dart';
 import '../market/market_home_screen.dart';
 import '../../widgets/common/app_header.dart';
 import '../../widgets/common/app_drawer.dart';
+import '../../services/avatar_service.dart';
+import '../../models/avatar_item_model.dart';
+import '../../widgets/avatar/avatar_layered_character.dart';
 
 class CommunityHomeScreen extends StatefulWidget {
   const CommunityHomeScreen({super.key});
@@ -35,6 +38,13 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   static const _gradientEnd = Color(0xFFFF6B1A);
 
   bool _showMarketHint = true;
+  final PageController _adController = PageController();
+  int _adIndex = 0;
+
+  static const _communityBanners = [
+    (imagePath: 'assets/images/community_banner_market.png', type: 'market'),
+    (imagePath: 'assets/images/community_banner_ad.png', type: 'ad'),
+  ];
 
   @override
   void initState() {
@@ -47,13 +57,10 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _adController.dispose();
     super.dispose();
   }
 
-  /// 글쓰기 카테고리 선택 바텀시트 (기존 원형 메뉴 대체)
-  ///
-  /// 아이콘만 있던 CircularMenu는 라벨이 없어서 뭘 뜻하는지 알기 어렵다는
-  /// 피드백을 받아, 텍스트 라벨이 붙은 바텀시트 방식으로 교체함
   void _openWriteSheet() {
     showModalBottomSheet(
       context: context,
@@ -225,32 +232,12 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                     );
                   }
                 },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [_gradientStart, _gradientEnd],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('내 또래는 어떻게 쓰고 있을까?',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            Text('저축·지출·수입까지 또래와 비교해보세요 →',
-                                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.9))),
-                          ],
-                        ),
-                      ),
-                      const CircleAvatar(radius: 20, backgroundColor: Colors.white24),
-                    ],
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/images/community_banner_peer.png',
+                    width: double.infinity,
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -262,7 +249,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  separatorBuilder: (_, __) => const SizedBox(width: 25),
                   itemBuilder: (context, i) {
                     final cat = _categories[i];
                     final selected = cat == _selectedCategory;
@@ -312,6 +299,55 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              SizedBox(
+                height: 90,
+                child: PageView.builder(
+                  controller: _adController,
+                  itemCount: _communityBanners.length,
+                  onPageChanged: (i) => setState(() => _adIndex = i),
+                  itemBuilder: (context, i) {
+                    final banner = _communityBanners[i];
+                    return GestureDetector(
+                      onTap: () {
+                        if (banner.type == 'market') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
+                          );
+                        } else {
+                          // TODO: 리워드 광고 시청 → 상담 횟수 충전 로직 연결
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('곧 만나볼 수 있어요!')),
+                          );
+                        }
+                      },
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 2),
+                          width: double.infinity,
+                          child: Image.asset(banner.imagePath, fit: BoxFit.cover),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(_communityBanners.length, (i) {
+                  return Container(
+                    width: _adIndex == i ? 16 : 6,
+                    height: 6,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    decoration: BoxDecoration(
+                      color: _adIndex == i ? _green : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
+              ),
 
               // 검색바
               Container(
@@ -706,10 +742,27 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                 children: [
                   Row(
                     children: [
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundColor: _greenLight,
-                        child: Icon(Icons.person, size: 14, color: _green),
+                      FutureBuilder<List<AvatarItem>>(
+                        future: AvatarService.instance.getEquippedItemsForUser(post.authorId),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return CircleAvatar(
+                              radius: 12,
+                              backgroundColor: _greenLight,
+                              child: Icon(Icons.person, size: 14, color: _green),
+                            );
+                          }
+                          return ClipOval(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: AvatarLayeredCharacter(
+                                items: snapshot.data!,
+                                size: 24,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(width: 8),
                       Text(post.authorName,

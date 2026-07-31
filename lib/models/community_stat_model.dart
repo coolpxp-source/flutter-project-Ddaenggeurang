@@ -44,6 +44,7 @@ class CommunityStat {
 
   Map<String, dynamic> toMap() {
     return {
+      'userId': userId,
       'nicknameMasked': nicknameMasked,
       'savingRate': savingRate,
       'savingAmount': savingAmount,

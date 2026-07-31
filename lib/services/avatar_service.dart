@@ -125,6 +125,38 @@ class AvatarService {
     }
   }
 
+  // 특정 유저의 현재 착용 아이템만 조회 (다른 사람 캐릭터 표시용, 커뮤니티 등)
+  Future<List<AvatarItem>> getEquippedItemsForUser(String userId) async {
+    try {
+      final results = await Future.wait([
+        _firestore.collection('avatarItems').get(),
+        _firestore.collection('users').doc(userId).get(),
+      ]);
+
+      final avatarItemsSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
+      final userSnapshot = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+
+      final userData = userSnapshot.data();
+      final equippedItems = Map<String, dynamic>.from(
+        userData?['equippedItems'] ?? {},
+      );
+
+      final equippedIds = equippedItems.values.whereType<String>().toSet();
+
+      return avatarItemsSnapshot.docs
+          .where((doc) => equippedIds.contains(doc.id))
+          .map((doc) => AvatarItem.fromMap(doc.id, doc.data()).copyWith(
+        isOwned: true,
+        isEquipped: true,
+      ))
+          .toList();
+    } catch (e) {
+      debugPrint('유저 착용 아이템 조회 실패: $e');
+      return [];
+    }
+  }
+
+
   // 기본 아바타 아이템의 보유 및 장착 상태를 초기화하는 메서드
   Future<void> initializeDefaultAvatar() async {
     final userId = _currentUserId;

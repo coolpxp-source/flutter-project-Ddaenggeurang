@@ -24,6 +24,8 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
   static const _pink = Color(0xFFEE5586);
   static const _green = Color(0xFFFF8A3D);
   static const _greenLight = Color(0xFFFFF0E8);
+  static const _gradientStart = Color(0xFFFFA351);
+  static const _gradientEnd = Color(0xFFFF6B1A);
 
   static const _ageGroups = [
     '10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상',
@@ -273,8 +275,69 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
 
             final peer = snapshot.data!;
 
+            final positiveCount = [
+              _compareLevel(myValue: mine.savingRate.toDouble(), peerValue: peer.savingRate, higherIsBetter: true, unit: '%'),
+              _compareLevel(myValue: mine.expenseAmount.toDouble(), peerValue: peer.expenseAmount, higherIsBetter: false, unit: '원'),
+              _compareLevel(myValue: mine.incomeAmount.toDouble(), peerValue: peer.incomeAmount, higherIsBetter: true, unit: '원'),
+            ].where((level) => level == 'positive').length;
+
+            final String heroTitle = positiveCount == 3
+                ? '완벽해요! 세 지표 모두 또래보다 좋아요'
+                : positiveCount == 0
+                ? '괜찮아요, 하나씩 따라잡아봐요'
+                : '$positiveCount개 지표에서 또래보다 좋아요';
+
+            // 결과 개수에 따라 히어로 카드 그라데이션 색을 다르게
+            final List<Color> heroGradient = positiveCount == 3
+                ? const [Color(0xFF6FCF97), Color(0xFF27AE60)]
+                : positiveCount == 2
+                ? const [Color(0xFFFFD452), Color(0xFFFFA351)]
+                : positiveCount == 1
+                ? const [_gradientStart, _gradientEnd]
+                : const [Color(0xFFFF8FB1), Color(0xFFEE5586)];
+
             return Column(
               children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: heroGradient,
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                        child: Icon(
+                          positiveCount == 3 ? Icons.emoji_events_rounded : Icons.insights_rounded,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(heroTitle,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                            const SizedBox(height: 4),
+                            Text('$_selectedAgeGroup · $_selectedJob 기준',
+                                style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85))),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
                 if (peer.matchLevel != 'exact') _buildMatchLevelNotice(peer),
                 if (peer.matchLevel != 'exact') const SizedBox(height: 14),
                 _buildCompareCard(
@@ -371,7 +434,21 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
       ),
     );
   }
+  // 'positive' | 'neutral' | 'negative' 3단계로 판정
+  // 퍼센트(%)는 절대 차이 0.5p 이내, 금액은 또래값의 3% 이내면 '평균'으로 취급
+  String _compareLevel({
+    required double myValue,
+    required double peerValue,
+    required bool higherIsBetter,
+    required String unit,
+  }) {
+    final diff = myValue - peerValue;
+    final threshold = unit == '%' ? 0.5 : (peerValue.abs() * 0.03).clamp(1, double.infinity);
 
+    if (diff.abs() <= threshold) return 'neutral';
+    final isBetter = higherIsBetter ? diff > 0 : diff < 0;
+    return isBetter ? 'positive' : 'negative';
+  }
   Widget _buildCompareCard({
     required IconData icon,
     required String title,
@@ -382,7 +459,7 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
     required Color barColor,
   }) {
     final double diff = myValue - peerValue;
-    final bool isPositive = higherIsBetter ? diff >= 0 : diff <= 0;
+    final String level = _compareLevel(myValue: myValue, peerValue: peerValue, higherIsBetter: higherIsBetter, unit: unit);
 
     final String formattedMy = unit == '%' ? myValue.toStringAsFixed(1) : _formatAmount(myValue);
     final String formattedPeer = unit == '%' ? peerValue.toStringAsFixed(1) : _formatAmount(peerValue);
@@ -390,8 +467,13 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
 
     const Color positiveBg = Color(0xFFE9F9F1);
     const Color positiveText = Color(0xFF1B8F5A);
+    const Color neutralBg = Color(0xFFF1F3F5);
+    const Color neutralText = Color(0xFF6B7280);
     const Color negativeBg = Color(0xFFFFF1E5);
     const Color negativeText = Color(0xFFC2610C);
+
+    final Color badgeBg = level == 'positive' ? positiveBg : level == 'neutral' ? neutralBg : negativeBg;
+    final Color badgeText = level == 'positive' ? positiveText : level == 'neutral' ? neutralText : negativeText;
 
     return Container(
       width: double.infinity,
@@ -432,28 +514,32 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: isPositive ? positiveBg : negativeBg,
+              color: badgeBg,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 Icon(
-                  isPositive ? Icons.thumb_up_rounded : Icons.info_rounded,
+                  level == 'positive'
+                      ? Icons.thumb_up_rounded
+                      : level == 'neutral'
+                      ? Icons.horizontal_rule_rounded
+                      : Icons.info_rounded,
                   size: 14,
-                  color: isPositive ? positiveText : negativeText,
+                  color: badgeText,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    diff == 0
-                        ? '또래 평균과 같아요'
-                        : isPositive
+                    level == 'neutral'
+                        ? '또래 평균과 비슷해요'
+                        : level == 'positive'
                         ? '또래보다 $formattedDiff$unit 더 ${_positiveLabel(title)}'
                         : '또래보다 $formattedDiff$unit 더 ${_negativeLabel(title)}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: isPositive ? positiveText : negativeText,
+                      color: badgeText,
                     ),
                   ),
                 ),
