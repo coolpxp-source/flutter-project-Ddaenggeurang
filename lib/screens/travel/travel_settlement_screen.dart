@@ -4,7 +4,6 @@ import '../../models/travel_settlement_model.dart';
 import '../../services/travel_settlement_service.dart';
 import 'travel_member_screen.dart';
 
-// 앱 공통 블루 테마 컬러
 const Color _mainColor = Color(0xFF4F7DF3);
 const Color _mainSoftColor = Color(0xFFE8EFFE);
 const Color _bgColor = Color(0xFFF8F7FA);
@@ -37,19 +36,23 @@ class _TravelSettlementScreenState
 
   bool _isLoading = true;
   bool _isProcessing = false;
+  bool _isClosing = false;
 
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-
-    _calculateSettlement();
+    _loadSettlement();
   }
 
-  /// 최신 참여자와 경비를 기준으로 정산 계산
-  Future<void> _calculateSettlement() async {
-    if (_isProcessing) {
+  /// 정산 화면 최초 실행
+  ///
+  /// 1. 완료된 정산이 없는 경우: 일반 정산
+  /// 2. 완료된 정산이 있고 변경 없음: 안내 후 화면 종료
+  /// 3. 완료 후 추가 지출이나 참여자 변경이 있음: 다시 정산
+  Future<void> _loadSettlement() async {
+    if (_isProcessing || _isClosing) {
       return;
     }
 
@@ -57,6 +60,172 @@ class _TravelSettlementScreenState
       _isLoading = true;
       _errorMessage = null;
     });
+
+    try {
+      final TravelSettlementModel? savedSettlement =
+      await _settlementService.getSettlement(
+        widget.travelId,
+      );
+
+      // 기존 정산이 없거나 아직 완료되지 않은 경우
+      if (savedSettlement?.isCompleted != true) {
+        await _calculateSettlement();
+        return;
+      }
+
+      // 현재 참여자와 지출을 기준으로 계산만 수행한다.
+      final TravelSettlementModel currentSettlement =
+      await _settlementService
+          .calculateFromFirestore(
+        widget.travelId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final bool hasChanged = _hasSettlementChanged(
+        savedSettlement!,
+        currentSettlement,
+      );
+
+      // 완료 후 추가 지출이나 참여자 변경이 없는 경우
+      if (!hasChanged) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        await _showNoSettlementDialog();
+
+        if (!mounted) {
+          return;
+        }
+
+        _isClosing = true;
+        Navigator.of(context).pop(false);
+        return;
+      }
+
+      // 완료 이후 변경 사항이 있으면 다시 정산할 수 있게 한다.
+      await _settlementService.reopenSettlement(
+        widget.travelId,
+      );
+
+      final TravelSettlementModel updatedSettlement =
+      await _settlementService.calculateAndSave(
+        widget.travelId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _settlement = updatedSettlement;
+        _isLoading = false;
+      });
+
+      _showMessage(
+        '추가된 지출을 반영해 정산 금액을 다시 계산했습니다.',
+      );
+    } on StateError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    } on ArgumentError catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage =
+            error.message?.toString() ??
+                '정산 정보를 확인해 주세요.';
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = _cleanError(error);
+      });
+    }
+  }
+
+  /// 저장된 정산과 현재 정산 결과가 달라졌는지 확인
+  bool _hasSettlementChanged(
+      TravelSettlementModel saved,
+      TravelSettlementModel current,
+      ) {
+    if (saved.totalAmount != current.totalAmount) {
+      return true;
+    }
+
+    if (saved.memberCount != current.memberCount) {
+      return true;
+    }
+
+    if (saved.memberSummaries.length !=
+        current.memberSummaries.length) {
+      return true;
+    }
+
+    final Map<String, SettlementMemberSummary>
+    savedSummaryMap =
+    <String, SettlementMemberSummary>{
+      for (final SettlementMemberSummary summary
+      in saved.memberSummaries)
+        summary.memberId: summary,
+    };
+
+    for (final SettlementMemberSummary currentSummary
+    in current.memberSummaries) {
+      final SettlementMemberSummary? savedSummary =
+      savedSummaryMap[currentSummary.memberId];
+
+      if (savedSummary == null) {
+        return true;
+      }
+
+      if (savedSummary.paidAmount !=
+          currentSummary.paidAmount) {
+        return true;
+      }
+
+      if (savedSummary.shareAmount !=
+          currentSummary.shareAmount) {
+        return true;
+      }
+
+      if (savedSummary.balance !=
+          currentSummary.balance) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// 최신 참여자와 경비 기준으로 정산
+  Future<void> _calculateSettlement() async {
+    if (_isProcessing || _isClosing) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final TravelSettlementModel settlement =
@@ -95,12 +264,10 @@ class _TravelSettlementScreenState
       }
 
       setState(() {
-        _errorMessage = error
-            .toString()
-            .replaceFirst('Exception: ', '');
+        _errorMessage = _cleanError(error);
       });
     } finally {
-      if (mounted) {
+      if (mounted && !_isClosing) {
         setState(() {
           _isLoading = false;
         });
@@ -110,6 +277,10 @@ class _TravelSettlementScreenState
 
   /// 참여자 관리 화면 이동
   Future<void> _openMemberScreen() async {
+    if (_isProcessing || _isClosing) {
+      return;
+    }
+
     await Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
@@ -128,22 +299,23 @@ class _TravelSettlementScreenState
     await _calculateSettlement();
   }
 
-  /// 정산 완료 또는 완료 취소
-  Future<void> _toggleCompleted() async {
+  /// 정산 완료
+  Future<void> _completeSettlement() async {
     final TravelSettlementModel? settlement =
         _settlement;
 
-    if (settlement == null || _isProcessing) {
+    if (settlement == null ||
+        settlement.isCompleted ||
+        _isProcessing ||
+        _isClosing) {
       return;
     }
 
-    if (!settlement.isCompleted) {
-      final bool? confirmed =
-      await _showCompleteDialog();
+    final bool? confirmed =
+    await _showCompleteDialog();
 
-      if (confirmed != true) {
-        return;
-      }
+    if (confirmed != true || !mounted) {
+      return;
     }
 
     setState(() {
@@ -151,18 +323,7 @@ class _TravelSettlementScreenState
     });
 
     try {
-      if (settlement.isCompleted) {
-        await _settlementService.reopenSettlement(
-          widget.travelId,
-        );
-      } else {
-        await _settlementService.completeSettlement(
-          widget.travelId,
-        );
-      }
-
-      final TravelSettlementModel? updated =
-      await _settlementService.getSettlement(
+      await _settlementService.completeSettlement(
         widget.travelId,
       );
 
@@ -170,33 +331,80 @@ class _TravelSettlementScreenState
         return;
       }
 
-      setState(() {
-        _settlement = updated;
-      });
+      _isClosing = true;
 
-      _showMessage(
-        settlement.isCompleted
-            ? '정산 완료를 취소했습니다.'
-            : '여행 정산을 완료했습니다.',
-      );
+      // true를 반환해 이전 화면도 새로고침할 수 있게 한다.
+      Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) {
         return;
       }
 
       _showMessage(
-        error
-            .toString()
-            .replaceFirst('Exception: ', ''),
+        _cleanError(error),
         isError: true,
       );
     } finally {
-      if (mounted) {
+      if (mounted && !_isClosing) {
         setState(() {
           _isProcessing = false;
         });
       }
     }
+  }
+
+  /// 정산할 새로운 내역이 없을 때 표시
+  Future<void> _showNoSettlementDialog() {
+    return showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Text(
+            '정산 내역 없음',
+            style: TextStyle(
+              color: Color(0xFF222222),
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          content: const Text(
+            '현재 새로 정산할 내역이 없습니다.\n'
+                '추가 지출이 생기면 다시 정산할 수 있습니다.',
+            style: TextStyle(
+              color: Color(0xFF666666),
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            14,
+          ),
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: _mainColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius:
+                  BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text('확인'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<bool?> _showCompleteDialog() {
@@ -218,8 +426,7 @@ class _TravelSettlementScreenState
           ),
           content: const Text(
             '모든 참여자가 송금을 완료했나요?\n\n'
-                '완료 후에도 다시 정산을 계산하거나 '
-                '완료 상태를 취소할 수 있습니다.',
+                '추가 지출이 생기면 다시 정산할 수 있습니다.',
             style: TextStyle(
               fontSize: 13,
               color: Color(0xFF555555),
@@ -238,7 +445,8 @@ class _TravelSettlementScreenState
                 Navigator.of(dialogContext).pop(false);
               },
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF999999),
+                foregroundColor:
+                const Color(0xFF999999),
               ),
               child: const Text('취소'),
             ),
@@ -249,7 +457,8 @@ class _TravelSettlementScreenState
               style: FilledButton.styleFrom(
                 backgroundColor: _mainColor,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                  BorderRadius.circular(12),
                 ),
               ),
               child: const Text('정산 완료'),
@@ -274,9 +483,17 @@ class _TravelSettlementScreenState
         SnackBar(
           content: Text(message),
           behavior: SnackBarBehavior.floating,
-          backgroundColor: isError ? _sendColor : null,
+          backgroundColor:
+          isError ? _sendColor : null,
         ),
       );
+  }
+
+  String _cleanError(Object error) {
+    return error
+        .toString()
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Bad state: ', '');
   }
 
   String _formatAmount(int amount) {
@@ -292,45 +509,51 @@ class _TravelSettlementScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bgColor,
-      appBar: AppBar(
-        elevation: 0,
-        centerTitle: true,
+    return PopScope(
+      canPop: !_isProcessing,
+      child: Scaffold(
         backgroundColor: _bgColor,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: const Color(0xFF222222),
-        title: const Text(
-          '여행 정산',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
+        appBar: AppBar(
+          elevation: 0,
+          centerTitle: true,
+          backgroundColor: _bgColor,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor:
+          const Color(0xFF222222),
+          title: const Text(
+            '여행 정산',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
           ),
+          actions: <Widget>[
+            IconButton(
+              onPressed:
+              _isLoading || _isProcessing
+                  ? null
+                  : _openMemberScreen,
+              tooltip: '참여자 관리',
+              icon: const Icon(
+                Icons.groups_rounded,
+                color: _mainColor,
+              ),
+            ),
+            IconButton(
+              onPressed:
+              _isLoading || _isProcessing
+                  ? null
+                  : _calculateSettlement,
+              tooltip: '다시 계산',
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: _mainColor,
+              ),
+            ),
+          ],
         ),
-        actions: <Widget>[
-          IconButton(
-            onPressed: _isProcessing
-                ? null
-                : _openMemberScreen,
-            tooltip: '참여자 관리',
-            icon: const Icon(
-              Icons.groups_rounded,
-              color: _mainColor,
-            ),
-          ),
-          IconButton(
-            onPressed: _isLoading || _isProcessing
-                ? null
-                : _calculateSettlement,
-            tooltip: '다시 계산',
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: _mainColor,
-            ),
-          ),
-        ],
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -345,7 +568,7 @@ class _TravelSettlementScreenState
             ),
             SizedBox(height: 16),
             Text(
-              '정산 금액을 계산하고 있습니다.',
+              '정산 정보를 확인하고 있습니다.',
               style: TextStyle(
                 color: Color(0xFF999999),
                 fontSize: 13,
@@ -371,6 +594,8 @@ class _TravelSettlementScreenState
       color: _mainColor,
       onRefresh: _calculateSettlement,
       child: ListView(
+        physics:
+        const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           20,
           16,
@@ -378,7 +603,7 @@ class _TravelSettlementScreenState
           40,
         ),
         children: <Widget>[
-          _buildStatusCard(settlement),
+          _buildStatusCard(),
           const SizedBox(height: 16),
           _buildTotalCard(settlement),
           const SizedBox(height: 26),
@@ -408,11 +633,9 @@ class _TravelSettlementScreenState
             child: FilledButton.icon(
               onPressed: _isProcessing
                   ? null
-                  : _toggleCompleted,
+                  : _completeSettlement,
               style: FilledButton.styleFrom(
-                backgroundColor: settlement.isCompleted
-                    ? const Color(0xFF9AA5B1)
-                    : _mainColor,
+                backgroundColor: _mainColor,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius:
@@ -423,21 +646,19 @@ class _TravelSettlementScreenState
                   ? const SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(
+                child:
+                CircularProgressIndicator(
                   strokeWidth: 2.5,
                   color: Colors.white,
                 ),
               )
-                  : Icon(
-                settlement.isCompleted
-                    ? Icons.restart_alt_rounded
-                    : Icons.check_circle_outline_rounded,
+                  : const Icon(
+                Icons
+                    .check_circle_outline_rounded,
               ),
-              label: Text(
-                settlement.isCompleted
-                    ? '정산 완료 취소'
-                    : '정산 완료',
-                style: const TextStyle(
+              label: const Text(
+                '정산 완료',
+                style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -449,39 +670,25 @@ class _TravelSettlementScreenState
     );
   }
 
-  Widget _buildStatusCard(
-      TravelSettlementModel settlement,
-      ) {
-    final Color color = settlement.isCompleted
-        ? _receiveColor
-        : const Color(0xFFC98A00);
-
-    final Color bgColor = settlement.isCompleted
-        ? const Color(0xFFE9F9F1)
-        : const Color(0xFFFFF6E5);
-
+  Widget _buildStatusCard() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: const Color(0xFFFFF6E5),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: const Row(
         children: <Widget>[
           Icon(
-            settlement.isCompleted
-                ? Icons.check_circle_rounded
-                : Icons.schedule_rounded,
-            color: color,
+            Icons.schedule_rounded,
+            color: Color(0xFFC98A00),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
-              settlement.isCompleted
-                  ? '정산이 완료되었습니다.'
-                  : '아직 정산이 완료되지 않았습니다.',
+              '아직 정산이 완료되지 않았습니다.',
               style: TextStyle(
-                color: color,
+                color: Color(0xFFC98A00),
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
@@ -521,20 +728,24 @@ class _TravelSettlementScreenState
             ),
           ),
           const SizedBox(height: 20),
-          const Divider(color: Color(0xFFD5E1FB)),
+          const Divider(
+            color: Color(0xFFD5E1FB),
+          ),
           const SizedBox(height: 12),
           Row(
             children: <Widget>[
               Expanded(
                 child: _buildTotalItem(
                   title: '참여 인원',
-                  value: '${settlement.memberCount}명',
+                  value:
+                  '${settlement.memberCount}명',
                 ),
               ),
               Container(
                 width: 1,
                 height: 40,
-                color: const Color(0xFFD5E1FB),
+                color:
+                const Color(0xFFD5E1FB),
               ),
               Expanded(
                 child: _buildTotalItem(
@@ -675,7 +886,10 @@ class _TravelSettlementScreenState
             ],
           ),
           const SizedBox(height: 14),
-          const Divider(height: 1, color: Color(0xFFF0EDF0)),
+          const Divider(
+            height: 1,
+            color: Color(0xFFF0EDF0),
+          ),
           const SizedBox(height: 14),
           Row(
             children: <Widget>[
@@ -814,15 +1028,15 @@ class _TravelSettlementScreenState
           color: const Color(0xFFF0EDF0),
         ),
       ),
-      child: Column(
+      child: const Column(
         children: <Widget>[
-          const Icon(
+          Icon(
             Icons.check_circle_outline_rounded,
             size: 42,
             color: _receiveColor,
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             '송금할 금액이 없습니다.',
             style: TextStyle(
               color: Color(0xFF333333),
@@ -836,7 +1050,7 @@ class _TravelSettlementScreenState
 
   Widget _buildErrorView() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -871,6 +1085,7 @@ class _TravelSettlementScreenState
               style: const TextStyle(
                 color: Color(0xFF999999),
                 fontSize: 13,
+                height: 1.5,
               ),
             ),
             const SizedBox(height: 22),
@@ -881,7 +1096,8 @@ class _TravelSettlementScreenState
                 style: FilledButton.styleFrom(
                   backgroundColor: _mainColor,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius:
+                    BorderRadius.circular(14),
                   ),
                 ),
                 icon: const Icon(

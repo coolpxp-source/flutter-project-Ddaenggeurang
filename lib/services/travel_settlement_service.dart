@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/travel_expense_model.dart';
 import '../models/travel_member_model.dart';
 import '../models/travel_settlement_model.dart';
+import 'travel_member_service.dart';
 
 class TravelSettlementService {
   TravelSettlementService({
@@ -19,11 +20,6 @@ class TravelSettlementService {
   CollectionReference<Map<String, dynamic>>
   get _settlementCollection {
     return _db.collection('travelSettlements');
-  }
-
-  CollectionReference<Map<String, dynamic>>
-  get _memberCollection {
-    return _db.collection('travelMembers');
   }
 
   CollectionReference<Map<String, dynamic>>
@@ -65,6 +61,12 @@ class TravelSettlementService {
 
       final List<TravelExpenseModel> expenses =
       results[1] as List<TravelExpenseModel>;
+
+      debugPrint(
+        '정산 데이터 조회 완료: '
+            '참여자 ${members.length}명, '
+            '경비 ${expenses.length}건',
+      );
 
       return calculateSettlement(
         travelId: trimmedTravelId,
@@ -320,7 +322,6 @@ class TravelSettlementService {
       return null;
     }
 
-    // 로그인 상태를 먼저 확인한다.
     _currentUserId;
 
     try {
@@ -400,11 +401,15 @@ class TravelSettlementService {
     try {
       await _settlementCollection
           .doc(trimmedTravelId)
-          .update(<String, dynamic>{
-        'isCompleted': true,
-        'completedAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(
+        <String, dynamic>{
+          'isCompleted': true,
+          'completedAt':
+          FieldValue.serverTimestamp(),
+          'updatedAt':
+          FieldValue.serverTimestamp(),
+        },
+      );
 
       debugPrint(
         '여행 정산 완료: $trimmedTravelId',
@@ -437,11 +442,14 @@ class TravelSettlementService {
     try {
       await _settlementCollection
           .doc(trimmedTravelId)
-          .update(<String, dynamic>{
-        'isCompleted': false,
-        'completedAt': null,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+          .update(
+        <String, dynamic>{
+          'isCompleted': false,
+          'completedAt': null,
+          'updatedAt':
+          FieldValue.serverTimestamp(),
+        },
+      );
 
       debugPrint(
         '여행 정산 완료 취소: $trimmedTravelId',
@@ -460,39 +468,41 @@ class TravelSettlementService {
   }
 
   /// 여행 참여자 조회
+  ///
+  /// 참여자 관리 화면과 동일하게 travels 문서의
+  /// userId와 memberIds를 기준으로 참여자를 불러온다.
   Future<List<TravelMemberModel>> _getMembers(
       String travelId,
       ) async {
+    final String trimmedTravelId = travelId.trim();
+
+    if (trimmedTravelId.isEmpty) {
+      return <TravelMemberModel>[];
+    }
+
     _currentUserId;
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot =
-    await _memberCollection
-        .where(
-      'travelId',
-      isEqualTo: travelId,
-    )
-        .get();
+    final TravelMemberService memberService =
+    TravelMemberService(
+      firestore: _db,
+      auth: _auth,
+    );
 
     final List<TravelMemberModel> members =
-    snapshot.docs
-        .map(
-          (
-          QueryDocumentSnapshot<
-              Map<String, dynamic>>
-          document,
-          ) {
-        return TravelMemberModel.fromFirestore(
-          document,
-        );
-      },
-    )
+    await memberService.getMembers(
+      trimmedTravelId,
+    );
+
+    final List<TravelMemberModel> activeMembers =
+    members
         .where(
           (TravelMemberModel member) =>
-      !member.isDeleted,
+      !member.isDeleted &&
+          member.memberId.trim().isNotEmpty,
     )
         .toList();
 
-    members.sort(
+    activeMembers.sort(
           (
           TravelMemberModel first,
           TravelMemberModel second,
@@ -507,19 +517,34 @@ class TravelSettlementService {
       },
     );
 
-    return members;
+    debugPrint(
+      '정산 참여자 조회 완료: '
+          'travelId=$trimmedTravelId, '
+          '인원=${activeMembers.length}명',
+    );
+
+    for (final TravelMemberModel member
+    in activeMembers) {
+      debugPrint(
+        '정산 참여자: '
+            'memberId=${member.memberId}, '
+            'userId=${member.userId}, '
+            'name=${member.displayName}, '
+            'isOwner=${member.isOwner}',
+      );
+    }
+
+    return activeMembers;
   }
 
   /// 로그인 사용자의 여행 경비 조회
   Future<List<TravelExpenseModel>> _getExpenses(
       String travelId,
       ) async {
-    // 로그인 상태를 확인한다.
-    // Firestore 규칙에서 해당 여행의 참여자인지도 다시 검사한다.
     _currentUserId;
 
-    final QuerySnapshot<Map<String, dynamic>> snapshot =
-    await _expenseCollection
+    final QuerySnapshot<Map<String, dynamic>>
+    snapshot = await _expenseCollection
         .where(
       'travelId',
       isEqualTo: travelId,
@@ -565,17 +590,20 @@ class TravelSettlementService {
     required List<TravelMemberModel> members,
   }) {
     final String payerId =
-        expense.effectivePayerId;
+    expense.effectivePayerId.trim();
 
-    // 새 경비는 참여자 문서 ID가 payerId에 저장된다.
+    if (payerId.isEmpty) {
+      return null;
+    }
+
+    // 새 경비의 payerId가 참여자 memberId인 경우
     for (final TravelMemberModel member in members) {
-      if (member.memberId == payerId) {
+      if (member.memberId.trim() == payerId) {
         return member;
       }
     }
 
-    // 기존 경비는 등록자 UID만 있으므로
-    // 참여자의 Firebase UID와 비교한다.
+    // 기존 경비의 payerId가 Firebase UID인 경우
     for (final TravelMemberModel member in members) {
       if (member.userId.trim().isNotEmpty &&
           member.userId.trim() == payerId) {
