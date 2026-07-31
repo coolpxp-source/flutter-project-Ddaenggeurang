@@ -802,13 +802,33 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isCompletedSaving ? Colors.grey[400] : AppColors.ink,
-                    ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          item.title,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: isCompletedSaving ? Colors.grey[400] : AppColors.ink,
+                          ),
+                        ),
+                      ),
+                      if (item.isRecurring) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          isExpense
+                              ? '(정기결제)'
+                              : (isSaving ? '(반복저축)' : '(정기수입)'),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isCompletedSaving ? Colors.grey[400] : AppColors.inkSub,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 3),
                   Text(

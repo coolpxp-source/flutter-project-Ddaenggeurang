@@ -80,6 +80,7 @@ class TransactionService {
       isInstallment: expense.installmentPlanId != null,
       installmentTotalMonths: expense.installmentTotalMonths,
       isRecurring: expense.recurringPaymentId != null,
+      recurringPaymentId: expense.recurringPaymentId,
     );
   }
 
@@ -226,7 +227,7 @@ class TransactionService {
 
     try {
       await _db.collection(collectionName).doc(id).update({
-        'isDeleted': true, // 👈 완전히 지우지 않고 상태만 변경 (기존 로직과 호환)
+        'isDeleted': true,
       });
       print('✅ 삭제 완료: $collectionName 의 $id');
     } catch (e) {
