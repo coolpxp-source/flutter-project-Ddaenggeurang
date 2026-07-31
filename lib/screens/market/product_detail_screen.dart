@@ -1,3 +1,4 @@
+import 'package:ddaenggeurang/screens/market/seller_products_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,7 @@ import '../../widgets/common/ddaeng_modal.dart';
 import '../chat/chat_room_screen.dart';
 import 'price_comparison_screen.dart';
 import 'product_register_screen.dart';
+import 'package:intl/intl.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final MarketProduct product;
@@ -302,20 +304,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('${product.price}원', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    Text('${NumberFormat('#,###').format(product.price)}원', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
 
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: _green,
-                          backgroundImage:
-                          product.sellerAvatarUrl.isNotEmpty ? NetworkImage(product.sellerAvatarUrl) : null,
+                    GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SellerProductsScreen(
+                              sellerId: product.sellerId,
+                              sellerName: product.sellerName,
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(product.sellerName, style: const TextStyle(fontSize: 13)),
-                      ],
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: _green,
+                            backgroundImage:
+                            product.sellerAvatarUrl.isNotEmpty ? NetworkImage(product.sellerAvatarUrl) : null,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(product.sellerName, style: const TextStyle(fontSize: 13)),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Divider(height: 1, color: Colors.grey[200]),
@@ -325,6 +338,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 16),
 
                     Text('#${product.category}', style: TextStyle(fontSize: 12, color: _green)),
+                    if (product.verifiedDong != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, size: 13, color: Colors.grey[400]),
+                          const SizedBox(width: 3),
+                          Text(
+                            product.verifiedDong!,
+                            style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                          ),
+                        ],
+                      ),
+                    ],
 
                     if (product.priceComparisons.isNotEmpty) ...[
                       const Divider(height: 32),
