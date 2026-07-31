@@ -9,6 +9,7 @@ import '../../widgets/common/coach_avatar.dart';
 import '../onboarding/onboarding_screen.dart'; // OnboardingData, DdaengColors
 import '../../utils/formatters.dart';
 import '../home/home_screen.dart';
+import '../../services/avatar_service.dart';
 
 /// 온보딩에서 입력받은 데이터를 이메일 인증 화면까지 임시로 들고 가기 위한 홀더.
 /// main.dart의 AppGate는 Firebase 인증 상태만 보고 라우팅하기 때문에,
@@ -259,7 +260,16 @@ class _SignupExtraScreenState extends State<SignupExtraScreen> {
         debugPrint('⚠️ createUser 타임아웃 (8초) — Firestore 쓰기 응답 없음');
         throw Exception('저장 시간 초과');
       });
-      debugPrint('✅ createUser 완료 — 홈 화면으로 이동');
+      debugPrint('✅ createUser 완료');
+
+      try {
+        await AvatarService.instance.initializeDefaultAvatar();
+        debugPrint('✅ 기본 아바타 초기화 완료');
+      } catch (e) {
+        debugPrint('⚠️ 기본 아바타 초기화 실패 (계속 진행): $e');
+      }
+
+      debugPrint('✅ 홈 화면으로 이동');
       if (!mounted) return;
       // login_screen.dart / email_signup_screen.dart가 pushReplacement로 이 화면을
       // 열기 때문에 main.dart의 AppGate는 더 이상 위젯 트리에 없다. 따라서 AppGate의

@@ -143,6 +143,19 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
         ageGroup: _ageGroup,
         job: _job,
       );
+      // communityStats 동기화는 별도로 처리 — 실패해도 프로필 저장 자체를 막지 않는다
+      try {
+        final statRef = FirebaseFirestore.instance.collection('communityStats').doc(_uid);
+        final statDoc = await statRef.get();
+        if (statDoc.exists) {
+          await statRef.update({
+            'ageGroup': _ageGroup,
+            'job': _job,
+          });
+        }
+      } catch (e) {
+        debugPrint('communityStats 동기화 실패: $e');
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -172,6 +185,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   void _openAgeSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -188,18 +202,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 decoration:
                 BoxDecoration(color: _line, borderRadius: BorderRadius.circular(10)),
               ),
-              ..._ageGroups.map((age) => ListTile(
-                title: Text(age,
-                    style: TextStyle(
-                        fontWeight: age == _ageGroup ? FontWeight.w800 : FontWeight.w500,
-                        color: age == _ageGroup ? _accent : _ink)),
-                trailing:
-                age == _ageGroup ? const Icon(Icons.check, color: _accent) : null,
-                onTap: () {
-                  setState(() => _ageGroup = age);
-                  Navigator.pop(context);
-                },
-              )),
+              ConstrainedBox(                                          // ← 추가
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: _ageGroups.map((age) => ListTile(
+                    title: Text(age,
+                        style: TextStyle(
+                            fontWeight: age == _ageGroup ? FontWeight.w800 : FontWeight.w500,
+                            color: age == _ageGroup ? _accent : _ink)),
+                    trailing:
+                    age == _ageGroup ? const Icon(Icons.check, color: _accent) : null,
+                    onTap: () {
+                      setState(() => _ageGroup = age);
+                      Navigator.pop(context);
+                    },
+                  )).toList(),
+                ),
+              ),
             ],
           ),
         ),

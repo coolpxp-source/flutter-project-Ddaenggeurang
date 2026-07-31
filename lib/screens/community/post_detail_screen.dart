@@ -5,6 +5,9 @@ import '../../services/community_service.dart';
 import '../../models/community_post_model.dart';
 import '../../models/post_comment_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../services/avatar_service.dart';
+import '../../models/avatar_item_model.dart';
+import '../../widgets/avatar/avatar_layered_character.dart';
 
 class PostDetailScreen extends StatefulWidget {
   final CommunityPost post;
@@ -88,6 +91,28 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         return _greenLight;
     }
   }
+
+  Widget _authorAvatar(String userId, double radius) {
+    return FutureBuilder<List<AvatarItem>>(
+      future: AvatarService.instance.getEquippedItemsForUser(userId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return CircleAvatar(radius: radius, backgroundColor: _greenLight);
+        }
+        return ClipOval(
+          child: SizedBox(
+            width: radius * 2,
+            height: radius * 2,
+            child: AvatarLayeredCharacter(
+              items: snapshot.data!,
+              size: radius * 2,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
 
   void _submitComment() async {
     if (_commentController.text.trim().isEmpty) return;
@@ -303,7 +328,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(radius: 16, backgroundColor: _green),
+                        _authorAvatar(post.authorId, 16),
                         const SizedBox(width: 10),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,7 +473,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    CircleAvatar(radius: 12, backgroundColor: Colors.grey[300]),
+                                    _authorAvatar(c.authorId, 12),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Column(

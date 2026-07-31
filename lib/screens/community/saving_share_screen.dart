@@ -21,25 +21,6 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
   static const _gradientStart = Color(0xFFFFA351);
   static const _gradientEnd = Color(0xFFFF6B1A);
 
-  static const _ageGroups = [
-    '10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상',
-  ];
-
-  static const _jobs = [
-    '경영·관리·인사',
-    '기획·전략·마케팅',
-    '개발·데이터 엔지니어',
-    '디자인·UI·UX',
-    '영업·고객상담',
-    '금융·재무·회계',
-    '연구개발·바이오',
-    '미디어·엔터·문화',
-    '의료·보건·복지',
-    '교육·학원·학술',
-    '서비스·식음료·유통',
-    '제조·생산·품질',
-  ];
-
   final _communityService = CommunityService();
   final _expenseService = ExpenseService();
   final _incomeService = IncomeService();
@@ -47,8 +28,11 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
 
   final _nicknameController = TextEditingController();
 
-  String _ageGroup = _ageGroups[1];
-  String _job = _jobs[2];
+  List<String> _ageGroups = [];
+  List<String> _jobs = [];
+  String _ageGroup = '';
+  String _job = '';
+  bool _isLoadingOptions = true;
 
   bool _isLoadingMonthly = true;
   bool _isSaving = false;
@@ -63,7 +47,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
   void initState() {
     super.initState();
     _loadMonthlyTotals();
-    _loadProfileDefaults();
+    _loadOptionsAndProfileDefaults();
   }
 
   @override
@@ -77,31 +61,51 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
     return (_monthlySaving / _monthlyIncome * 100).clamp(0, 100).toDouble();
   }
 
-  /// users/{uid} 문서에서 닉네임/연령대/직군을 미리 채워온다.
-  /// 필드가 없거나 값이 목록에 없으면 기존 기본값을 그대로 둔다.
-  Future<void> _loadProfileDefaults() async {
+  Future<void> _loadOptionsAndProfileDefaults() async {
+    try {
+      final optionsDoc =
+      await FirebaseFirestore.instance.collection('metadata').doc('options').get();
+      final options = optionsDoc.data();
+      if (options != null) {
+        _ageGroups = List<String>.from(options['ageGroups'] ?? []);
+        _jobs = List<String>.from(options['jobs'] ?? []);
+      }
+    } catch (_) {
+    }
+
+    if (_ageGroups.isEmpty) {
+      _ageGroups = ['10대', '20대 초반', '20대 후반', '30대 초반', '30대 후반', '40대', '50대', '60대 이상'];
+    }
+    if (_jobs.isEmpty) _jobs = ['기타'];
+
     try {
       final doc = await FirebaseFirestore.instance.collection('users').doc(_myId).get();
       final data = doc.data();
-      if (data == null || !mounted) return;
 
-      final nickname = data['nickname'] as String?;
-      final ageGroup = data['ageGroup'] as String?;
-      final job = data['job'] as String?;
+      final nickname = data?['nickname'] as String?;
+      final ageGroup = data?['ageGroup'] as String?;
+      final job = data?['job'] as String?;
 
-      setState(() {
-        if (nickname != null && nickname.trim().isNotEmpty) {
-          _nicknameController.text = nickname.trim();
-        }
-        if (ageGroup != null && _ageGroups.contains(ageGroup)) {
-          _ageGroup = ageGroup;
-        }
-        if (job != null && _jobs.contains(job)) {
-          _job = job;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          if (nickname != null && nickname.trim().isNotEmpty) {
+            _nicknameController.text = nickname.trim();
+          }
+          _ageGroup = (ageGroup != null && _ageGroups.contains(ageGroup))
+              ? ageGroup
+              : _ageGroups.first;
+          _job = (job != null && _jobs.contains(job)) ? job : _jobs.first;
+          _isLoadingOptions = false;
+        });
+      }
     } catch (_) {
-      // 프로필 자동완성 실패해도 화면은 그대로 수동 입력으로 진행 가능
+      if (mounted) {
+        setState(() {
+          _ageGroup = _ageGroups.first;
+          _job = _jobs.first;
+          _isLoadingOptions = false;
+        });
+      }
     }
   }
 
@@ -295,7 +299,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
         foregroundColor: Colors.black87,
         title: const Text('저축 비율 공유', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ),
-      body: _isLoadingMonthly
+      body: (_isLoadingMonthly || _isLoadingOptions)
           ? const Center(child: CircularProgressIndicator(color: _green))
           : ListView(
         padding: const EdgeInsets.all(20),
