@@ -409,7 +409,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
             right: 16,
             bottom: 16,
             child: FloatingActionButton(
-              backgroundColor: _green,
+              backgroundColor: const Color(0xFFFFA733),
               onPressed: _openWriteSheet,
               child: const Icon(Icons.edit_rounded, color: Colors.white),
             ),

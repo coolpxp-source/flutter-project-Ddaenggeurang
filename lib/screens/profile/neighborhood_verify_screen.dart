@@ -14,12 +14,29 @@ class NeighborhoodVerifyScreen extends StatefulWidget {
 
 class _NeighborhoodVerifyScreenState extends State<NeighborhoodVerifyScreen> {
   static const _green = Color(0xFFFF9166);
+  static const _greenLight = Color(0xFFFFF0E8);
+  static const _gradientStart = Color(0xFFFFA351);
+  static const _gradientEnd = Color(0xFFFF6B1A);
+
   final _locationService = LocationService();
   bool _loading = false;
   String? _detectedDong;
 
-  /// 위치 서비스/권한 상태를 확인해서, 문제가 있으면 사용자에게 보여줄
-  /// 안내 문구를 반환한다. 문제없으면 null.
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingDong();
+  }
+
+  Future<void> _loadExistingDong() async {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+    final verifiedDong = doc.data()?['verifiedDong'] as String?;
+    if (mounted && verifiedDong != null) {
+      setState(() => _detectedDong = verifiedDong);
+    }
+  }
+
   Future<String?> _checkLocationPermission() async {
     final serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -44,7 +61,6 @@ class _NeighborhoodVerifyScreenState extends State<NeighborhoodVerifyScreen> {
   Future<void> _detectLocation() async {
     setState(() => _loading = true);
     try {
-      // 1) 권한/위치 서비스 상태 먼저 확인 — 실기기에서 가장 흔한 실패 원인
       final permissionMessage = await _checkLocationPermission();
       if (permissionMessage != null) {
         if (mounted) {
@@ -60,8 +76,6 @@ class _NeighborhoodVerifyScreenState extends State<NeighborhoodVerifyScreen> {
 
       final position = await _locationService.getCurrentPosition();
 
-      // 2) 에뮬레이터에서 위치를 따로 설정 안 하면 흔히 (0.0, 0.0)이 잡힘 —
-      // 실제 GPS 좌표가 정확히 0,0일 가능성은 거의 없으므로 이걸로 구분
       if (position.latitude == 0.0 && position.longitude == 0.0) {
         if (mounted) {
           await DdaengModal.alert(
@@ -120,46 +134,174 @@ class _NeighborhoodVerifyScreenState extends State<NeighborhoodVerifyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('동네 인증')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('현재 위치로 내 동네를 인증해주세요.\n인증된 동네는 직거래 신뢰도를 높여줘요.',
-                style: TextStyle(fontSize: 14, height: 1.5)),
-            const SizedBox(height: 24),
-            if (_detectedDong != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0E8),
-                  borderRadius: BorderRadius.circular(12),
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Text(
+          '동네 인증',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        ),
+        centerTitle: false,
+        backgroundColor: const Color(0xFFF8F9FA),
+        elevation: 0,
+        foregroundColor: Colors.black87,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // 상단 그라데이션 히어로 카드
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_gradientStart, _gradientEnd],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: Container(
+                    width: 100,
+                    height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.14),
+                    ),
+                  ),
                 ),
-                child: Row(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.location_on, color: _green),
-                    const SizedBox(width: 8),
-                    Text(_detectedDong!, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Colors.white24,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.location_on_rounded, color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text('내 동네를 인증해주세요',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white)),
+                    const SizedBox(height: 6),
+                    Text('인증된 동네는 직거래 신뢰도를 높여줘요',
+                        style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.9))),
                   ],
                 ),
-              ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading ? null : _detectLocation,
-              style: ElevatedButton.styleFrom(backgroundColor: _green, padding: const EdgeInsets.symmetric(vertical: 14)),
-              child: Text(_loading ? '위치 확인 중...' : '현재 위치 확인하기',
-                  style: const TextStyle(color: Colors.white)),
+              ],
             ),
-            if (_detectedDong != null) ...[
-              const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: _confirmVerify,
-                child: const Text('이 동네로 인증하기'),
+          ),
+          const SizedBox(height: 20),
+
+          // 인증 결과 카드 (인증 전/후 상태에 따라 다르게)
+          if (_detectedDong != null)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: _green.withOpacity(0.3)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 3)),
+                ],
               ),
-            ],
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: const BoxDecoration(color: _greenLight, shape: BoxShape.circle),
+                    child: const Icon(Icons.check_circle_rounded, color: _green, size: 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('감지된 동네', style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+                        const SizedBox(height: 2),
+                        Text(_detectedDong!,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.withOpacity(0.1)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 3)),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.my_location_rounded, size: 30, color: Colors.grey[300]),
+                  const SizedBox(height: 10),
+                  Text('아직 위치를 확인하지 않았어요',
+                      style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+                ],
+              ),
+            ),
+          const SizedBox(height: 20),
+
+          // 버튼 영역
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _loading ? null : _detectLocation,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFA733),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: _loading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+                  : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.my_location_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Text('현재 위치 확인하기',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+          ),
+
+          if (_detectedDong != null) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: _confirmVerify,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  side: BorderSide(color: _green),
+                ),
+                child: Text('이 동네로 인증하기',
+                    style: TextStyle(color: _green, fontWeight: FontWeight.bold)),
+              ),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

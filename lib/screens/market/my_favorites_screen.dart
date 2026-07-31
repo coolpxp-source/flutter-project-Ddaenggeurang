@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../services/market_service.dart';
 import '../../models/market_product_model.dart';
 import 'product_detail_screen.dart';
@@ -19,6 +20,8 @@ class _MyFavoritesScreenState extends State<MyFavoritesScreen> {
   final String _myId = FirebaseAuth.instance.currentUser!.uid;
 
   late Future<List<MarketProduct>> _favoritesFuture;
+  String _statusFilter = '전체';
+  static const _filters = ['전체', '판매중', '거래중', '판매완료'];
 
   @override
   void initState() {
@@ -42,40 +45,157 @@ class _MyFavoritesScreenState extends State<MyFavoritesScreen> {
         elevation: 0,
         title: const Text('내 찜 목록', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
       ),
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        child: FutureBuilder<List<MarketProduct>>(
-          future: _favoritesFuture,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final products = snapshot.data!;
-            if (products.isEmpty) {
-              return ListView(
-                children: [
-                  SizedBox(
-                    height: 300,
-                    child: Center(
-                      child: Text('찜한 상품이 없어요', style: TextStyle(color: Colors.grey[500])),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: SizedBox(
+              height: 32,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: _filters.map((label) {
+                  final selected = _statusFilter == label;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _statusFilter = label),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: selected ? _green : Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: selected ? _green : Colors.grey[300]!),
+                        ),
+                        child: Text(label,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                              color: selected ? Colors.white : Colors.grey[600],
+                            )),
+                      ),
                     ),
-                  ),
-                ],
-              );
-            }
-            return GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.85,
+                  );
+                }).toList(),
               ),
-              itemCount: products.length,
-              itemBuilder: (context, index) => _productCard(context, products[index]),
-            );
-          },
-        ),
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refresh,
+              child: FutureBuilder<List<MarketProduct>>(
+                future: _favoritesFuture,
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final products = snapshot.data!.where((p) {
+                    if (_statusFilter == '전체') return true;
+                    if (_statusFilter == '판매중') return p.status == ProductStatus.selling;
+                    if (_statusFilter == '거래중') return p.status == ProductStatus.reserved;
+                    return p.status == ProductStatus.sold;
+                  }).toList();
+
+                  if (products.isEmpty) {
+                    return ListView(
+                      children: [
+                        SizedBox(
+                          height: 300,
+                          child: Center(
+                            child: Text(
+                              _statusFilter == '전체' ? '찜한 상품이 없어요' : '해당 상태의 찜한 상품이 없어요',
+                              style: TextStyle(color: Colors.grey[500]),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.72,
+                    ),
+                    itemCount: products.length,
+                    itemBuilder: (context, index) => _productCard(context, products[index]),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _statusLabel(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.selling:
+        return '판매중';
+      case ProductStatus.reserved:
+        return '거래중';
+      case ProductStatus.sold:
+        return '판매완료';
+    }
+  }
+
+  Color _statusBg(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.selling:
+        return const Color(0xFFFFE9DC);
+      case ProductStatus.reserved:
+        return const Color(0xFFFFF3D6);
+      case ProductStatus.sold:
+        return const Color(0xFFEDEDED);
+    }
+  }
+
+  Color _statusText(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.selling:
+        return _green;
+      case ProductStatus.reserved:
+        return const Color(0xFFC98A00);
+      case ProductStatus.sold:
+        return Colors.grey[600]!;
+    }
+  }
+
+  IconData _statusIcon(ProductStatus status) {
+    switch (status) {
+      case ProductStatus.selling:
+        return Icons.local_fire_department_rounded;
+      case ProductStatus.reserved:
+        return Icons.schedule_rounded;
+      case ProductStatus.sold:
+        return Icons.check_circle_rounded;
+    }
+  }
+
+  String _timeAgo(DateTime dateTime) {
+    final diff = DateTime.now().difference(dateTime);
+    if (diff.inMinutes < 1) return '방금 전';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    if (diff.inDays < 7) return '${diff.inDays}일 전';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}주 전';
+    return '${dateTime.year}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
+  Widget _tagChip(String label, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 9, color: color),
+          const SizedBox(width: 2),
+          Text(label, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w500)),
+        ],
       ),
     );
   }
@@ -89,43 +209,91 @@ class _MyFavoritesScreenState extends State<MyFavoritesScreen> {
         MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
       ),
       child: Container(
-        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
+          border: Border.all(color: Colors.grey[200]!),
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2)),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: hasImage
-                  ? Image.network(
-                product.images.first,
-                height: 90,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 90,
-                  width: double.infinity,
-                  color: _greenLight,
-                  child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  child: AspectRatio(
+                    aspectRatio: 4 / 3,
+                    child: hasImage
+                        ? Image.network(
+                      product.images.first,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: _greenLight,
+                        child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4), size: 30),
+                      ),
+                    )
+                        : Container(
+                      color: _greenLight,
+                      child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4), size: 30),
+                    ),
+                  ),
                 ),
-              )
-                  : Container(
-                height: 90,
-                width: double.infinity,
-                decoration: BoxDecoration(color: _greenLight, borderRadius: BorderRadius.circular(10)),
-                child: Icon(Icons.image_outlined, color: _green.withOpacity(0.4)),
+                Positioned(
+                  left: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _statusBg(product.status),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(_statusIcon(product.status), size: 10, color: _statusText(product.status)),
+                        const SizedBox(width: 3),
+                        Text(
+                          _statusLabel(product.status),
+                          style: TextStyle(fontSize: 9, color: _statusText(product.status), fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${NumberFormat('#,###').format(product.price)}원',
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                  const SizedBox(height: 3),
+                  Text(product.title,
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
+                  if (product.isUrgent || product.isNegotiable || product.isDirectDeal) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        if (product.isUrgent) _tagChip('급처', Colors.redAccent, Icons.bolt_rounded),
+                        if (product.isNegotiable) _tagChip('네고가능', _green, Icons.sell_rounded),
+                        if (product.isDirectDeal) _tagChip('직거래', Colors.blueGrey, Icons.handshake_rounded),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    _timeAgo(product.createdAt),
+                    style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(product.title, style: const TextStyle(fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text('${product.price}원', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
           ],
         ),
       ),

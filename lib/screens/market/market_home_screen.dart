@@ -8,7 +8,6 @@ import '../../services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:circular_menu/circular_menu.dart';
 import '../../services/market_service.dart';
 import '../../models/market_product_model.dart';
 import '../../widgets/common/bottom_nav_bar.dart';
@@ -40,6 +39,26 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Set<String> _favoriteIds = {};
   String _statusFilter = '전체';
+
+  final PageController _adController = PageController();
+  int _adIndex = 0;
+
+  static const _adBanners = [
+    (
+    imagePath: 'assets/images/ad_banner_sale.png',
+    title: '이번 주 특가 상품',
+    subtitle: '',
+    icon: Icons.local_fire_department_rounded,
+    url: 'https://example.com/promo2',
+    ),
+    (
+    imagePath: 'assets/images/ad_banner_pick.png',
+    title: '땡그랑 픽 아이템',
+    subtitle: '',
+    icon: Icons.star_rounded,
+    url: 'https://example.com/promo3',
+    ),
+  ];
 
   String? _myVerifiedDong;
   bool _myDongOnly = false;
@@ -241,6 +260,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _adController.dispose();
     super.dispose();
   }
 
@@ -255,80 +275,21 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         inkColor: Colors.black87,
         extraActions: [_buildCommunityBackAction(), _buildChatAction()],
       ),
-      body: _tabIndex == 1
-          ? CircularMenu(
-        alignment: Alignment.bottomRight,
-        radius: 80,
-        toggleButtonColor: _green,
-        toggleButtonIconColor: Colors.white,
-        toggleButtonSize: 30,
-        toggleButtonPadding: 18,
-        toggleButtonMargin: 20,
-        toggleButtonBoxShadow: [
-          BoxShadow(
-            color: _green.withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-        items: [
-          CircularMenuItem(
-            icon: Icons.add,
-            color: _green,
-            iconColor: Colors.white,
-            onTap: () async {
-              final uid = FirebaseAuth.instance.currentUser!.uid;
-              final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-              final verifiedDong = userDoc.data()?['verifiedDong'] as String?;
-
-              if (verifiedDong == null) {
-                final confirmed = await DdaengModal.confirm(
-                  context,
-                  title: '동네 인증이 필요해요',
-                  message: '직거래 상품 등록을 위해 동네 인증을 먼저 해주세요.',
-                  type: ModalType.warning,
-                  confirmText: '인증하기',
-                );
-                if (confirmed && context.mounted) {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const NeighborhoodVerifyScreen()));
-                }
-                return;
-              }
-
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ProductRegisterScreen()),
-                );
-              }
-            },
-          ),
-          CircularMenuItem(
-            icon: Icons.inventory_2_outlined,
-            color: const Color(0xFF9B7EDE),
-            iconColor: Colors.white,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MyProductsScreen()),
-              );
-            },
-          ),
-          CircularMenuItem(
-            icon: Icons.favorite_border,
-            color: const Color(0xFFE5735A),
-            iconColor: Colors.white,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MyFavoritesScreen()),
-              );
-            },
-          ),
-        ],
-        backgroundWidget: _buildContent(),
-      )
-          : _buildContent(),
+        body: Stack(
+          children: [
+            _buildContent(),
+            if (_tabIndex == 1)
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: FloatingActionButton(
+                  backgroundColor: const Color(0xFFFFA733),
+                  onPressed: _openFleaMarketSheet,
+                  child: const Icon(Icons.add, color: Colors.white),
+                ),
+              ),
+          ],
+        ),
       bottomNavigationBar: BottomNavBar(
         currentTab: NavTab.community,
         onTabSelected: (tab) {
@@ -336,6 +297,93 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
           Navigator.of(context).pop();
         },
       ),
+    );
+  }
+
+  void _openFleaMarketSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(12, 4, 12, 12),
+                  child: Text('무엇을 하시겠어요?',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(color: _greenLight, shape: BoxShape.circle),
+                    child: Icon(Icons.add, color: _green, size: 18),
+                  ),
+                  title: const Text('상품 등록', style: TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    final uid = FirebaseAuth.instance.currentUser!.uid;
+                    final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+                    final verifiedDong = userDoc.data()?['verifiedDong'] as String?;
+
+                    if (verifiedDong == null) {
+                      final confirmed = await DdaengModal.confirm(
+                        context,
+                        title: '동네 인증이 필요해요',
+                        message: '직거래 상품 등록을 위해 동네 인증을 먼저 해주세요.',
+                        type: ModalType.warning,
+                        confirmText: '인증하기',
+                      );
+                      if (confirmed && context.mounted) {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const NeighborhoodVerifyScreen()));
+                      }
+                      return;
+                    }
+
+                    if (context.mounted) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ProductRegisterScreen()));
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(color: Color(0xFFF1ECFA), shape: BoxShape.circle),
+                    child: const Icon(Icons.inventory_2_outlined, color: Color(0xFF9B7EDE), size: 18),
+                  ),
+                  title: const Text('내 상품', style: TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MyProductsScreen()));
+                  },
+                ),
+                ListTile(
+                  leading: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(color: Color(0xFFFBECE9), shape: BoxShape.circle),
+                    child: const Icon(Icons.favorite_border, color: Color(0xFFE5735A), size: 18),
+                  ),
+                  title: const Text('내 찜', style: TextStyle(fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MyFavoritesScreen()));
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -631,75 +679,100 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   List<Widget> _buildDdaengMarketTab() {
     return [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_gradientStart, _gradientEnd],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        clipBehavior: Clip.hardEdge,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -20,
-              top: -20,
-              child: Container(
-                width: 90,
-                height: 90,
+      AspectRatio(
+        aspectRatio: 4.5,
+        child: PageView.builder(
+          controller: _adController,
+          itemCount: _adBanners.length,
+          onPageChanged: (i) => setState(() => _adIndex = i),
+          itemBuilder: (context, i) {
+            final ad = _adBanners[i];
+            return GestureDetector(
+              onTap: () async {
+                final url = Uri.parse(ad.url);
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: ad.imagePath != null
+                  ? ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 2),
+                  width: double.infinity,
+                  child: Image.asset(ad.imagePath!, fit: BoxFit.cover),
+                ),
+              )
+                  : Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.14),
+                  gradient: const LinearGradient(
+                    colors: [_gradientStart, _gradientEnd],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                clipBehavior: Clip.hardEdge,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      right: -20,
+                      top: -20,
+                      child: Container(
+                        width: 90,
+                        height: 90,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.14),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: const BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                          child: Icon(ad.icon, color: Colors.white, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(ad.title,
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                              const SizedBox(height: 4),
+                              Text(ad.subtitle,
+                                  style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Positioned(
-              right: 20,
-              bottom: -30,
-              child: Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: Colors.white24,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.savings_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('오늘의 절약 추천',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
-                      SizedBox(height: 4),
-                      Text('여러 쇼핑몰 가격을 비교해 더 저렴하게!',
-                          style: TextStyle(fontSize: 12, color: Colors.white70)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
+      ),
+      const SizedBox(height: 8),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(_adBanners.length, (i) {
+          return Container(
+            width: _adIndex == i ? 16 : 6,
+            height: 6,
+            margin: const EdgeInsets.symmetric(horizontal: 3),
+            decoration: BoxDecoration(
+              color: _adIndex == i ? _gradientEnd : Colors.grey[300],
+              borderRadius: BorderRadius.circular(3),
+            ),
+          );
+        }),
       ),
       const SizedBox(height: 14),
       _categoryFilterBar(),
@@ -1330,6 +1403,19 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                     _timeAgo(product.createdAt),
                     style: TextStyle(fontSize: 10, color: Colors.grey[400]),
                   ),
+                  if (product.verifiedDong != null) ...[
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 10, color: Colors.grey[400]),
+                        const SizedBox(width: 1),
+                        Text(
+                          product.verifiedDong!,
+                          style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
