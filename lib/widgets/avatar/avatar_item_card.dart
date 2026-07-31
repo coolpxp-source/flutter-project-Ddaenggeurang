@@ -55,24 +55,47 @@ class AvatarItemCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 4),
+
+            // 실제 아바타 아이템 이미지를 출력하는 영역
             Container(
-              width: 66,
-              height: 66,
+              width: 82,
+              height: 82,
+              padding: const EdgeInsets.all(5),
               decoration: BoxDecoration(
                 color: isLocked
                     ? const Color(0xFFF1F2F5)
                     : const Color(0xFFFFF0F6),
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(
-                isLocked ? Icons.lock_outline : _getIcon(item.slot),
-                size: 32,
-                color: isLocked
-                    ? const Color(0xFFB5B7C0)
-                    : pinkColor,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Opacity(
+                    opacity: isLocked ? 0.6 : 1,
+                    child: _buildItemImage(
+                      pinkColor: pinkColor,
+                    ),
+                  ),
+                  if (isLocked)
+                    const Icon(
+                      Icons.lock_outline,
+                      size: 29,
+                      color: Color(0xFF8F929D),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
+
+            const SizedBox(height: 8),
+            Text(
+              _rarityLabel(item.rarity),
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8566FF),
+              ),
+            ),
+            const SizedBox(height: 1),
             Text(
               item.name,
               overflow: TextOverflow.ellipsis,
@@ -104,6 +127,134 @@ class AvatarItemCard extends StatelessWidget {
     );
   }
 
+  // imageUrl, assetPath, 기본 아이콘 순서로 아이템 이미지를 출력하는 메서드
+  Widget _buildItemImage({
+    required Color pinkColor,
+  }) {
+    final imageUrl = item.imageUrl.trim();
+    final assetPath = item.assetPath.trim();
+
+    if (imageUrl.isNotEmpty) {
+      return _buildPreviewTransform(
+        Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, _, _) {
+            return _buildAssetOrIcon(
+              assetPath: assetPath,
+              pinkColor: pinkColor,
+            );
+          },
+        ),
+      );
+    }
+
+    return _buildAssetOrIcon(
+      assetPath: assetPath,
+      pinkColor: pinkColor,
+    );
+  }
+
+// 로컬 에셋 또는 슬롯 기본 아이콘을 출력하는 메서드
+  Widget _buildAssetOrIcon({
+    required String assetPath,
+    required Color pinkColor,
+  }) {
+    if (assetPath.isNotEmpty) {
+      return _buildPreviewTransform(
+        Image.asset(
+          assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, error, _) {
+            debugPrint('아바타 에셋 로드 실패: $assetPath');
+            debugPrint('$error');
+
+            return Icon(
+              _getIcon(item.slot),
+              size: 34,
+              color: pinkColor,
+            );
+          },
+        ),
+      );
+    }
+
+    return Icon(
+      _getIcon(item.slot),
+      size: 34,
+      color: pinkColor,
+    );
+  }
+
+// 슬롯별 미리보기 위치와 확대 비율을 적용하는 메서드
+  Widget _buildPreviewTransform(Widget image) {
+    double scale;
+    Alignment alignment;
+
+    switch (item.slot) {
+      case 'hair':
+        scale = 2.0;
+        alignment = const Alignment(0, -0.85);
+        break;
+
+      case 'clothes':
+        scale = 3.0;
+        alignment = const Alignment(0, 0.4);
+        break;
+
+      case 'shoes':
+        scale = 3.6;
+        alignment = const Alignment(0, 0.90);
+        break;
+
+      case 'accessory':
+        scale = 3.0;
+        alignment = const Alignment(0, -0.4);
+        break;
+
+      case 'pet':
+        scale = 2.8;
+        alignment = const Alignment(0.9, 0.65);
+        break;
+
+      default:
+        scale = 1;
+        alignment = Alignment.center;
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Transform.scale(
+        scale: scale,
+        alignment: alignment,
+        child: SizedBox.expand(
+          child: image,
+        ),
+      ),
+    );
+  }
+
+  // 희귀도 값을 한글 이름으로 변환하는 메서드
+  String _rarityLabel(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return '일반';
+      case 'uncommon':
+        return '고급';
+      case 'rare':
+        return '희귀';
+      case 'epic':
+        return '영웅';
+      case 'legendary':
+        return '전설';
+      default:
+        return '일반';
+    }
+  }
+
+  // 잠금, 착용, 보유 상태 배지를 출력하는 메서드
   Widget _buildStatusBadge({
     required bool isLocked,
     required Color pinkColor,
@@ -144,6 +295,7 @@ class AvatarItemCard extends StatelessWidget {
     return const SizedBox(height: 14);
   }
 
+  // 아이템 상태에 따른 하단 문구를 반환하는 메서드
   String _buildBottomText(bool isLocked) {
     if (isLocked) {
       return 'Lv.${item.unlockLevel} 해금';
@@ -156,16 +308,19 @@ class AvatarItemCard extends StatelessWidget {
     return '${item.price} P';
   }
 
+  // 슬롯별 기본 아이콘을 반환하는 메서드
   IconData _getIcon(String slot) {
     switch (slot) {
-      case 'hat':
-        return Icons.checkroom;
+      case 'hair':
+        return Icons.face_retouching_natural;
       case 'clothes':
         return Icons.dry_cleaning;
       case 'shoes':
         return Icons.ice_skating;
       case 'accessory':
         return Icons.auto_awesome;
+      case 'pet':
+        return Icons.pets;
       default:
         return Icons.star_outline;
     }
