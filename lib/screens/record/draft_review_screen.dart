@@ -261,6 +261,13 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     );
   }
 
+// TODO(퉁치기 편집 UI 개선): 지금은 지출 성격 칩 / 수입·저축 가짜 카테고리 칩만
+// 있어서 AI가 잘못 뽑은 카테고리를 실제로 못 고침. 특히 변동비 감정태그(emotionTag)는
+// UI 자체가 없어서 항상 null로 저장되는 중 (필수 규칙이 이 경로에서만 안 지켜짐).
+// → 퉁치기 전용 바텀시트로 교체 예정: 대분류/소분류 실제 카테고리 드롭다운 +
+//   변동비일 때만 감정태그 필수 노출 + 수입/저축도 진짜 categoryId 기반으로 교체.
+// 단, 착수 전에 정기결제/구독 메뉴(subscription_add/edit_screen)가 퉁치기 결과와
+// 연결되어 있는지부터 확인 필요.
   Widget _buildDraftEditor(ParsedRecordDraft draft) {
     switch (draft.type) {
       case TransactionType.expense:
