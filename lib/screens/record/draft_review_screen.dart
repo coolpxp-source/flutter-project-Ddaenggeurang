@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
-import '../../models/category_model.dart' show TransactionType;
+import '../../models/transaction_type.dart';
 import '../../models/expense_model.dart';
 import '../../models/income_model.dart';
 import '../../models/saving_model.dart';

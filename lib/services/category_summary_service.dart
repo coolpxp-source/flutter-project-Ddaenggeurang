@@ -87,6 +87,12 @@ class CategorySummaryService {
     return _firestore.collection('categories');
   }
 
+  /// 실제로 커스텀 카테고리가 저장되는 컬렉션.
+  /// customCategories 최상위 컬렉션을 그대로 따른다.
+  CollectionReference<Map<String, dynamic>> get _customCategoryCollection {
+    return _firestore.collection('customCategories');
+  }
+
   // =========================================================
   // 1. 일간/주간/월간 카테고리 집계 + 이전 기간 비교
   // =========================================================
@@ -133,7 +139,7 @@ class CategorySummaryService {
     );
 
     final Map<String, _CategoryInfo> categoryInfoMap =
-    await _loadCategoryInfoMap();
+    await _loadCategoryInfoMap(userId: userId);
 
     final List<_ExpenseData> currentExpenses = _filterExpensesByRange(
       expenses: expenses,
@@ -296,7 +302,7 @@ class CategorySummaryService {
     );
 
     final Map<String, _CategoryInfo> categoryInfoMap =
-    await _loadCategoryInfoMap();
+    await _loadCategoryInfoMap(userId: userId);
 
     /// 원본 목록을 최신 날짜순으로 정렬한다.
     expenses.sort(
@@ -526,41 +532,36 @@ class CategorySummaryService {
   }
 
   /// categories 컬렉션에서 문서 ID별 표시 이름과 카테고리 키를 조회한다.
-  Future<Map<String, _CategoryInfo>> _loadCategoryInfoMap() async {
-    final QuerySnapshot<Map<String, dynamic>> snapshot =
-    await _categoryCollection.get();
+  Future<Map<String, _CategoryInfo>> _loadCategoryInfoMap({
+    required String userId,
+  }) async {
+    final List<QuerySnapshot<Map<String, dynamic>>> snapshots =
+    await Future.wait(<Future<QuerySnapshot<Map<String, dynamic>>>>[
+      _categoryCollection.where('isCustom', isEqualTo: false).get(),
+      _customCategoryCollection.where('userId', isEqualTo: userId).get(),
+    ]);
 
     final Map<String, _CategoryInfo> result = <String, _CategoryInfo>{};
 
-    for (final QueryDocumentSnapshot<Map<String, dynamic>> document
-    in snapshot.docs) {
-      final Map<String, dynamic> data = document.data();
+    for (final QuerySnapshot<Map<String, dynamic>> snapshot in snapshots) {
+      for (final QueryDocumentSnapshot<Map<String, dynamic>> document
+      in snapshot.docs) {
+        final Map<String, dynamic> data = document.data();
 
-      final String categoryName = _readFirstNonEmptyString(
-        data,
-        const <String>[
-          'name',
-          'categoryName',
-          'label',
-        ],
-      ) ??
-          document.id;
+        final String categoryName = _readFirstNonEmptyString(
+          data,
+          const <String>['name', 'categoryName', 'label'],
+        ) ??
+            document.id;
 
-      /// categoryKey가 있으면 사용하고, 없으면 code 또는 문서 ID를 사용한다.
-      final String categoryKey = _readFirstNonEmptyString(
-        data,
-        const <String>[
-          'categoryKey',
-          'key',
-          'code',
-        ],
-      ) ??
-          document.id;
+        final String categoryKey = _readFirstNonEmptyString(
+          data,
+          const <String>['categoryKey', 'key', 'code'],
+        ) ??
+            document.id;
 
-      result[document.id] = _CategoryInfo(
-        key: categoryKey,
-        name: categoryName,
-      );
+        result[document.id] = _CategoryInfo(key: categoryKey, name: categoryName);
+      }
     }
 
     return result;
