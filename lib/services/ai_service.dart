@@ -20,6 +20,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/coach_tone.dart';
+import 'package:flutter/foundation.dart';
 
 export '../models/coach_tone.dart' show CoachTone;
 
@@ -61,6 +62,7 @@ class ConsultResult {
 class ParsedExpense {
   final int amount;
   final String merchant;
+  final String memo; // 실제 구매 내용 (예: "삼각김밥, 커피"). 없으면 빈 문자열
   final String category;
   final String type; // 고정비 | 변동비
   final String? date;
@@ -68,13 +70,15 @@ class ParsedExpense {
   ParsedExpense({
     required this.amount,
     required this.merchant,
+    this.memo = '',
     required this.category,
     required this.type,
     this.date,
     this.transactionType
   });
   @override
-  String toString() => '$date / $transactionType / $merchant / $amount원 / $category / $type';
+  String toString() =>
+      '$date / $transactionType / $merchant / $memo / $amount원 / $category / $type';
 }
 
 /// 파싱된 수입
@@ -357,6 +361,11 @@ class AiService {
           'model': kAiModel,
           'prompt': prompt,
           'stream': false,
+          // memo 필드가 추가되면서 응답이 길어져 모델 기본 출력 한도에 걸릴 수 있어
+          // 넉넉하게 명시해준다. (기본값이 짧으면 항목이 중간에서 계속 잘림)
+          'options': {
+            'num_predict': 1024,
+          },
         }),
       )
           .timeout(const Duration(seconds: 90)); // CPU 서빙 + 공용, 넉넉하게
@@ -412,34 +421,132 @@ class AiService {
       2. 카테고리(category)는 내용에 맞게 '식비', '월급', '중고거래', '교통비', '모임/회비' 등으로 자유롭게 적어.
       3. 지출일 경우 성격(type)을 '고정비' 또는 '변동비'로 적고, 수입이나 저축이면 "기타"로 둬.
       4. 텍스트에 '오늘', '어제' 같은 말이 있으면 $today 를 기준으로 계산해.
+      5. merchant는 실제 상호명이나 장소명(예: "스타벅스", "편의점", "GS25")을 적고,
+         memo에는 무엇을 샀는지/구매 내역을 구체적으로 적어(예: "삼각김밥, 커피",
+         "파스타", "화장품"). 텍스트에 특별한 구매 내역 언급이 없으면 memo는 빈 문자열로 둬.
+      6. 각 항목의 merchant/memo/category는 반드시 그 항목 자신의 문장에 나온
+         내용만 담아야 해. 앞뒤에 있는 다른 날짜/다른 항목의 문장 내용을
+         섞어서 넣지 마.
       
       반드시 아래의 JSON 배열 형식으로만 출력해 (다른 말은 절대 금지):
-      [{"date": "YYYY-MM-DD", "transactionType": "지출/수입/저축", "amount": 숫자, "merchant": "상호명 또는 내용", "category": "카테고리명", "type": "고정비/변동비"}]
+      [{"date": "YYYY-MM-DD", "transactionType": "지출/수입/저축", "amount": 숫자, "merchant": "상호명 또는 장소명", "memo": "구매 내역(없으면 빈 문자열)", "category": "카테고리명", "type": "고정비/변동비"}]
       
       입력텍스트: $bulkText''';
 
-    final raw = await _callOllama(prompt);
-    try {
-      final start = raw.indexOf('[');
-      final end = raw.lastIndexOf(']');
-      if (start == -1 || end == -1) return [];
+    // 로컬 모델이라 실행마다 편차가 있어서, 응답이 중간에 끊긴 것처럼 보이면
+    // 최대 1회 자동으로 다시 시도한다. 여러 번 시도한 것 중 가장 많이
+    // 건진 결과를 최종적으로 사용한다.
+    List<ParsedExpense> best = [];
 
-      final List decoded = jsonDecode(raw.substring(start, end + 1));
-      return decoded.map((j) {
-        final amount = (j['amount'] as num?)?.toInt() ?? 0;
-        final merchant = j['merchant'] as String? ?? '기타';
-        return ParsedExpense(
-          amount: amount,
-          merchant: merchant,
-          // 대량 파싱에서는 AI가 유추한 카테고리를 그대로 라벨로 씁니다
-          category: j['category'] as String? ?? '미분류',
-          type: j['type'] as String? ?? '변동비',
-          date: j['date'] as String?,
-          transactionType: j['transactionType'] as String? ?? '지출',
-        );
-      }).toList();
+    for (int attempt = 0; attempt < 2; attempt++) {
+      final String raw = await _callOllama(prompt);
+      final List<ParsedExpense> parsed = _extractParsedExpenses(raw);
+
+      if (parsed.length > best.length) {
+        best = parsed;
+      }
+
+      // 응답이 제대로 닫혀서 끝난 것 같으면(배열이나 코드블록이 정상 종료)
+      // 굳이 다시 시도할 필요 없다.
+      if (_looksComplete(raw)) break;
+
+      debugPrint('[대량파싱] 응답이 중간에 끊긴 것 같아 재시도함 (시도 ${attempt + 1}회, 항목 ${parsed.length}개)');
+    }
+
+    return best;
+  }
+
+  /// 응답 끝부분이 배열(`]`)이나 코드블록(```)으로 정상적으로 닫혔는지 본다.
+  /// 닫히지 않았으면 응답이 중간에 잘렸을 가능성이 높다는 신호로 쓴다.
+  bool _looksComplete(String raw) {
+    final String trimmed = raw.trim();
+    return trimmed.endsWith(']') || trimmed.endsWith('```');
+  }
+
+  /// 모델이 배열 하나를 깔끔하게 뱉지 않고(중간에 끊기거나, 블록을 통째로
+  /// 다시 시작하는 등) 응답이 지저분할 때가 있어서, 배열 단위가 아니라
+  /// 완전한 `{...}` 객체 하나하나를 낱개로 찾아 개별적으로 파싱한다.
+  ///
+  /// ```json 코드블록이 여러 개로 쪼개져 나올 때, 한 블록 안에서 따옴표가
+  /// 깨지면(예: 문자열이 안 닫힌 채로 블록이 끝남) 그 "문자열 안에 있다"는
+  /// 상태가 다음 블록까지 새어나가 이후 블록의 항목을 전부 놓치게 된다.
+  /// 이를 막기 위해 ``` 로 감싸인 블록 단위로 나눠서, 블록마다 따옴표/중괄호
+  /// 상태를 완전히 새로 시작해서 독립적으로 스캔한다.
+  List<ParsedExpense> _extractParsedExpenses(String raw) {
+    final List<ParsedExpense> result = [];
+
+    final List<String> chunks = raw.split(RegExp(r'```(json)?'));
+    for (final String chunk in chunks) {
+      result.addAll(_extractObjectsFrom(chunk));
+    }
+
+    if (result.isEmpty) {
+      debugPrint('[대량파싱] 완전한 항목을 하나도 못 찾음. 원본:\n$raw');
+    }
+    return result;
+  }
+
+  /// 완전한 `{...}` 객체 하나하나를 낱개로 찾아 개별적으로 파싱한다.
+  /// (따옴표/중괄호 상태는 이 청크 안에서만 유지되고 다음 청크로 넘어가지 않음)
+  List<ParsedExpense> _extractObjectsFrom(String chunk) {
+    final List<ParsedExpense> result = [];
+    int depth = 0;
+    bool inString = false;
+    bool escape = false;
+    int? objStart;
+
+    for (int i = 0; i < chunk.length; i++) {
+      final String ch = chunk[i];
+
+      if (escape) {
+        escape = false;
+        continue;
+      }
+      if (ch == '\\') {
+        escape = true;
+        continue;
+      }
+      if (ch == '"') {
+        inString = !inString;
+        continue;
+      }
+      if (inString) continue;
+
+      if (ch == '{') {
+        if (depth == 0) objStart = i;
+        depth++;
+      } else if (ch == '}') {
+        if (depth > 0) {
+          depth--;
+          if (depth == 0 && objStart != null) {
+            _tryAddExpense(chunk.substring(objStart, i + 1), result);
+            objStart = null;
+          }
+        }
+      }
+    }
+
+    return result;
+  }
+
+  void _tryAddExpense(String candidate, List<ParsedExpense> result) {
+    try {
+      final Map<String, dynamic> j = jsonDecode(candidate) as Map<String, dynamic>;
+      final num? amountNum = j['amount'] as num?;
+      final String? merchant = j['merchant'] as String?;
+      if (amountNum == null || merchant == null) return;
+
+      result.add(ParsedExpense(
+        amount: amountNum.toInt(),
+        merchant: merchant,
+        memo: (j['memo'] as String? ?? '').trim(),
+        category: j['category'] as String? ?? '미분류',
+        type: j['type'] as String? ?? '변동비',
+        date: j['date'] as String?,
+        transactionType: j['transactionType'] as String? ?? '지출',
+      ));
     } catch (_) {
-      return [] ;
+      // 이 객체 하나만 깨진 것뿐이니 나머지 항목은 계속 시도한다
     }
   }
 }

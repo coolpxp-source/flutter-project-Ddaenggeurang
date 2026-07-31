@@ -76,10 +76,19 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
   Future<void> _parseAndReview() async {
     if (_extractedText == null || _extractedText!.trim().isEmpty) return;
 
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await DdaengModal.alert(context, title: '로그인이 필요해요', message: '로그인 후 이용 가능합니다.', type: ModalType.warning);
+      return;
+    }
+
     setState(() => _isProcessing = true);
     try {
       final parsedList = await _aiService.parseBulkText(_extractedText!);
-      final drafts = mapParsedExpensesToDrafts(parsedList);
+      final drafts = await mapParsedExpensesToDrafts(
+        parsedList,
+        userId: currentUser.uid,
+      );
 
       if (!mounted) return;
       setState(() => _isProcessing = false);

@@ -60,7 +60,10 @@ class _SmsPasteScreenState extends State<SmsPasteScreen> {
     try {
       final text = _textController.text.trim();
       final parsedList = await _aiService.parseBulkText(text);
-      final drafts = mapParsedExpensesToDrafts(parsedList);
+      final drafts = await mapParsedExpensesToDrafts(
+        parsedList,
+        userId: currentUser.uid,
+      );
 
       if (!mounted) return;
       setState(() => _isParsing = false);
