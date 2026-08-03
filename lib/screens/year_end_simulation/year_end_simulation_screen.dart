@@ -5,6 +5,8 @@ import '../../services/year_end_simulation_service.dart';
 import '../../utils/app_colors.dart';
 import '../../utils/formatters.dart';
 import '../../utils/korean_amount.dart';
+import '../../utils/year_end_tax_calculator.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 import 'year_end_simulation_list_screen.dart';
 
 class YearEndSimulationScreen extends StatefulWidget {
@@ -27,34 +29,29 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
     final salary = parseAmount(_salaryController.text);
     final credit = parseAmount(_creditController.text);
     final debit = parseAmount(_debitController.text);
-    final totalUsage = credit + debit;
 
-    if (salary <= 0 || totalUsage <= 0) {
-      setState(() => _estimatedDeduction = 0);
-      return;
-    }
+    final result = YearEndTaxCalculator.calculate(
+      salary: salary,
+      credit: credit,
+      debit: debit,
+    );
 
-    final threshold = (salary * 0.25).round();
-    final excessAmount = totalUsage - threshold;
-    if (excessAmount <= 0) {
-      setState(() => _estimatedDeduction = 0);
-      return;
-    }
-
-    final creditRatio = credit / totalUsage;
-    final debitRatio = debit / totalUsage;
-    var deduction = (excessAmount * creditRatio * 0.15).round() +
-        (excessAmount * debitRatio * 0.30).round();
-
-    final limit = _deductionLimitFor(salary);
-    if (deduction > limit) deduction = limit;
-
-    setState(() => _estimatedDeduction = deduction);
+    setState(() => _estimatedDeduction = result.estimatedDeduction);
   }
 
   Future<void> _saveSimulation() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null || _estimatedDeduction == 0) return;
+    final salary = parseAmount(_salaryController.text);
+
+    if (userId == null || salary <= 0) {
+      await DdaengModal.alert(
+        context,
+        title: '입력을 확인해주세요',
+        message: '총급여액을 입력해주세요.',
+        type: ModalType.warning,
+      );
+      return;
+    }
 
     setState(() => _isSaving = true);
     try {
@@ -70,20 +67,33 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
           estimatedRefund: _estimatedDeduction,
         ),
       );
+
+      if (!mounted) return;
+      setState(() => _isSaving = false);
+
+      await DdaengModal.alert(
+        context,
+        title: '저장 완료',
+        message: '시뮬레이션 결과를 저장했어요.',
+        type: ModalType.success,
+      );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const YearEndSimulationListScreen()),
+      );
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('시뮬레이션 결과를 저장했어요')),
+        setState(() => _isSaving = false);
+        await DdaengModal.alert(
+          context,
+          title: '저장에 실패했어요',
+          message: '$e',
+          type: ModalType.danger,
         );
       }
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
     }
-  }
-
-  int _deductionLimitFor(int salary) {
-    if (salary <= 70000000) return 3000000;
-    if (salary <= 120000000) return 2500000;
-    return 2000000;
   }
 
   @override
@@ -96,10 +106,12 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
 
   InputDecoration _deco(String hint) => InputDecoration(
     filled: true,
-    fillColor: Colors.white,
+    fillColor: AppColors.bg,
     hintText: hint,
+    hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.inkSub),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide.none,
     ),
   );
@@ -109,11 +121,14 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
     final koreanText = koreanAmountText(_estimatedDeduction);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.white, // ← AppColors.bg에서 변경
       appBar: AppBar(
-        title: const Text('연말정산 미리보기', style: TextStyle(color: AppColors.ink)),
-        backgroundColor: Colors.transparent,
+        title: const Text('연말정산 미리보기',
+            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 16)),
+        backgroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
         actions: [
           IconButton(
             icon: const Icon(Icons.history, color: AppColors.ink),
@@ -125,12 +140,13 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('올해 총급여액을 입력해주세요', style: TextStyle(color: AppColors.ink)),
-            const SizedBox(height: 12),
+            const Text('올해 총급여액을 입력해주세요',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+            const SizedBox(height: 10),
             TextField(
               controller: _salaryController,
               keyboardType: TextInputType.number,
@@ -138,9 +154,10 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
               decoration: _deco('총급여액 입력'),
               onChanged: (value) => _calculateTax(),
             ),
-            const SizedBox(height: 32),
-            const Text('신용카드 사용액', style: TextStyle(color: AppColors.ink)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 24),
+            const Text('신용카드 사용액',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+            const SizedBox(height: 10),
             TextField(
               controller: _creditController,
               keyboardType: TextInputType.number,
@@ -148,10 +165,10 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
               decoration: _deco('신용카드 사용액 입력'),
               onChanged: (value) => _calculateTax(),
             ),
-            const SizedBox(height: 20),
-
-            const Text('체크카드 사용액', style: TextStyle(color: AppColors.ink)),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
+            const Text('체크카드 사용액',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+            const SizedBox(height: 10),
             TextField(
               controller: _debitController,
               keyboardType: TextInputType.number,
@@ -159,41 +176,34 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
               decoration: _deco('체크카드 사용액 입력'),
               onChanged: (value) => _calculateTax(),
             ),
-            const SizedBox(height: 32),
-            // 결과 영역
+            const SizedBox(height: 28),
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: AppColors.savingSoft,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
               ),
               child: Column(
                 children: [
-                  const Text('예상 소득공제액', style: TextStyle(color: AppColors.ink)),
+                  const Text('예상 소득공제액',
+                      style: TextStyle(fontSize: 13, color: AppColors.ink, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   Text(
                     '${CurrencyFormatter.format(_estimatedDeduction)} 원',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.ink,
-                    ),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.ink),
                   ),
                   if (koreanText.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      koreanText,
-                      style: const TextStyle(fontSize: 13, color: AppColors.inkSub),
-                    ),
+                    Text(koreanText, style: const TextStyle(fontSize: 12.5, color: AppColors.inkSub)),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             SizedBox(
               height: 54,
               child: ElevatedButton(
-                onPressed: (_isSaving || _estimatedDeduction == 0) ? null : _saveSimulation,
+                onPressed: (_isSaving || parseAmount(_salaryController.text) <= 0) ? null : _saveSimulation,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.ink,
                   disabledBackgroundColor: const Color(0xFFE5E8EB),
@@ -203,17 +213,16 @@ class _YearEndSimulationScreenState extends State<YearEndSimulationScreen> {
                 ),
                 child: _isSaving
                     ? const SizedBox(
-                  width: 20,
-                  height: 20,
+                  width: 20, height: 20,
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
-                    : const Text('결과 저장하기', style: TextStyle(fontWeight: FontWeight.w800)),
+                    : const Text('결과 저장하기', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             const Text(
               '* 본 결과는 간이 시뮬레이션이며 실제 결과와 다를 수 있습니다.',
-              style: TextStyle(fontSize: 12, color: AppColors.inkSub),
+              style: TextStyle(fontSize: 11.5, color: AppColors.inkSub),
               textAlign: TextAlign.center,
             ),
           ],

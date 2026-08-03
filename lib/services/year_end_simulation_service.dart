@@ -20,4 +20,12 @@ class YearEndSimulationService {
         .snapshots()
         .map((snap) => snap.docs.map((d) => YearEndSimulationModel.fromFirestore(d)).toList());
   }
+
+  Future<void> deleteSimulation({
+    required String userId,
+    required String simId,
+  }) async {
+    await _ref(userId).doc(simId).delete();
+  }
+
 }

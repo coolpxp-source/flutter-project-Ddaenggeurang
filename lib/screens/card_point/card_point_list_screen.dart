@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
-import '../../utils/formatters.dart'; // ← 추가
+import '../../utils/formatters.dart';
 import '../../models/card_point_model.dart';
 import '../../services/card_point_service.dart';
+import '../../widgets/common/ddaeng_modal.dart';
 import 'card_point_add_screen.dart';
 import 'card_point_detail_screen.dart';
 
@@ -16,7 +17,7 @@ class CardPointListScreen extends StatelessWidget {
     final service = CardPointService();
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         foregroundColor: AppColors.ink,
@@ -24,13 +25,14 @@ class CardPointListScreen extends StatelessWidget {
         scrolledUnderElevation: 0,
         surfaceTintColor: Colors.transparent,
         title: const Text('내 카드 포인트',
-            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.ink)),
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.ink)),
         centerTitle: true,
       ),
       floatingActionButton: userId == null
           ? null
           : FloatingActionButton(
         backgroundColor: AppColors.ink,
+        elevation: 0,
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
@@ -51,22 +53,41 @@ class CardPointListScreen extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('등록된 카드가 없어요', style: TextStyle(color: AppColors.inkSub)),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppColors.bg,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.credit_card_outlined, size: 28, color: AppColors.inkSub),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('등록된 카드가 없어요',
+                      style: TextStyle(color: AppColors.inkSub, fontSize: 13.5)),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
                     ),
-                    icon: const Icon(Icons.add),
-                    label: const Text('카드 추가하기'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.ink,
+                      side: const BorderSide(color: Color(0xFFE8ECF3), width: 1.4),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('카드 추가하기',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                   ),
                 ],
               ),
             );
           }
           return ListView.builder(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
             itemCount: cards.length,
             itemBuilder: (context, index) => _CardPointCard(card: cards[index]),
           );
@@ -80,6 +101,28 @@ class _CardPointCard extends StatelessWidget {
   final CardPointModel card;
   const _CardPointCard({required this.card});
 
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await DdaengModal.confirm(
+      context,
+      title: '카드 삭제',
+      message: '${card.cardName}을(를) 삭제할까요?\n포인트 내역도 함께 사라져요.',
+      type: ModalType.danger,
+      confirmText: '삭제',
+    );
+
+    if (confirmed) {
+      await CardPointService().deleteCard(userId: card.userId, cardId: card.cardId);
+      if (context.mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '삭제 완료',
+          message: '카드를 삭제했어요.',
+          type: ModalType.success,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -87,6 +130,7 @@ class _CardPointCard extends StatelessWidget {
         context,
         MaterialPageRoute(builder: (_) => CardPointDetailScreen(card: card)),
       ),
+      onLongPress: () => _confirmDelete(context),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         margin: const EdgeInsets.only(bottom: 14),
@@ -116,18 +160,19 @@ class _CardPointCard extends StatelessWidget {
                 ),
                 if (card.expiringPoint > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFE5E5),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text('${CurrencyFormatter.format(card.expiringPoint)}P 소멸예정', // ← 수정
-                        style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
+                    child: Text('${CurrencyFormatter.format(card.expiringPoint)}P 소멸예정',
+                        style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w700, color: Colors.redAccent)),
                   ),
               ],
             ),
-            const SizedBox(height: 14),
-            Text('${CurrencyFormatter.format(card.totalPoint)}P', // ← 수정
+            const SizedBox(height: 16),
+            Text('${CurrencyFormatter.format(card.totalPoint)}P',
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.ink)),
           ],
         ),

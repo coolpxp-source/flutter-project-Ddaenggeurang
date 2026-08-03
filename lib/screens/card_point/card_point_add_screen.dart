@@ -53,12 +53,20 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
     }
   }
 
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 8, left: 2),
+    child: Text(text,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+  );
+
   InputDecoration _deco(String hint) => InputDecoration(
     filled: true,
-    fillColor: Colors.white,
+    fillColor: AppColors.bg,
     hintText: hint,
+    hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.inkSub),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       borderSide: BorderSide.none,
     ),
   );
@@ -66,41 +74,49 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: const Text('카드 추가', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800)),
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('카드 추가',
+            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 16)),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(controller: _companyController, decoration: _deco('카드사 (예: 신한카드)')),
-            const SizedBox(height: 12),
-            TextField(controller: _cardNameController, decoration: _deco('카드 이름 (예: 딥드림 카드)')),
-            const SizedBox(height: 12),
+            _label('카드사'),
+            TextField(controller: _companyController, decoration: _deco('예: 신한카드')),
+            const SizedBox(height: 18),
+            _label('카드 이름'),
+            TextField(controller: _cardNameController, decoration: _deco('예: 딥드림 카드')),
+            const SizedBox(height: 18),
+            _label('보유 포인트'),
             TextField(
               controller: _totalPointController,
               keyboardType: TextInputType.number,
               inputFormatters: [CurrencyFormatter()],
-              decoration: _deco('보유 포인트'),
+              decoration: _deco('0'),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 18),
+            _label('소멸예정 포인트'),
             TextField(
               controller: _expiringPointController,
               keyboardType: TextInputType.number,
               inputFormatters: [CurrencyFormatter()],
-              decoration: _deco('소멸예정 포인트'),
+              decoration: _deco('0'),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             SizedBox(
               height: 54,
               child: ElevatedButton(
                 onPressed: _isSaving ? null : _save,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.ink,
+                  disabledBackgroundColor: const Color(0xFFE5E8EB),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -110,7 +126,7 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
                   width: 20, height: 20,
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                 )
-                    : const Text('저장', style: TextStyle(fontWeight: FontWeight.w800)),
+                    : const Text('저장', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
               ),
             ),
           ],

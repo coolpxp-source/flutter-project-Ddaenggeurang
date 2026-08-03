@@ -13,7 +13,7 @@ import '../../screens/travel/travel_mode_start_screen.dart';
 import '../../screens/budget/budget_setting_screen.dart';
 import '../../screens/budget/budget_vs_expense_screen.dart';
 import '../../screens/card_point/card_point_list_screen.dart';
-import '../../screens/tax/year_end_simulation_screen.dart';
+import '../../screens/year_end_simulation/year_end_simulation_screen.dart';
 import '../../utils/app_colors.dart';
 
 /// 앱 전체에서 공용으로 쓰는 사이드바.
