@@ -78,14 +78,14 @@
 
 ---
 
-## <a name="members"></a>🤝🏼 팀원 구성
+## 🤝🏼 팀원 구성
 | 이름 | 담당 영역 | GitHub | 이메일 |
 |:---:|:---:|:---:|:---:|
-| 임예림 | 지출 입력·기록 + 카드포인트·연말정산 | [@kewiibird-source](https://github.com/kewiibird-source) | kewiibird@gmail.com |
-| 김은동 | 공통·인증 + 마이페이지 + AI상담 | | |
-| 성기필 | 예산·통계 + 구독·여행|  [@SeongGipil](https://github.com/SeongGipil) |20416rlvf@gmail.com |
-| 안혜진 | 마켓·거래 + 커뮤니티 | [@coolpxp-source](https://github.com/coolpxp-source) | coolpxp@gmail.com |
-| 이태화 | 공동관리 + 미션·아바타 + 소비심리테스트 | | |
+| 임예림 | 지출 입력·기록 + 카드포인트·연말정산 | [![GitHub](https://img.shields.io/badge/kewiibird--source-181717?style=flat&logo=github&logoColor=white)](https://github.com/kewiibird-source) | kewiibird@gmail.com |
+| 김은동 | 공통·인증 + 마이페이지 + AI상담 | [![GitHub](https://img.shields.io/badge/rladmsehd135-181717?style=flat&logo=github&logoColor=white)](https://github.com/rladmsehd135) | eundong011204@naver.com |
+| 성기필 | 예산·통계 + 구독·여행 | [![GitHub](https://img.shields.io/badge/SeongGipil-181717?style=flat&logo=github&logoColor=white)](https://github.com/SeongGipil) | 20416rlvf@gmail.com |
+| 안혜진 | 마켓·거래 + 커뮤니티 | [![GitHub](https://img.shields.io/badge/coolpxp--source-181717?style=flat&logo=github&logoColor=white)](https://github.com/coolpxp-source) | coolpxp@gmail.com |
+| 이태화 | 공동관리 + 미션·아바타 + 소비심리테스트 | [![GitHub](https://img.shields.io/badge/leetaehwa1-181717?style=flat&logo=github&logoColor=white)](https://github.com/leetaehwa1) | th3926@naver.com |
 
 ---
 
