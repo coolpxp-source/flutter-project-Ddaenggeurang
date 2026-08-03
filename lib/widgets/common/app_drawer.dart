@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../screens/category/custom_categories.dart';
+import '../../screens/category/custom_categories_screen.dart';
 import '../../screens/history/installment_recurring_screen.dart';
 import '../../screens/history/transaction_history_screen.dart';
 import 'drawer_menu_item.dart';
@@ -12,6 +12,8 @@ import '../../screens/subscription/subscription_list_screen.dart';
 import '../../screens/travel/travel_mode_start_screen.dart';
 import '../../screens/budget/budget_setting_screen.dart';
 import '../../screens/budget/budget_vs_expense_screen.dart';
+import '../../screens/card_point/card_point_list_screen.dart';
+import '../../screens/tax/tax_simulation_screen.dart';
 import '../../utils/app_colors.dart';
 
 /// 앱 전체에서 공용으로 쓰는 사이드바.
@@ -143,14 +145,14 @@ class AppDrawer extends StatelessWidget {
           DrawerMenuItem(
             icon: Icons.card_giftcard,
             title: '카드포인트',
-            destinationScreen: const PlaceholderScreen(title: '카드포인트'),
+            destinationScreen: const CardPointListScreen(),
             iconColor: AppColors.pink,
             iconBg: AppColors.pinkSoft,
           ),
           DrawerMenuItem(
             icon: Icons.calculate_outlined,
             title: '연말정산 시뮬레이션',
-            destinationScreen: const PlaceholderScreen(title: '연말정산 시뮬레이션'),
+            destinationScreen: const TaxSimulationScreen(),
             iconColor: AppColors.pink,
             iconBg: AppColors.pinkSoft,
           ),
