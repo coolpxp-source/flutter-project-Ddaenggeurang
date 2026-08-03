@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/formatters.dart';
 import '../../models/card_point_model.dart';
 import '../../models/card_point_history_model.dart';
 import '../../services/card_point_service.dart';
@@ -49,7 +50,7 @@ class CardPointDetailScreen extends StatelessWidget {
                 title: Text(h.merchant),
                 subtitle: Text('${h.date.month}/${h.date.day}'),
                 trailing: Text(
-                  '${isEarn ? '+' : ''}${h.point}P',
+                  '${isEarn ? '+' : ''}${CurrencyFormatter.format(h.point)}P',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     color: isEarn ? AppColors.income : Colors.redAccent,

@@ -13,7 +13,7 @@ import '../../screens/travel/travel_mode_start_screen.dart';
 import '../../screens/budget/budget_setting_screen.dart';
 import '../../screens/budget/budget_vs_expense_screen.dart';
 import '../../screens/card_point/card_point_list_screen.dart';
-import '../../screens/tax/tax_simulation_screen.dart';
+import '../../screens/tax/year_end_simulation_screen.dart';
 import '../../utils/app_colors.dart';
 
 /// 앱 전체에서 공용으로 쓰는 사이드바.
@@ -152,7 +152,7 @@ class AppDrawer extends StatelessWidget {
           DrawerMenuItem(
             icon: Icons.calculate_outlined,
             title: '연말정산 시뮬레이션',
-            destinationScreen: const TaxSimulationScreen(),
+            destinationScreen: const YearEndSimulationScreen(),
             iconColor: AppColors.pink,
             iconBg: AppColors.pinkSoft,
           ),

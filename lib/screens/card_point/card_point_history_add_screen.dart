@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/formatters.dart';
 import '../../models/card_point_history_model.dart';
 import '../../services/card_point_service.dart';
 
@@ -45,7 +46,7 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
           historyId: '',
           date: _date,
           merchant: _merchantController.text.trim(),
-          point: int.tryParse(_pointController.text) ?? 0,
+          point: parseAmount(_pointController.text),
           type: _type,
         ),
       );
@@ -134,6 +135,7 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
             TextField(
               controller: _pointController,
               keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyFormatter()],
               decoration: _deco('포인트'),
             ),
             const SizedBox(height: 12),

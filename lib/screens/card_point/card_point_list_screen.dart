@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/formatters.dart'; // ← 추가
 import '../../models/card_point_model.dart';
 import '../../services/card_point_service.dart';
 import 'card_point_add_screen.dart';
@@ -120,13 +121,13 @@ class _CardPointCard extends StatelessWidget {
                       color: const Color(0xFFFFE5E5),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text('${card.expiringPoint}P 소멸예정',
+                    child: Text('${CurrencyFormatter.format(card.expiringPoint)}P 소멸예정', // ← 수정
                         style: const TextStyle(fontSize: 11, color: Colors.redAccent)),
                   ),
               ],
             ),
             const SizedBox(height: 14),
-            Text('${card.totalPoint}P',
+            Text('${CurrencyFormatter.format(card.totalPoint)}P', // ← 수정
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.ink)),
           ],
         ),

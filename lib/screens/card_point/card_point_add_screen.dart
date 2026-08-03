@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../utils/app_colors.dart';
+import '../../utils/formatters.dart';
 import '../../models/card_point_model.dart';
 import '../../services/card_point_service.dart';
 
@@ -42,8 +43,8 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
           userId: userId,
           cardName: _cardNameController.text.trim(),
           companyName: _companyController.text.trim(),
-          totalPoint: int.tryParse(_totalPointController.text) ?? 0,
-          expiringPoint: int.tryParse(_expiringPointController.text) ?? 0,
+          totalPoint: parseAmount(_totalPointController.text),
+          expiringPoint: parseAmount(_expiringPointController.text),
         ),
       );
       if (mounted) Navigator.pop(context);
@@ -83,12 +84,14 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
             TextField(
               controller: _totalPointController,
               keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyFormatter()],
               decoration: _deco('보유 포인트'),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _expiringPointController,
               keyboardType: TextInputType.number,
+              inputFormatters: [CurrencyFormatter()],
               decoration: _deco('소멸예정 포인트'),
             ),
             const SizedBox(height: 24),
