@@ -3,6 +3,7 @@ import '../../utils/app_colors.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/ai_service.dart';
+import 'category_matcher.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
 
@@ -45,9 +46,10 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
     try {
       final text = _textController.text.trim();
       final parsedList = await _aiService.parseBulkText(text);
+      final categories = await loadAllCategoryOptions(userId: currentUser.uid);
       final drafts = await mapParsedExpensesToDrafts(
         parsedList,
-        userId: currentUser.uid,
+        categories: categories,
       );
 
       if (!mounted) return;
@@ -55,7 +57,10 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
       final saved = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => DraftReviewScreen(initialDrafts: drafts)),
+        MaterialPageRoute(builder: (_) => DraftReviewScreen(
+          initialDrafts: drafts,
+          categories: categories,
+        )),
       );
       if (saved == true && mounted) {
         _textController.clear();
