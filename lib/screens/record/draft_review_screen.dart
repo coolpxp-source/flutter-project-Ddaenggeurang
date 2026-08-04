@@ -7,14 +7,18 @@ import '../../models/income_model.dart';
 import '../../models/saving_model.dart';
 import '../../models/emotion_tag_model.dart';
 import '../../models/recurring_payment_model.dart';
+import '../../models/card_point_model.dart';
+import '../../models/card_point_history_model.dart';
 import '../../services/expense_service.dart';
 import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
 import '../../services/recurring_payment_service.dart';
+import '../../services/card_point_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../../utils/formatters.dart' show comma;
 import 'parsed_record_draft.dart';
 import 'category_matcher.dart';
+import 'point_detector.dart';
 
 /// 파싱된 항목들을 확인 · 수정 · 선택해서 일괄 저장하는 공통 화면.
 ///
@@ -25,10 +29,15 @@ class DraftReviewScreen extends StatefulWidget {
   final List<ParsedRecordDraft> initialDrafts;
   final AllCategoryOptions categories;
 
+  /// 원본 텍스트(영수증 OCR/문자/직접입력)에서 미리 감지해둔 포인트 내역.
+  /// 비어있으면 저장 시 포인트 관련 확인을 아예 건너뛴다.
+  final List<DetectedPoint> detectedPoints;
+
   const DraftReviewScreen({
     super.key,
     required this.initialDrafts,
-    required this.categories
+    required this.categories,
+    this.detectedPoints = const [],
   });
 
   @override
@@ -40,6 +49,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   final _incomeService = IncomeService();
   final _savingService = SavingService();
   final _recurringPaymentService = RecurringPaymentService();
+  final _cardPointService = CardPointService();
 
   late List<ParsedRecordDraft> _drafts;
   bool _isSaving = false;
@@ -64,6 +74,12 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     if (selected.isEmpty) return;
 
     final String userId = currentUser.uid;
+
+    // 포인트가 감지된 경우, 실제 저장에 들어가기 전에 먼저 물어본다.
+    // (거절하거나 카드가 없어서 못 골라도 아래 일반 저장 흐름은 그대로 진행)
+    await _maybeOfferPointSave(userId);
+    if (!mounted) return;
+
     setState(() => _isSaving = true);
 
     try {
@@ -162,6 +178,120 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  /// 감지된 포인트가 있으면 "카드 포인트로도 저장할까요?" 확인 모달을 띄우고,
+  /// 저장을 선택하면 카드를 고르게 한 뒤 각 포인트를 CardPointHistory로 저장한다.
+  /// 감지된 포인트가 없거나, 사용자가 거절하거나, 카드가 없어서 못 고르면
+  /// 조용히 넘어간다(지출/수입/저축 저장 자체는 이 함수와 무관하게 계속됨).
+  Future<void> _maybeOfferPointSave(String userId) async {
+    if (widget.detectedPoints.isEmpty) return;
+
+    final String summary = widget.detectedPoints.map((p) {
+      final String label = p.type == 'earn' ? '적립' : '사용';
+      return '${comma(p.amount)}P $label';
+    }).join(', ');
+
+    final bool confirmed = await DdaengModal.confirm(
+      context,
+      title: '포인트 내역이 있어요',
+      message: '이번 내역에서 포인트 정보를 찾았어요 ($summary).\n카드 포인트에도 저장할까요?',
+      type: ModalType.info,
+      confirmText: '저장',
+    );
+    if (!confirmed || !mounted) return;
+
+    final CardPointModel? card = await _pickCard(userId);
+    if (card == null || !mounted) return;
+
+    final String merchant = _drafts.isNotEmpty
+        ? (_drafts.first.memo.isNotEmpty ? _drafts.first.memo : _drafts.first.categoryName)
+        : '영수증';
+    final DateTime date = _drafts.isNotEmpty ? _drafts.first.date : DateTime.now();
+
+    for (final DetectedPoint point in widget.detectedPoints) {
+      await _cardPointService.addHistory(
+        userId: userId,
+        cardId: card.cardId,
+        history: CardPointHistoryModel(
+          historyId: '',
+          date: date,
+          merchant: merchant,
+          point: point.amount,
+          type: point.type,
+        ),
+      );
+    }
+  }
+
+  /// 사용자가 직접 적립/사용할 카드를 고르게 하는 바텀시트.
+  /// 등록된 카드가 없으면 안내만 하고 null을 반환한다.
+  Future<CardPointModel?> _pickCard(String userId) async {
+    final List<CardPointModel> cards =
+    await _cardPointService.getCardPoints(userId: userId).first;
+    if (!mounted) return null;
+
+    if (cards.isEmpty) {
+      await DdaengModal.alert(context,
+          title: '등록된 카드가 없어요',
+          message: '카드 포인트 화면에서 카드를 먼저 등록해주세요.',
+          type: ModalType.info);
+      return null;
+    }
+
+    return showModalBottomSheet<CardPointModel>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('어느 카드에 적립할까요?',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                const SizedBox(height: 14),
+                ...cards.map((c) => InkWell(
+                  onTap: () => Navigator.pop(sheetContext, c),
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.bg,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(c.companyName,
+                                  style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
+                              const SizedBox(height: 2),
+                              Text(c.cardName,
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                            ],
+                          ),
+                        ),
+                        Text('${comma(c.totalPoint)}P',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                      ],
+                    ),
+                  ),
+                )),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   final Map<ParsedRecordDraft, TextEditingController> _accountNameControllers = {};
@@ -350,15 +480,30 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                           ],
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text('${draft.memo} · ${draft.categoryName}',
+                            child: Text(draft.memo.isNotEmpty ? draft.memo : draft.categoryName,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Text(_formatDate(draft.date),
-                          style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.bg,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: typeColor.withValues(alpha: 0.3), width: 1),
+                            ),
+                            child: Text(draft.categoryName,
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: typeColor)),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(_formatDate(draft.date),
+                              style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
+                        ],
+                      ),
                     ],
                   ),
                 ),

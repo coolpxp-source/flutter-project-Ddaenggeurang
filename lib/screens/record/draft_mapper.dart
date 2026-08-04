@@ -77,11 +77,14 @@ Future<List<ParsedRecordDraft>> mapParsedExpensesToDrafts(
         categoryId: matchedId ?? 'deposit',
       );
     } else {
-      final String? matchedId = matchCategoryId(
+      // AI가 (프롬프트 덕분에) 유저 커스텀 카테고리를 고려해서 'category' 필드에
+      // 알맞은 텍스트를 담아 보내줄 테니, 우리는 그냥 기본 매칭만 돌려주면 됩니다!
+      String? matchedId = matchCategoryId(
         aiCategoryText: item.category,
         merchant: matchText(item),
         options: expenseOptions,
       );
+
       return ParsedRecordDraft.expense(
         date: itemDate,
         memo: displayMemo(item),

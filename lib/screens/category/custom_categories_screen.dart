@@ -22,19 +22,21 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
   // 1. 3가지 탭의 순서를 각각 기억할 리스트
   List<String> _expenseOrder = [];
   List<String> _incomeOrder = [];
-  List<String> _savingOrder = []; // 저축 순서 추가!
+  List<String> _savingOrder = [];
+
+  static final Map<String, bool> _expansionStates = {};
 
   // 2. 탭 컨트롤러 길이 3으로 변경 및 3개의 스크롤 컨트롤러 세팅
   late TabController _tabController;
   final ScrollController _expenseScroll = ScrollController();
   final ScrollController _incomeScroll = ScrollController();
-  final ScrollController _savingScroll = ScrollController(); // 저축 스크롤 추가!
+  final ScrollController _savingScroll = ScrollController();
   bool _showFab = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this); // length: 3
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() => _scrollListener());
     _expenseScroll.addListener(_scrollListener);
     _incomeScroll.addListener(_scrollListener);
@@ -51,7 +53,6 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
     super.dispose();
   }
 
-  // 활성화된 탭의 스크롤 컨트롤러를 찾아주는 헬퍼 함수
   ScrollController _getActiveScrollController() {
     if (_tabController.index == 0) return _expenseScroll;
     if (_tabController.index == 1) return _incomeScroll;
@@ -95,7 +96,7 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
         }
         if (data.containsKey('expenseOrder')) _expenseOrder = List<String>.from(data['expenseOrder']);
         if (data.containsKey('incomeOrder')) _incomeOrder = List<String>.from(data['incomeOrder']);
-        if (data.containsKey('savingsOrder')) _savingOrder = List<String>.from(data['savingsOrder']); // 저축 순서 로드!
+        if (data.containsKey('savingsOrder')) _savingOrder = List<String>.from(data['savingsOrder']);
       }
 
       setState(() => _isLoading = false);
@@ -114,24 +115,25 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
       final String item = currentOrder.removeAt(oldIndex);
       currentOrder.insert(newIndex, item);
 
-      // 3. 타입에 맞게 로컬 순서 업데이트
       if (type == 'expense') {
-        _expenseOrder = currentOrder;
+        _expenseOrder = List.from(currentOrder);
       } else if (type == 'income') {
-        _incomeOrder = currentOrder;
+        _incomeOrder = List.from(currentOrder);
       } else if (type == 'saving') {
-        _savingOrder = currentOrder;
+        _savingOrder = List.from(currentOrder);
       }
     });
 
-    // 4. 파이어베이스에 저장할 필드명 결정
     String fieldName = 'expenseOrder';
     if (type == 'income') fieldName = 'incomeOrder';
     if (type == 'saving') fieldName = 'savingsOrder';
 
     try {
+      // 갱신된 안전한 로컬 변수를 그대로 DB에 저장
+      List<String> orderToSave = type == 'expense' ? _expenseOrder : (type == 'income' ? _incomeOrder : _savingOrder);
+
       await _db.collection('users').doc(_userId).set({
-        fieldName: currentOrder,
+        fieldName: orderToSave,
       }, SetOptions(merge: true));
     } catch (e) {
       debugPrint('순서 저장 에러: $e');
@@ -200,7 +202,6 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
         title: const Text('카테고리 관리', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         bottom: TabBar(
           controller: _tabController,
-          // 5. 탭 메뉴 3개로 확장
           tabs: const [Tab(text: '지출'), Tab(text: '수입'), Tab(text: '저축')],
           labelColor: Colors.black,
           indicatorColor: Colors.black,
@@ -298,7 +299,6 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
     if (grouped.isEmpty) return const Center(child: Text('카테고리가 없습니다.'));
 
     List<String> orderedKeys = grouped.keys.toList();
-    // 7. 렌더링 시 타입에 맞는 저장된 순서(Order) 매핑
     List<String> savedOrder = type == 'expense'
         ? _expenseOrder
         : type == 'income' ? _incomeOrder : _savingOrder;
@@ -320,6 +320,10 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
         List<Map<String, dynamic>> children = grouped[parentName]!;
         String nature = children.isNotEmpty ? (children.first['nature'] ?? 'variable') : 'variable';
 
+        // 👇 [핵심 추가 3] 고유 Key를 생성하고, 기억해둔 상태가 없다면 기본값(true) 적용
+        String tileKey = 'tile_${type}_$parentName';
+        bool isExpanded = _expansionStates[tileKey] ?? true;
+
         return Card(
           key: ValueKey('${type}_$parentName'),
           elevation: 0,
@@ -330,9 +334,16 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
             side: BorderSide(color: Colors.grey.shade200),
           ),
           child: ExpansionTile(
-            key: PageStorageKey<String>('tile_${type}_$parentName'),
+            key: PageStorageKey<String>(tileKey),
             title: Text(parentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
-            initiallyExpanded: true,
+
+            // 👇 기억해둔 상태값을 여기에 주입!
+            initiallyExpanded: isExpanded,
+
+            // 👇 접거나 펼칠 때마다 그 상태를 저장!
+            onExpansionChanged: (expanded) {
+              _expansionStates[tileKey] = expanded;
+            },
             shape: const Border(),
             collapsedShape: const Border(),
             iconColor: Colors.indigo,
