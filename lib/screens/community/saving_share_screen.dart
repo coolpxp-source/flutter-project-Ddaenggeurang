@@ -17,7 +17,6 @@ class SavingShareScreen extends StatefulWidget {
 
 class _SavingShareScreenState extends State<SavingShareScreen> {
   static const _green = Color(0xFFFF8A3D);
-  static const _greenLight = Color(0xFFFFF0E8);
   static const _gradientStart = Color(0xFFFFA351);
   static const _gradientEnd = Color(0xFFFF6B1A);
 
@@ -126,14 +125,14 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
     final totalSaving = results[2] as double;
     final recurringTemplates = results[3] as List;
 
-    final totalExpense = expenses.fold<num>(0, (sum, e) => sum + e.amount);
+    final totalExpense = expenses.fold<num>(0, (acc, e) => acc + e.amount);
 
-    final manualIncomeTotal = incomes.fold<num>(0, (sum, i) => sum + i.amount);
+    final manualIncomeTotal = incomes.fold<num>(0, (acc, i) => acc + i.amount);
 
     final activeTemplates = recurringTemplates.where(
           (t) => t.isActive && !t.isDeleted && !t.startDate.isAfter(end),
     );
-    final recurringIncomeTotal = activeTemplates.fold<num>(0, (sum, t) => sum + t.amount);
+    final recurringIncomeTotal = activeTemplates.fold<num>(0, (acc, t) => acc + t.amount);
 
     num totalIncome = manualIncomeTotal + recurringIncomeTotal;
 
@@ -349,7 +348,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
               style: ElevatedButton.styleFrom(
                 elevation: 0,
                 backgroundColor: _green,
-                disabledBackgroundColor: _green.withOpacity(0.4),
+                disabledBackgroundColor: _green.withValues(alpha: 0.4),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
@@ -381,7 +380,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
           const SizedBox(height: 6),
           Text('${_savingRate.toStringAsFixed(1)}%', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('내 지출·수입·저축 내역으로 자동 계산돼요', style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11)),
+          Text('내 지출·수입·저축 내역으로 자동 계산돼요', style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11)),
         ],
       ),
     );
@@ -394,7 +393,7 @@ class _SavingShareScreenState extends State<SavingShareScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       child: Row(
         children: [

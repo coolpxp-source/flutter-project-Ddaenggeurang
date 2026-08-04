@@ -95,7 +95,7 @@ class RankingScreen extends StatelessWidget {
                     style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 3),
                 Text('총 $count명 참여 중',
-                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12)),
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12)),
               ],
             ),
           ),
@@ -114,7 +114,7 @@ class RankingScreen extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: isTopThree ? Border.all(color: _medalColor(rank), width: 1.5) : null,
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
         ],
       ),
       child: Row(

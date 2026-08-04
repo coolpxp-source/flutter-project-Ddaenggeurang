@@ -363,7 +363,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: post.imageUrls.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
                           itemBuilder: (context, index) {
                             final url = post.imageUrls[index];
                             return ClipRRect(

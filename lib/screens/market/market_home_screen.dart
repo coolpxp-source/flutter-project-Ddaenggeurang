@@ -18,7 +18,6 @@ import 'my_products_screen.dart';
 import 'my_favorites_screen.dart';
 import '../../widgets/market/tappable_product_image.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 
 class MarketHomeScreen extends StatefulWidget {
   const MarketHomeScreen({super.key});
@@ -43,7 +42,14 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
   final PageController _adController = PageController();
   int _adIndex = 0;
 
-  static const _adBanners = [
+  static const List<
+      ({
+        String? imagePath,
+        String title,
+        String subtitle,
+        IconData icon,
+        String productId,
+      })> _adBanners = [
     (
     imagePath: 'assets/images/ad_banner_sale.png',
     title: '이번 주 특가 상품',
@@ -255,12 +261,6 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     '가구': Icons.weekend_rounded,
     '생활용품': Icons.local_cafe_rounded,
     '기타': Icons.category_rounded,
-  };
-
-  static const Map<String, Map<String, dynamic>> _badgeStyles = {
-    '인기': {'color': Color(0xFFE5735A), 'icon': Icons.local_fire_department_rounded},
-    '특가': {'color': Color(0xFFFF9166), 'icon': Icons.bolt_rounded},
-    '땡그랑 픽': {'color': Color(0xFF2F6BFF), 'icon': Icons.auto_awesome_rounded},
   };
 
   @override
