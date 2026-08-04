@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/mission_service.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class MissionProofUploadScreen extends StatefulWidget {
   const MissionProofUploadScreen({
@@ -31,12 +32,25 @@ class _MissionProofUploadScreenState
   bool _isInitialLoading = true;
   String? _rejectionReason;
 
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _loadSubmissionStatus();
   }
 
+  // 사진 인증 제출 상태 조회 메서드
   Future<void> _loadSubmissionStatus() async {
     try {
       final data =
@@ -65,9 +79,17 @@ class _MissionProofUploadScreenState
       setState(() {
         _isInitialLoading = false;
       });
+
+      debugPrint('사진 인증 상태 조회 오류: $e');
+
+      _showMessage(
+        '인증 상태를 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
+      );
     }
   }
 
+  // 카메라 또는 갤러리에서 인증 사진 선택 메서드
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
@@ -82,42 +104,40 @@ class _MissionProofUploadScreenState
       setState(() {
         _selectedImage = image;
       });
+
     } catch (error) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            source == ImageSource.camera
-                ? '카메라를 실행하지 못했습니다.'
-                : '이미지를 불러오지 못했습니다.',
-          ),
-        ),
+      _showMessage(
+        source == ImageSource.camera
+            ? '카메라를 실행하지 못했습니다.'
+            : '이미지를 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
       );
 
       debugPrint('이미지 선택 오류: $error');
     }
   }
 
+  // 사진 인증 제출 메서드
   Future<void> _submitProof() async {
-    final description = _descriptionController.text.trim();
+    final String description =
+    _descriptionController.text.trim();
 
     if (_selectedImage == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('인증 사진을 선택해 주세요.'),
-        ),
+      _showMessage(
+        '인증 사진을 선택해 주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (description.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('인증 설명을 입력해 주세요.'),
-        ),
+      _showMessage(
+        '인증 설명을 입력해 주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -130,35 +150,56 @@ class _MissionProofUploadScreenState
       _isSubmitting = true;
     });
 
-    final success = await _missionService.submitMissionProof(
-      missionDefId: 'photo_proof',
-      image: _selectedImage!,
-      description: description,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = false;
-
-      if (success) {
-        _approvalStatus = 'pending';
-      }
-    });
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('사진 인증이 제출되었습니다.'),
-        ),
+    try {
+      final bool success =
+      await _missionService.submitMissionProof(
+        missionDefId: 'photo_proof',
+        image: _selectedImage!,
+        description: description,
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('사진 인증 제출에 실패했습니다.'),
-        ),
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSubmitting = false;
+
+        if (success) {
+          _approvalStatus = 'pending';
+        }
+      });
+
+      if (!success) {
+        _showMessage(
+          '사진 인증 제출에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+
+      _showMessage(
+        '사진 인증이 제출되었습니다.',
+        type: AppSnackBarType.success,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isSubmitting = false;
+      });
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
       );
     }
   }

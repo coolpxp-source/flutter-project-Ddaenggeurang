@@ -4,6 +4,7 @@ import '../../models/group_model.dart';
 import '../../services/group_service.dart';
 import 'group_permission_screen.dart';
 import 'package:flutter/services.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class GroupCreateJoinScreen extends StatefulWidget {
   const GroupCreateJoinScreen({super.key});
@@ -65,70 +66,136 @@ class _GroupCreateJoinScreenState
         _isLoadingGroups = false;
       });
 
-      _showMessage('그룹 목록을 불러오지 못했습니다: $e');
+      _showMessage(
+        '그룹 목록을 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
+      );
     }
   }
 
+  // 새 그룹 생성 처리 메서드
   Future<void> _createGroup() async {
-    final groupName = _groupNameController.text.trim();
-    final description = _descriptionController.text.trim();
+    final String groupName =
+    _groupNameController.text.trim();
+
+    final String description =
+    _descriptionController.text.trim();
 
     if (groupName.isEmpty) {
-      _showMessage('그룹 이름을 입력해 주세요.');
+      _showMessage(
+        '그룹 이름을 입력해 주세요.',
+        type: AppSnackBarType.warning,
+      );
       return;
     }
-  // 새 그룹 생성 처리 메서드
-    final createdGroup = await _groupService.createGroup(
-      name: groupName,
-      description: description.isEmpty
-          ? null
-          : description,
-    );
 
-    _groupNameController.clear();
-    _descriptionController.clear();
+    try {
+      final GroupModel createdGroup =
+      await _groupService.createGroup(
+        name: groupName,
+        description: description.isEmpty
+            ? null
+            : description,
+      );
 
-    await _loadGroups();
+      if (!mounted) {
+        return;
+      }
 
-    FocusScope.of(context).unfocus();
+      _groupNameController.clear();
+      _descriptionController.clear();
 
-    _showCreatedGroupDialog(createdGroup);
+      await _loadGroups();
+
+      if (!mounted) {
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+
+      await _showCreatedGroupDialog(createdGroup);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
-  void _joinGroup() async{
-    final inviteCode =
+  // 초대코드로 그룹 참여 처리 메서드
+  Future<void> _joinGroup() async {
+    final String inviteCode =
     _inviteCodeController.text.trim();
 
     if (inviteCode.isEmpty) {
-      _showMessage('초대 코드를 입력해 주세요.');
+      _showMessage(
+        '초대 코드를 입력해 주세요.',
+        type: AppSnackBarType.warning,
+      );
       return;
     }
 
-    final joinedGroup = await _groupService.joinGroup(
-      inviteCode: inviteCode,
-    );
+    try {
+      final GroupModel joinedGroup =
+      await _groupService.joinGroup(
+        inviteCode: inviteCode,
+      );
 
-    if (joinedGroup == null) {
-      _showMessage('유효하지 않은 초대 코드입니다.');
-      return;
+      if (!mounted) {
+        return;
+      }
+
+      _inviteCodeController.clear();
+
+      await _loadGroups();
+
+      if (!mounted) {
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+
+      _showMessage(
+        '${joinedGroup.name} 그룹에 참여했습니다.',
+        type: AppSnackBarType.success,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      FocusScope.of(context).unfocus();
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
     }
-
-    _inviteCodeController.clear();
-
-    await _loadGroups();
-
-    FocusScope.of(context).unfocus();
-
-    _showMessage(
-      '${joinedGroup.name} 그룹에 참여했습니다.',
-    );
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
     );
   }
 
@@ -211,7 +278,10 @@ class _GroupCreateJoinScreenState
                               return;
                             }
 
-                            _showMessage('초대 코드를 복사했습니다.');
+                            _showMessage(
+                              '초대 코드를 복사했습니다.',
+                              type: AppSnackBarType.info,
+                            );
                           },
                           icon: const Icon(
                             Icons.copy_rounded,

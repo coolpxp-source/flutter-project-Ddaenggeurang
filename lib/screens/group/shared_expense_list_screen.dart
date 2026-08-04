@@ -5,6 +5,7 @@ import '../../models/shared_expense_model.dart';
 import '../../services/group_service.dart';
 import 'shared_expense_add_screen.dart';
 import 'shared_expense_edit_screen.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class SharedExpenseListScreen extends StatefulWidget {
   const SharedExpenseListScreen({
@@ -34,6 +35,17 @@ class _SharedExpenseListScreenState
   bool get _canEditExpense {
     return _currentUserRole == 'owner' ||
         _currentUserRole == 'editor';
+  }
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
   }
 
 
@@ -71,12 +83,9 @@ class _SharedExpenseListScreenState
         _isLoadingRole = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '그룹 권한을 확인하지 못했습니다: $error',
-          ),
-        ),
+      _showMessage(
+        '그룹 권한을 확인하지 못했습니다: $error',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -109,12 +118,9 @@ class _SharedExpenseListScreenState
         _isLoadingExpenses = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '공동지출 목록을 불러오지 못했습니다: $e',
-          ),
-        ),
+      _showMessage(
+        '공동지출 목록을 불러오지 못했습니다: $e',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -210,13 +216,9 @@ class _SharedExpenseListScreenState
               return;
             }
 
-            ScaffoldMessenger.of(context)
-                .showSnackBar(
-              const SnackBar(
-                content: Text(
-                  '공동 지출이 등록되었습니다.',
-                ),
-              ),
+            _showMessage(
+              '공동 지출이 등록되었습니다.',
+              type: AppSnackBarType.success,
             );
           }
         },
@@ -772,13 +774,9 @@ class _SharedExpenseListScreenState
                                 return;
                               }
 
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    '공동 지출이 수정되었습니다.',
-                                  ),
-                                ),
+                              _showMessage(
+                                '공동 지출이 수정되었습니다.',
+                                type: AppSnackBarType.success,
                               );
                             }
                           },
@@ -968,27 +966,18 @@ class _SharedExpenseListScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '공동 지출이 삭제되었습니다.',
-          ),
-        ),
+      _showMessage(
+        '공동 지출이 삭제되었습니다.',
+        type: AppSnackBarType.success,
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().replaceFirst(
-              'Exception: ',
-              '',
-            ),
-          ),
-        ),
+      _showMessage(
+        e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }

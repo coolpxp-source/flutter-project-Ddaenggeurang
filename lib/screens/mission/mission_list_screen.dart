@@ -5,6 +5,7 @@ import '../../models/mission_definition_model.dart';
 import '../../services/mission_service.dart';
 import 'attendance_check_screen.dart';
 import 'mission_proof_upload_screen.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class MissionListScreen extends StatefulWidget {
   const MissionListScreen({super.key});
@@ -26,6 +27,17 @@ class _MissionListScreenState extends State<MissionListScreen> {
   Map<String, Map<String, dynamic>> _missionProgress = {};
 
   Set<int> _completedDays = {};
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
 
   @override
   void initState() {
@@ -86,12 +98,9 @@ class _MissionListScreenState extends State<MissionListScreen> {
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '미션 정보를 불러오지 못했습니다: $e',
-          ),
-        ),
+      _showMessage(
+        '미션 정보를 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -229,31 +238,21 @@ class _MissionListScreenState extends State<MissionListScreen> {
       final progressData =
       _missionProgress['budget_success'];
 
-      final isCompleted =
-          progressData?['status'] ==
-              'completed';
+      final bool isCompleted =
+          progressData?['status'] == 'completed';
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        SnackBar(
-          content: Text(
-            isCompleted
-                ? '이번 달 예산 미션을 이미 완료했어요.'
-                : '이번 달 예산을 지키면 자동으로 완료되는 미션이에요.',
-          ),
-        ),
+      _showMessage(
+        isCompleted
+            ? '이번 달 예산 미션을 이미 완료했어요.'
+            : '이번 달 예산을 지키면 자동으로 완료되는 미션이에요.',
+        type: isCompleted
+            ? AppSnackBarType.success
+            : AppSnackBarType.info,
       );
 
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${mission['title']} 기능은 다음 단계에서 구현합니다.',
-        ),
-      ),
-    );
   }
   @override
   Widget build(BuildContext context) {

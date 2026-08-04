@@ -19,7 +19,10 @@ class AvatarItemCard extends StatelessWidget {
     const pinkColor = Color(0xFFFF68AE);
     const purpleColor = Color(0xFF8566FF);
 
-    final isLocked = userLevel < item.unlockLevel;
+    final bool isLocked = userLevel < item.unlockLevel;
+    final Color rarityColor = _rarityColor(item.rarity);
+    final Color rarityBackgroundColor =
+    _rarityBackgroundColor(item.rarity);
 
     return InkWell(
       onTap: isLocked ? null : onTap,
@@ -33,8 +36,10 @@ class AvatarItemCard extends StatelessWidget {
           border: Border.all(
             color: item.isEquipped
                 ? pinkColor
-                : const Color(0xFFE8E9EF),
-            width: item.isEquipped ? 2 : 1,
+                : rarityColor.withOpacity(
+              isLocked ? 0.35 : 0.8,
+            ),
+            width: item.isEquipped ? 2.2 : 1.4,
           ),
           boxShadow: const [
             BoxShadow(
@@ -64,7 +69,7 @@ class AvatarItemCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isLocked
                     ? const Color(0xFFF1F2F5)
-                    : const Color(0xFFFFF0F6),
+                    : rarityBackgroundColor,
                 borderRadius: BorderRadius.circular(18),
               ),
               child: Stack(
@@ -87,12 +92,25 @@ class AvatarItemCard extends StatelessWidget {
             ),
 
             const SizedBox(height: 8),
-            Text(
-              _rarityLabel(item.rarity),
-              style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8566FF),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: rarityBackgroundColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: rarityColor.withOpacity(0.55),
+                ),
+              ),
+              child: Text(
+                _rarityLabel(item.rarity),
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: rarityColor,
+                ),
               ),
             ),
             const SizedBox(height: 1),
@@ -251,6 +269,52 @@ class AvatarItemCard extends StatelessWidget {
         return '전설';
       default:
         return '일반';
+    }
+  }
+
+  // 희귀도별 대표 색상을 반환하는 메서드
+  Color _rarityColor(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return const Color(0xFF7A7D88);
+
+      case 'uncommon':
+        return const Color(0xFF2EA96B);
+
+      case 'rare':
+        return const Color(0xFF3C7DDF);
+
+      case 'epic':
+        return const Color(0xFF8A5AD9);
+
+      case 'legendary':
+        return const Color(0xFFD79B16);
+
+      default:
+        return const Color(0xFF7A7D88);
+    }
+  }
+
+// 희귀도별 연한 배경색을 반환하는 메서드
+  Color _rarityBackgroundColor(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return const Color(0xFFF2F3F5);
+
+      case 'uncommon':
+        return const Color(0xFFECFAF2);
+
+      case 'rare':
+        return const Color(0xFFEEF5FF);
+
+      case 'epic':
+        return const Color(0xFFF5F0FF);
+
+      case 'legendary':
+        return const Color(0xFFFFF7E4);
+
+      default:
+        return const Color(0xFFF2F3F5);
     }
   }
 

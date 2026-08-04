@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/psychology_test_service.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class PersonalizedBudgetRecommendationScreen
     extends StatefulWidget {
@@ -20,6 +21,17 @@ class _PersonalizedBudgetRecommendationScreenState
     extends State<PersonalizedBudgetRecommendationScreen> {
   final PsychologyTestService _psychologyTestService =
   PsychologyTestService();
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
 
   bool _isApplying = false;
 
@@ -63,53 +75,56 @@ class _PersonalizedBudgetRecommendationScreenState
   }
 
   // 현재 월 예산에 추천 카테고리 예산을 적용하는 메서드
+  // 현재 월 예산에 추천 카테고리 예산을 적용하는 메서드
   Future<void> _applyRecommendedBudget() async {
-    if (_isApplying) return;
+    if (_isApplying) {
+      return;
+    }
 
     setState(() {
       _isApplying = true;
     });
 
     try {
-      final categoryBudgets =
-      await _psychologyTestService
-          .applyRecommendedBudget(
+      final Map<String, int> categoryBudgets =
+      await _psychologyTestService.applyRecommendedBudget(
         resultType: widget.resultType,
       );
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      final totalApplied =
+      final int totalApplied =
       categoryBudgets.values.fold<int>(
         0,
             (sum, amount) => sum + amount,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '추천 예산이 적용되었습니다. '
-                '카테고리 예산 총 ${_formatAmount(totalApplied)}원',
-          ),
-        ),
+      _showMessage(
+        '추천 예산이 적용되었습니다. '
+            '카테고리 예산 총 ${_formatAmount(totalApplied)}원',
+        type: AppSnackBarType.success,
       );
     } on StateError catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.message),
-        ),
+      _showMessage(
+        error.message,
+        type: AppSnackBarType.warning,
       );
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '추천 예산 적용에 실패했습니다: $error',
-          ),
-        ),
+      debugPrint('추천 예산 적용 실패: $error');
+
+      _showMessage(
+        '추천 예산을 적용하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+        type: AppSnackBarType.error,
       );
     } finally {
       if (mounted) {
