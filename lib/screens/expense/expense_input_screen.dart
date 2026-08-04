@@ -23,7 +23,9 @@ class ExpenseInputScreen extends StatefulWidget {
 
 class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   final _expenseService = ExpenseService();
-  final _amountController = TextEditingController(text: '0');
+  // 입력 전에는 실제 값을 비워 둡니다.
+  // 화면에는 hintText로 0원을 보여 주므로, 처음부터 '영원' 자막이 뜨지 않습니다.
+  final _amountController = TextEditingController();
   final _memoController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
@@ -372,107 +374,176 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── 결제 금액 히어로 카드 ──
+            // ── 결제 금액 입력 카드 ──
+            //
+            // 기존의 강한 그라데이션 카드 대신,
+            // 실제 입력창처럼 보이는 밝은 배경 + 테두리 방식으로 변경했습니다.
+            //
+            // 동작:
+            // 1. 입력 전에는 0원만 표시
+            // 2. 숫자 입력 시 천 단위 쉼표 자동 적용
+            // 3. 1원 이상 입력했을 때만 아래에 한글 금액 자막 표시
+            // 4. 입력값을 모두 지우면 자막도 다시 사라짐
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFFFC168), Color(0xFFFF7A45), Color(0xFFFF5C7A)],
-                  stops: [0.0, 0.55, 1.0],
+                color: const Color(0xFFFFF7F2),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFFFFD7C7),
+                  width: 1.2,
                 ),
-                borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFFF6A66).withValues(alpha: 0.35),
-                    blurRadius: 24,
-                    offset: const Offset(0, 12),
+                    color: const Color(0xFFFF8A65).withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '결제 금액',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                  // 입력 카드 제목
+                  const Row(
                     children: [
-                      IntrinsicWidth(
-                        child: TextField(
-                          controller: _amountController,
-                          enabled: !_isSaving,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [CurrencyFormatter()],
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: 30,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                          ),
-                          cursorColor: Colors.white,
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
+                      Icon(
+                        Icons.payments_outlined,
+                        size: 18,
+                        color: AppColors.expenseDeep,
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 7),
                       Text(
-                        '원',
+                        '결제 금액',
                         style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.expenseDeep,
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+
+                  // 실제 금액 입력 영역
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: const Color(0xFFFFE2D6),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _amountController,
+                            enabled: !_isSaving,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              // 입력과 동시에 천 단위 쉼표를 표시합니다.
+                              CurrencyFormatter(),
+                            ],
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontSize: 30,
+                              height: 1.15,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                              color: AppColors.ink,
+                            ),
+                            cursorColor: AppColors.expense,
+                            decoration: const InputDecoration(
+                              // 실제 컨트롤러 값은 비어 있지만
+                              // 화면에는 0이 보이도록 처리합니다.
+                              hintText: '0',
+                              hintStyle: TextStyle(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFFB8BFC8),
+                              ),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              disabledBorder: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _amountController,
+                          builder: (context, value, _) {
+                            final int amount = int.tryParse(
+                              value.text.replaceAll(',', '').trim(),
+                            ) ??
+                                0;
+
+                            return Text(
+                              '원',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                color: amount > 0
+                                    ? AppColors.ink
+                                    : const Color(0xFFB8BFC8),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 숫자가 입력됐을 때만 한글 금액 자막을 표시합니다.
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _amountController,
                     builder: (context, value, _) {
-                      final amount =
-                          int.tryParse(value.text.replaceAll(',', '')) ?? 0;
-                      final label = koreanAmountText(amount);
-                      if (label.isEmpty) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white.withValues(alpha: 0.85),
+                      final int amount = int.tryParse(
+                        value.text.replaceAll(',', '').trim(),
+                      ) ??
+                          0;
+
+                      if (amount <= 0) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final String label = koreanAmountText(amount);
+
+                      if (label.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        switchInCurve: Curves.easeOut,
+                        switchOutCurve: Curves.easeIn,
+                        child: Padding(
+                          key: ValueKey<int>(amount),
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              label,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.expenseDeep,
+                              ),
                             ),
                           ),
                         ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 6),
-                  // 숫자로 입력한 금액을 한글로 함께 보여 줍니다.
-                  Text(
-                    koreanAmount(
-                      parseAmount(_amountController.text),
-                    ),
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
                   ),
                 ],
               ),

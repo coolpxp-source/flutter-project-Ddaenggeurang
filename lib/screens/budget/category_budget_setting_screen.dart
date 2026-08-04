@@ -108,12 +108,6 @@ class _CategoryBudgetSettingScreenState
     }
   }
 
-  void _refreshTotal() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
   /// 카테고리 입력값이 바뀔 때마다 호출 — 마지막으로 만진 카테고리를 기록
   void _onCategoryChanged(String keyName) {
     if (mounted) {
@@ -194,9 +188,9 @@ class _CategoryBudgetSettingScreenState
 
   @override
   void dispose() {
-    for (final entry in _controllers.entries) {
-      entry.value.removeListener(_refreshTotal);
-      entry.value.dispose();
+    // 각 컨트롤러는 화면 종료 시 반드시 해제한다.
+    for (final controller in _controllers.values) {
+      controller.dispose();
     }
 
     super.dispose();
@@ -598,38 +592,54 @@ class _CategoryBudgetSettingScreenState
     );
   }
 
+  /// 카테고리별 금액 입력 카드
+  ///
+  /// 수입 입력 화면과 동일하게:
+  /// - 입력 전에는 큰 글씨로 0원만 표시
+  /// - 숫자를 입력하면 천 단위 쉼표가 적용됨
+  /// - 금액이 1원 이상일 때만 아래에 한글 금액 자막 표시
+  /// - 마지막으로 입력한 카테고리에만 남은 예산 안내 표시
   Widget _buildCategoryCard(_BudgetCategory category) {
+    final TextEditingController controller =
+    _controllers[category.keyName]!;
     final int amount = _amountOf(category.keyName);
 
-    // 이 카테고리를 제외한 나머지 카테고리들의 배분 합계
-    final int othersTotal = _categoryTotal - amount;
-
-    // 이 카테고리에 입력 가능한 최대 금액
-    final int remainingForThis = widget.availableBudget - othersTotal;
-
-    // 전체 남은 예산 (모든 카테고리 반영 후)
-    final int remainingAfterThis = widget.availableBudget - _categoryTotal;
+    // 전체 카테고리 입력 후 남아 있는 예산
+    final int remainingAfterThis =
+        widget.availableBudget - _categoryTotal;
     final bool exceeded = remainingAfterThis < 0;
+    final bool isLastEdited =
+        category.keyName == _lastEditedKey;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _C.line,
+          color: exceeded && isLastEdited
+              ? _C.red
+              : _C.line,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.025),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 카테고리명과 아이콘
           Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: category.color.withOpacity(0.14),
+                backgroundColor:
+                category.color.withOpacity(0.14),
                 child: Icon(
                   category.icon,
                   color: category.color,
@@ -641,71 +651,130 @@ class _CategoryBudgetSettingScreenState
                 child: Text(
                   category.name,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                     color: _C.ink,
                   ),
                 ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  SizedBox(
-                    width: 130,
-                    child: TextFormField(
-                      controller: _controllers[category.keyName],
-                      textAlign: TextAlign.right,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        // 입력과 동시에 천 단위 쉼표 표시
-                        ThousandsFormatter(),
-                      ],
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        color: _C.ink,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '0',
-                        suffixText: '원',
-                        isDense: true,
-                        border: InputBorder.none,
-                      ),
-                      validator: (value) {
-                        final int parsed = _parseAmount(value ?? '');
-
-                        if (parsed < 0) {
-                          return '0원 이상';
-                        }
-
-                        return null;
-                      },
-                    ),
-                  ),
-                  if (category.keyName == _lastEditedKey && amount > 0) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      koreanAmount(amount),
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _C.inkSub,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
             ],
           ),
+          const SizedBox(height: 14),
 
-          // 입력 즉시 보이는 잔여 예산 안내 (마지막으로 입력한 카테고리에만 표시)
-          if (category.keyName == _lastEditedKey && amount > 0) ...[
-            const SizedBox(height: 10),
+          // 큰 금액 입력 영역
+          TextFormField(
+            controller: controller,
+            textAlign: TextAlign.right,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              // 숫자 이외 입력을 막고 천 단위 쉼표를 자동 적용
+              FilteringTextInputFormatter.digitsOnly,
+              ThousandsFormatter(),
+            ],
+            style: const TextStyle(
+              fontSize: 29,
+              height: 1.15,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.8,
+              color: _C.ink,
+            ),
+            cursorColor: _C.blue,
+            decoration: InputDecoration(
+              // 값이 없을 때는 수입 입력 화면처럼 0원 표시
+              hintText: '0',
+              hintStyle: const TextStyle(
+                fontSize: 29,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFFB0B8C1),
+              ),
+              suffixText: '원',
+              suffixStyle: TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+                color: amount > 0
+                    ? _C.ink
+                    : const Color(0xFFB0B8C1),
+              ),
+              isDense: true,
+              contentPadding:
+              const EdgeInsets.only(bottom: 10),
+              enabledBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: _C.line,
+                  width: 1.2,
+                ),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: category.color,
+                  width: 1.8,
+                ),
+              ),
+              errorBorder: const UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: _C.red,
+                  width: 1.4,
+                ),
+              ),
+              focusedErrorBorder:
+              const UnderlineInputBorder(
+                borderSide: BorderSide(
+                  color: _C.red,
+                  width: 1.8,
+                ),
+              ),
+            ),
+            validator: (value) {
+              final int parsed =
+              _parseAmount(value ?? '');
+
+              if (parsed < 0) {
+                return '0원 이상 입력해 주세요.';
+              }
+
+              return null;
+            },
+          ),
+
+          // 입력값이 1원 이상일 때만 한글 금액 자막 표시
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: amount > 0
+                ? Padding(
+              key: ValueKey<int>(amount),
+              padding:
+              const EdgeInsets.only(top: 7),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  koreanAmount(amount),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _C.inkSub,
+                  ),
+                ),
+              ),
+            )
+                : const SizedBox.shrink(
+              key: ValueKey<String>('empty'),
+            ),
+          ),
+
+          // 마지막으로 입력한 카테고리에만 남은 예산 또는 초과 안내
+          if (isLastEdited && amount > 0) ...[
+            const SizedBox(height: 12),
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.symmetric(
                 horizontal: 12,
-                vertical: 8,
+                vertical: 9,
               ),
               decoration: BoxDecoration(
-                color: exceeded ? _C.redSoft : _C.bg,
+                color:
+                exceeded ? _C.redSoft : _C.blueSoft,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -713,11 +782,13 @@ class _CategoryBudgetSettingScreenState
                   Icon(
                     exceeded
                         ? Icons.error_outline_rounded
-                        : Icons.check_circle_outline_rounded,
-                    size: 15,
-                    color: exceeded ? _C.red : _C.blue,
+                        : Icons
+                        .check_circle_outline_rounded,
+                    size: 16,
+                    color:
+                    exceeded ? _C.red : _C.blue,
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   Expanded(
                     child: Text(
                       exceeded
@@ -726,7 +797,9 @@ class _CategoryBudgetSettingScreenState
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: exceeded ? _C.red : _C.blueDeep,
+                        color: exceeded
+                            ? _C.red
+                            : _C.blueDeep,
                       ),
                     ),
                   ),

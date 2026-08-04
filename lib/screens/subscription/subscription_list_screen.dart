@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/subscription_model.dart';
 import '../../services/subscription_service.dart';
+import '../../services/notification_service.dart';
 import 'subscription_add_screen.dart';
 import 'subscription_edit_screen.dart';
 
@@ -29,23 +30,16 @@ class SubscriptionListScreen extends StatefulWidget {
 
 class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
   final SubscriptionService _service = SubscriptionService();
-  final ScrollController _scrollController = ScrollController();
-  final GlobalKey _alertSectionKey = GlobalKey();
 
   bool _paymentAlert = true;
   bool _trialAlert = true;
   bool _annualAlert = false;
+  List<SubscriptionModel> _latestSubscriptions = const [];
 
   @override
   void initState() {
     super.initState();
     _loadAlertSettings();
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadAlertSettings() async {
@@ -68,16 +62,165 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     await prefs.setBool('subscription_${key}_${widget.userId}', value);
   }
 
-  void _openAlertSettings() {
-    final targetContext = _alertSectionKey.currentContext;
+  Future<void> _openAlertSettings(
+      List<SubscriptionModel> subscriptions,
+      ) async {
+    bool paymentAlert = _paymentAlert;
+    bool trialAlert = _trialAlert;
+    bool annualAlert = _annualAlert;
 
-    if (targetContext != null) {
-      Scrollable.ensureVisible(
-        targetContext,
-        duration: const Duration(milliseconds: 420),
-        curve: Curves.easeOutCubic,
-        alignment: 0.12,
-      );
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            Future<void> updatePaymentAlert(bool value) async {
+              setSheetState(() => paymentAlert = value);
+              setState(() => _paymentAlert = value);
+
+              await _saveAlertSetting('payment_alert', value);
+              await _syncSubscriptionReminders(
+                enabled: value,
+                subscriptions: subscriptions,
+              );
+            }
+
+            Future<void> updateTrialAlert(bool value) async {
+              setSheetState(() => trialAlert = value);
+              setState(() => _trialAlert = value);
+              await _saveAlertSetting('trial_alert', value);
+            }
+
+            Future<void> updateAnnualAlert(bool value) async {
+              setSheetState(() => annualAlert = value);
+              setState(() => _annualAlert = value);
+              await _saveAlertSetting('annual_alert', value);
+            }
+
+            return SafeArea(
+              top: false,
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x22000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8E5E8),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: _mainSoftColor,
+                          child: Icon(
+                            Icons.notifications_active_rounded,
+                            color: _mainColor,
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '구독 알림 설정',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF222222),
+                                ),
+                              ),
+                              SizedBox(height: 3),
+                              Text(
+                                '설정값은 사용자별로 저장됩니다.',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF999999),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    _AlertSwitch(
+                      title: '결제 하루 전 알림',
+                      value: paymentAlert,
+                      onChanged: updatePaymentAlert,
+                    ),
+                    _AlertSwitch(
+                      title: '무료 체험 종료 알림',
+                      value: trialAlert,
+                      onChanged: updateTrialAlert,
+                    ),
+                    _AlertSwitch(
+                      title: '연간 결제 경고',
+                      value: annualAlert,
+                      onChanged: updateAnnualAlert,
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _mainColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        child: const Text(
+                          '확인',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _syncSubscriptionReminders({
+    required bool enabled,
+    required List<SubscriptionModel> subscriptions,
+  }) async {
+    for (final subscription in subscriptions) {
+      if (enabled && subscription.isActive) {
+        await NotificationService.instance
+            .scheduleSubscriptionReminder(subscription);
+      } else {
+        await NotificationService.instance
+            .cancelSubscriptionReminder(subscription.id);
+      }
     }
   }
 
@@ -103,7 +246,7 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
             padding: const EdgeInsets.only(right: 10),
             child: IconButton(
               tooltip: '알림 설정으로 이동',
-              onPressed: _openAlertSettings,
+              onPressed: () => _openAlertSettings(_latestSubscriptions),
               style: IconButton.styleFrom(
                 backgroundColor: _mainSoftColor,
                 foregroundColor: _mainColor,
@@ -132,6 +275,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           }
 
           final subscriptions = snapshot.data ?? [];
+          _latestSubscriptions = subscriptions;
+
           final active =
           subscriptions.where((item) => item.isActive).toList();
 
@@ -144,21 +289,47 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
           final nextDays =
           next == null ? 0 : _daysUntilPayment(next.paymentDay);
 
+          final nextItems = next == null
+              ? const <SubscriptionModel>[]
+              : active
+              .where(
+                (item) =>
+            _daysUntilPayment(item.paymentDay) == nextDays,
+          )
+              .toList();
+
+          final nextTotalAmount = nextItems.fold<int>(
+            0,
+                (sum, item) => sum + item.amount,
+          );
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _syncSubscriptionReminders(
+              enabled: _paymentAlert,
+              subscriptions: subscriptions,
+            );
+          });
+
           return ListView(
-            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
             children: [
               _SummaryCard(
                 totalAmount: total,
                 activeCount: active.length,
-                nextAmount: next?.amount ?? 0,
+                scheduledAmount: total,
                 nextDays: nextDays,
               ),
-              if (next != null) ...[
+              if (_paymentAlert && next != null) ...[
                 const SizedBox(height: 14),
                 _PaymentAlertCard(
-                  subscription: next,
+                  subscriptions: nextItems,
                   days: nextDays,
+                  totalAmount: nextTotalAmount,
+                  onTap: () => _showUpcomingPayments(
+                    days: nextDays,
+                    subscriptions: nextItems,
+                  ),
                 ),
               ],
               const SizedBox(height: 14),
@@ -170,67 +341,6 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
                   onAdd: _openAdd,
                   onEdit: _openEdit,
                   onDelete: _confirmDelete,
-                ),
-              ),
-              const SizedBox(height: 14),
-              KeyedSubtree(
-                key: _alertSectionKey,
-                child: _SectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(
-                            Icons.notifications_active_rounded,
-                            size: 19,
-                            color: _mainColor,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            '알림 설정',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF222222),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '설정값은 사용자별로 저장됩니다.',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF999999),
-                        ),
-                      ),
-                      _AlertSwitch(
-                        title: '결제 하루 전 알림',
-                        value: _paymentAlert,
-                        onChanged: (value) {
-                          setState(() => _paymentAlert = value);
-                          _saveAlertSetting('payment_alert', value);
-                        },
-                      ),
-                      _AlertSwitch(
-                        title: '무료 체험 종료 알림',
-                        value: _trialAlert,
-                        onChanged: (value) {
-                          setState(() => _trialAlert = value);
-                          _saveAlertSetting('trial_alert', value);
-                        },
-                      ),
-                      _AlertSwitch(
-                        title: '연간 결제 경고',
-                        value: _annualAlert,
-                        onChanged: (value) {
-                          setState(() => _annualAlert = value);
-                          _saveAlertSetting('annual_alert', value);
-                        },
-                      ),
-                    ],
-                  ),
                 ),
               ),
               const SizedBox(height: 14),
@@ -288,6 +398,212 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
     }
 
     return target.difference(today).inDays;
+  }
+
+  Future<void> _showUpcomingPayments({
+    required int days,
+    required List<SubscriptionModel> subscriptions,
+  }) async {
+    if (subscriptions.isEmpty) return;
+
+    final totalAmount = subscriptions.fold<int>(
+      0,
+          (sum, item) => sum + item.amount,
+    );
+
+    final dayText = days == 0
+        ? '오늘'
+        : days == 1
+        ? '내일'
+        : '$days일 후';
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 22),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8E5E8),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      backgroundColor: _mainSoftColor,
+                      child: Icon(
+                        Icons.payments_rounded,
+                        color: _mainColor,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        '$dayText 결제 예정',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF222222),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: _mainSoftColor,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${subscriptions.length}건',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: _mainColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 13,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8F7FA),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text(
+                        '총 결제 예정 금액',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF777777),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${formatAmount(totalAmount)}원',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: _mainColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 340),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: subscriptions.map((subscription) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: const Color(0xFFF7F8FB),
+                            borderRadius: BorderRadius.circular(14),
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                _openEdit(subscription);
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 38,
+                                      height: 38,
+                                      decoration: BoxDecoration(
+                                        color: _mainSoftColor,
+                                        borderRadius:
+                                        BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.subscriptions_rounded,
+                                        size: 20,
+                                        color: _mainColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 11),
+                                    Expanded(
+                                      child: Text(
+                                        subscription.name,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFF333333),
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      '${formatAmount(subscription.amount)}원',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w900,
+                                        color: _mainColor,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 3),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      size: 20,
+                                      color: Color(0xFFAAAAAA),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _openAdd() {
@@ -430,6 +746,8 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
         userId: widget.userId,
         subscriptionId: subscription.id,
       );
+      await NotificationService.instance
+          .cancelSubscriptionReminder(subscription.id);
 
       if (!mounted) return;
 
@@ -477,13 +795,13 @@ class _SubscriptionListScreenState extends State<SubscriptionListScreen> {
 class _SummaryCard extends StatelessWidget {
   final int totalAmount;
   final int activeCount;
-  final int nextAmount;
+  final int scheduledAmount;
   final int nextDays;
 
   const _SummaryCard({
     required this.totalAmount,
     required this.activeCount,
-    required this.nextAmount,
+    required this.scheduledAmount,
     required this.nextDays,
   });
 
@@ -526,12 +844,12 @@ class _SummaryCard extends StatelessWidget {
               const SizedBox(width: 8),
               _SummaryItem(
                 label: '다음 결제',
-                value: nextAmount == 0 ? '-' : 'D-$nextDays',
+                value: activeCount == 0 ? '-' : 'D-$nextDays',
               ),
               const SizedBox(width: 8),
               _SummaryItem(
                 label: '결제 예정',
-                value: '${formatAmount(nextAmount)}원',
+                value: '${formatAmount(scheduledAmount)}원',
               ),
             ],
           ),
@@ -587,45 +905,72 @@ class _SummaryItem extends StatelessWidget {
 }
 
 class _PaymentAlertCard extends StatelessWidget {
-  final SubscriptionModel subscription;
+  final List<SubscriptionModel> subscriptions;
   final int days;
+  final int totalAmount;
+  final VoidCallback onTap;
 
   const _PaymentAlertCard({
-    required this.subscription,
+    required this.subscriptions,
     required this.days,
+    required this.totalAmount,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _mainSoftColor,
+    if (subscriptions.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final dayText = days == 0
+        ? '오늘'
+        : days == 1
+        ? '내일'
+        : '$days일 후';
+
+    final message = subscriptions.length == 1
+        ? '$dayText ${subscriptions.first.name} '
+        '${formatAmount(subscriptions.first.amount)}원 결제 예정'
+        : '$dayText 결제 예정 ${subscriptions.length}건 · '
+        '총 ${formatAmount(totalAmount)}원';
+
+    return Material(
+      color: _mainSoftColor,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            backgroundColor: _mainColor,
-            child: Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '${days == 0 ? '오늘' : '$days일 후'} '
-                  '${subscription.name} '
-                  '${formatAmount(subscription.amount)}원 결제 예정',
-              style: const TextStyle(
-                color: Color(0xFFC63A5C),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const CircleAvatar(
+                backgroundColor: _mainColor,
+                child: Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.white,
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(
+                    color: Color(0xFFC63A5C),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: _mainColor,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -681,6 +1026,11 @@ class _CalendarCardState extends State<_CalendarCard> {
     final selectedItems = _selectedDate == null
         ? const <SubscriptionModel>[]
         : paymentMap[_selectedDate!.day] ?? const <SubscriptionModel>[];
+
+    final selectedTotalAmount = selectedItems.fold<int>(
+      0,
+          (sum, item) => sum + item.amount,
+    );
 
     return _SectionCard(
       child: Column(
@@ -841,15 +1191,75 @@ class _CalendarCardState extends State<_CalendarCard> {
                   : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '${_selectedDate!.month}월 ${_selectedDate!.day}일 결제 예정',
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF555555),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_selectedDate!.month}월 ${_selectedDate!.day}일 결제 예정',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF555555),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _mainSoftColor,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${selectedItems.length}건',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: _mainColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 11,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _mainBorderSoftColor,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text(
+                          '총 결제 예정 금액',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF777777),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${formatAmount(selectedTotalAmount)}원',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            color: _mainColor,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                   ...selectedItems.map(
                         (item) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
