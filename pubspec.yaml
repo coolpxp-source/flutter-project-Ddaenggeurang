@@ -8,6 +8,7 @@ environment:
   sdk: ^3.12.2
 
 dependencies:
+  google_mobile_ads: ^9.0.0
   firebase_messaging: ^16.4.3
   flutter:
     sdk: flutter

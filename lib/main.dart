@@ -30,6 +30,7 @@ import 'widgets/common/brand_loading_dots.dart';
 import 'package:intl/date_symbol_data_local.dart'; // TableCalendar 한글번역팩
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +41,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await MobileAds.instance.initialize();
   FirebaseMessaging.onMessage.listen((message) {
     final notification = message.notification;
     if (notification != null) {

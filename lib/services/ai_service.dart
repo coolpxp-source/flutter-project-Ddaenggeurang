@@ -123,11 +123,12 @@ class AiService {
   // AiService()는 호출부마다 새 인스턴스라 static이어야 앱 전역에서 같은 카운트를 본다.
   static const int consultDailyLimit = 5;
   static int _consultCount = 0;
+  static int _bonusCount = 0;          // 추가 — 광고 시청으로 얻은 보너스 횟수
   static String _consultDate = '';
 
   int get consultRemaining {
     _resetIfNewDay();
-    return consultDailyLimit - _consultCount;
+    return consultDailyLimit + _bonusCount - _consultCount;
   }
 
   void _resetIfNewDay() {
@@ -135,7 +136,15 @@ class AiService {
     if (_consultDate != today) {
       _consultDate = today;
       _consultCount = 0;
+      _bonusCount = 0;   // 추가 — 날짜 바뀌면 보너스도 초기화
     }
+  }
+
+  /// 광고 시청 완료 시 호출 — 오늘 상담 가능 횟수를 늘려준다.
+  void addBonusConsult({int amount = 1}) {
+    _resetIfNewDay();
+    _bonusCount += amount;
+    debugPrint('🎯 보너스 적용 후 bonusCount=$_bonusCount, remaining=$consultRemaining');
   }
 
   // ═══════════════ 캐시 (잔소리/주간/월간 — 기간당 1회 생성, 재사용) ═══════════════
@@ -225,7 +234,7 @@ class AiService {
         required int daysToPayday,
       }) async {
     _resetIfNewDay();
-    if (_consultCount >= consultDailyLimit) {
+    if (consultRemaining <= 0) {
       throw RateLimitException('오늘 상담 횟수를 모두 사용했어요. 내일 다시 만나요!');
     }
     _consultCount++;
