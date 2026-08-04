@@ -99,6 +99,52 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     }
   }
 
+  // 희귀도별 대표 색상을 반환하는 메서드
+  Color _rarityColor(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return const Color(0xFF7A7D88);
+
+      case 'uncommon':
+        return const Color(0xFF2EA96B);
+
+      case 'rare':
+        return const Color(0xFF3C7DDF);
+
+      case 'epic':
+        return const Color(0xFF8A5AD9);
+
+      case 'legendary':
+        return const Color(0xFFD79B16);
+
+      default:
+        return const Color(0xFF7A7D88);
+    }
+  }
+
+// 희귀도별 연한 배경색을 반환하는 메서드
+  Color _rarityBackgroundColor(String rarity) {
+    switch (rarity) {
+      case 'common':
+        return const Color(0xFFF2F3F5);
+
+      case 'uncommon':
+        return const Color(0xFFECFAF2);
+
+      case 'rare':
+        return const Color(0xFFEEF5FF);
+
+      case 'epic':
+        return const Color(0xFFF5F0FF);
+
+      case 'legendary':
+        return const Color(0xFFFFF7E4);
+
+      default:
+        return const Color(0xFFF2F3F5);
+    }
+  }
+
   // 아바타 아이템 선택 처리 메서드
   Future<void> _selectItem(AvatarItem item) async {
     final bool isLocked = _level < item.unlockLevel;
@@ -656,8 +702,14 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                 childAspectRatio: 0.62,
               ),
               itemBuilder: (context, index) {
-                final item = filteredItems[index];
-                final isLocked = _level < item.unlockLevel;
+                final AvatarItem item = filteredItems[index];
+                final bool isLocked = _level < item.unlockLevel;
+
+                final Color rarityColor =
+                _rarityColor(item.rarity);
+
+                final Color rarityBackgroundColor =
+                _rarityBackgroundColor(item.rarity);
 
                 return InkWell(
                   onTap: () => _selectItem(item),
@@ -670,8 +722,10 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                       border: Border.all(
                         color: item.isEquipped
                             ? pinkColor
-                            : const Color(0xFFE8E9EF),
-                        width: item.isEquipped ? 2 : 1,
+                            : rarityColor.withOpacity(
+                          isLocked ? 0.35 : 0.8,
+                        ),
+                        width: item.isEquipped ? 2.2 : 1.4,
                       ),
                     ),
                     child: Column(
@@ -685,7 +739,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                               decoration: BoxDecoration(
                                 color: isLocked
                                     ? const Color(0xFFF0F1F4)
-                                    : const Color(0xFFFFF0F6),
+                                    : rarityBackgroundColor,
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               child: Stack(
@@ -727,12 +781,25 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
                           ],
                         ),
                         const SizedBox(height: 5),
-                        Text(
-                          _rarityLabel(item.rarity),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF8566FF),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: rarityBackgroundColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: rarityColor.withOpacity(0.55),
+                            ),
+                          ),
+                          child: Text(
+                            _rarityLabel(item.rarity),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: rarityColor,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 1),
