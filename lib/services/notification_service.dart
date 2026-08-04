@@ -52,12 +52,12 @@ class NotificationService {
         );
         break;
       case 'levelup':
-        // MyPageHomeScreen은 홈 탭 바디 전용(자체 Scaffold 없음)이라 단독으로
-        // push하면 InkWell 등이 Material 조상을 못 찾아 에러난다 — Scaffold로 감싼다.
+      // MyPageHomeScreen은 홈 탭 바디 전용(자체 Scaffold 없음)이라 단독으로
+      // push하면 InkWell 등이 Material 조상을 못 찾아 에러난다 — Scaffold로 감싼다.
         nav.push(
           MaterialPageRoute(
             builder: (_) =>
-                const _StandaloneTabScreen(child: MyPageHomeScreen()),
+            const _StandaloneTabScreen(child: MyPageHomeScreen()),
           ),
         );
         break;
@@ -67,16 +67,16 @@ class NotificationService {
         );
         break;
       case 'consult':
-        // AiConsultScreen도 마찬가지로 탭 바디 전용이라 Scaffold로 감싸야 한다.
+      // AiConsultScreen도 마찬가지로 탭 바디 전용이라 Scaffold로 감싸야 한다.
         nav.push(
           MaterialPageRoute(
             builder: (_) =>
-                const _StandaloneTabScreen(child: AiConsultScreen()),
+            const _StandaloneTabScreen(child: AiConsultScreen()),
           ),
         );
         break;
-      // 'nagging'/'resolution'은 홈 코치 말풍선과 이어지는 내용이라 별도 화면 없이
-      // 앱만 열어주면 충분하다.
+    // 'nagging'/'resolution'은 홈 코치 말풍선과 이어지는 내용이라 별도 화면 없이
+    // 앱만 열어주면 충분하다.
     }
   }
 
@@ -116,8 +116,8 @@ class NotificationService {
     );
     await _plugin
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+        AndroidFlutterLocalNotificationsPlugin
+    >()
         ?.requestNotificationsPermission();
 
     // 알림을 탭해서 앱이 콜드 스타트로 열린 경우 — 그 순간엔 아직 화면이 없으니
@@ -135,10 +135,10 @@ class NotificationService {
   /// coachEmoji/coachName은 선택한 코치 톤과 애칭을 반영하기 위한 값 — 안 넘기면
   /// 기존처럼 땡쥐 기준 문구를 쓴다.
   Future<({String title, String body})?> showConsultReminder(
-    int remaining, {
-    String coachEmoji = '🐭',
-    String coachName = '땡쥐',
-  }) async {
+      int remaining, {
+        String coachEmoji = '🐭',
+        String coachName = '땡쥐',
+      }) async {
     if (remaining <= 0) return null;
     if (await _isQuietHours()) return null;
     await init();
@@ -310,48 +310,75 @@ class NotificationService {
   }
 
   /// 구독 문서 id(String)를 알림 id(양의 32bit int)로 안정적으로 변환.
-  int _subscriptionNotificationId(String subscriptionId) =>
-      subscriptionId.hashCode & 0x7fffffff;
+  int _subscriptionNotificationId(String subscriptionId) {
+    var hash = 0x811C9DC5;
+    for (final codeUnit in subscriptionId.codeUnits) {
+      hash ^= codeUnit;
+      hash = (hash * 0x01000193) & 0x7fffffff;
+    }
+    return hash;
+  }
 
-  /// 구독 하나에 대해 매달 결제일 오전 9시 반복 알림을 건다.
-  /// (이미 같은 id로 걸려 있으면 덮어써서 최신 이름/금액/결제일을 반영)
+  /// 구독 하나에 대해 결제 하루 전 오전 9시 알림을 예약한다.
+  ///
+  /// 29~31일처럼 월마다 존재 여부가 달라지는 결제일은
+  /// 해당 월의 마지막 날짜로 자동 조정한다.
   Future<void> scheduleSubscriptionReminder(SubscriptionModel sub) async {
     await init();
+
     final id = _subscriptionNotificationId(sub.id);
     final now = tz.TZDateTime.now(tz.local);
-    var scheduled = tz.TZDateTime(
-      tz.local,
-      now.year,
-      now.month,
-      sub.paymentDay,
-      9,
-    );
-    if (scheduled.isBefore(now)) {
-      scheduled = tz.TZDateTime(
+
+    tz.TZDateTime paymentDateFor(int year, int month) {
+      final lastDay = DateTime(year, month + 1, 0).day;
+      final safeDay = sub.paymentDay.clamp(1, lastDay);
+
+      return tz.TZDateTime(
         tz.local,
-        now.year,
-        now.month + 1,
-        sub.paymentDay,
+        year,
+        month,
+        safeDay,
         9,
       );
     }
+
+    var paymentDate = paymentDateFor(now.year, now.month);
+    var scheduled = paymentDate.subtract(const Duration(days: 1));
+
+    // 이번 달 알림 시각이 지났다면 다음 달 결제 하루 전으로 예약한다.
+    if (!scheduled.isAfter(now)) {
+      final nextMonth = tz.TZDateTime(
+        tz.local,
+        now.year,
+        now.month + 1,
+        1,
+      );
+
+      paymentDate = paymentDateFor(
+        nextMonth.year,
+        nextMonth.month,
+      );
+      scheduled = paymentDate.subtract(const Duration(days: 1));
+    }
+
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
         'subscription_reminder',
         '구독 결제 알림',
-        channelDescription: '구독 결제일에 맞춰 알려드려요',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
+        channelDescription: '구독 결제 하루 전에 알려드려요',
+        importance: Importance.high,
+        priority: Priority.high,
       ),
     );
+
     await _plugin.zonedSchedule(
       id: id,
       scheduledDate: scheduled,
-      title: '오늘 구독 결제일이에요 💳',
-      body: '${sub.name} ${_comma(sub.amount)}원이 오늘 결제될 예정이에요',
+      title: '내일 구독 결제가 예정되어 있어요 💳',
+      body: '${sub.name} ${_comma(sub.amount)}원이 내일 결제될 예정이에요.',
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.dayOfMonthAndTime,
+      payload: 'subscription',
     );
   }
 
@@ -368,8 +395,8 @@ class NotificationService {
   /// RecurringPaymentService가 결제 처리할 때마다 갱신하는 nextBillingDate를
   /// 그대로 한 번 예약한다 — 매일 재동기화되므로 값이 바뀌면 자동으로 다시 걸린다.
   Future<void> scheduleFixedExpenseReminder(
-    RecurringPaymentModel payment,
-  ) async {
+      RecurringPaymentModel payment,
+      ) async {
     await init();
     final id = _fixedExpenseNotificationId(payment.recurringPaymentId);
     final now = tz.TZDateTime.now(tz.local);
@@ -442,7 +469,7 @@ class NotificationService {
 
   static String _comma(int n) => n.toString().replaceAllMapped(
     RegExp(r'(\d)(?=(\d{3})+$)'),
-    (m) => '${m[1]},',
+        (m) => '${m[1]},',
   );
 }
 
