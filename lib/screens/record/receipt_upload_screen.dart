@@ -34,6 +34,16 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
     super.dispose();
   }
 
+  Future<void> _openFullImage(File image) async {
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black,
+        pageBuilder: (_, __, ___) => _FullImageViewer(image: image),
+      ),
+    );
+  }
+
   Future<void> _pickAndExtract(ImageSource source) async {
     final User? currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
@@ -195,9 +205,28 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
               ),
             ] else ...[
               // ── 선택된 이미지 미리보기 + OCR 결과 ──
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.file(_previewImage!, height: 220, width: double.infinity, fit: BoxFit.cover),
+              GestureDetector(
+                onTap: () => _openFullImage(_previewImage!),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Stack(
+                    children: [
+                      Image.file(_previewImage!, height: 220, width: double.infinity, fit: BoxFit.cover),
+                      Positioned(
+                        right: 10,
+                        bottom: 10,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.45),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.zoom_in_rounded, size: 18, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
               if (_isProcessing)
@@ -265,6 +294,47 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
               ],
             ],
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 영수증 원본 사진을 꽉 채워 보여주는 전체화면 뷰어.
+/// 핀치로 확대/축소 가능하고, 배경이나 닫기 버튼을 누르면 닫힌다.
+class _FullImageViewer extends StatelessWidget {
+  final File image;
+
+  const _FullImageViewer({required this.image});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.pop(context),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: InteractiveViewer(
+                  minScale: 1,
+                  maxScale: 4,
+                  child: Center(
+                    child: Image.file(image, fit: BoxFit.contain),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 8,
+                right: 12,
+                child: IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -6,10 +6,13 @@ import '../../models/expense_model.dart';
 import '../../models/income_model.dart';
 import '../../models/saving_model.dart';
 import '../../models/emotion_tag_model.dart';
+import '../../models/recurring_payment_model.dart';
 import '../../services/expense_service.dart';
 import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
+import '../../services/recurring_payment_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../utils/formatters.dart' show comma;
 import 'parsed_record_draft.dart';
 import 'category_matcher.dart';
 
@@ -36,6 +39,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
   final _expenseService = ExpenseService();
   final _incomeService = IncomeService();
   final _savingService = SavingService();
+  final _recurringPaymentService = RecurringPaymentService();
 
   late List<ParsedRecordDraft> _drafts;
   bool _isSaving = false;
@@ -66,6 +70,28 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
       for (final draft in selected) {
         switch (draft.type) {
           case TransactionType.expense:
+            String? recurringPaymentId;
+            // 정기결제로 등록하는 경우, 지출을 만들기 전에 정기결제 원본을 먼저 만들어
+            // expense.recurringPaymentId로 연결한다.
+            if (draft.isRecurring) {
+              final cycle = draft.billingCycle == 'yearly'
+                  ? BillingCycle.yearly
+                  : BillingCycle.monthly;
+              final nextBillingDate = cycle == BillingCycle.yearly
+                  ? DateTime(draft.date.year + 1, draft.date.month, draft.date.day)
+                  : DateTime(draft.date.year, draft.date.month + 1, draft.date.day);
+              recurringPaymentId = await _recurringPaymentService.addRecurringPayment(
+                RecurringPaymentModel(
+                  recurringPaymentId: '',
+                  userId: userId,
+                  name: draft.memo.isNotEmpty ? draft.memo : draft.categoryName,
+                  amount: draft.amount,
+                  billingCycle: cycle,
+                  nextBillingDate: nextBillingDate,
+                  categoryId: draft.categoryId ?? 'uncategorized',
+                ),
+              );
+            }
             await _expenseService.addExpense(ExpenseModel(
               expenseId: '',
               userId: userId,
@@ -76,9 +102,28 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               emotionTag: draft.emotionTag,
               memo: draft.memo,
               isQuickInput: true,
+              recurringPaymentId: recurringPaymentId,
             ));
             break;
           case TransactionType.income:
+            String? recurringIncomeTemplateId;
+            int? recurringPayDay;
+            // 정기수입으로 등록하는 경우, 반복등록 템플릿을 먼저 만들어
+            // income.recurringIncomeTemplateId로 연결한다.
+            if (draft.isRecurring) {
+              recurringPayDay = draft.recurringPayDay ?? draft.date.day;
+              recurringIncomeTemplateId = await _incomeService.addRecurringTemplate(
+                RecurringIncomeTemplate(
+                  recurringIncomeTemplateId: '',
+                  userId: userId,
+                  categoryId: draft.categoryId ?? 'uncategorized',
+                  amount: draft.amount,
+                  payDay: recurringPayDay,
+                  startDate: draft.date,
+                  memo: draft.memo,
+                ),
+              );
+            }
             await _incomeService.addIncome(IncomeModel(
               incomeId: '',
               userId: userId,
@@ -86,6 +131,8 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
               categoryId: draft.categoryId ?? 'uncategorized',
               date: draft.date,
               memo: draft.memo,
+              recurringIncomeTemplateId: recurringIncomeTemplateId,
+              recurringPayDay: draft.isRecurring ? recurringPayDay : null,
             ));
             break;
           case TransactionType.saving:
@@ -289,6 +336,18 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                             child: Text(typeLabel,
                                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: typeColor)),
                           ),
+                          if (draft.isRecurring) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.utility.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text('정기',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.utility)),
+                            ),
+                          ],
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text('${draft.memo} · ${draft.categoryName}',
@@ -304,7 +363,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text('${draft.amount}원',
+                Text('${comma(draft.amount)}원',
                     style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
                 const SizedBox(width: 2),
                 Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.inkSub.withValues(alpha: 0.5)),
@@ -350,7 +409,7 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                         ),
                       ),
                     ),
-                    Text('${draft.amount}원',
+                    Text('${comma(draft.amount)}원',
                         style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.ink)),
                     const SizedBox(height: 2),
                     Text(_formatDate(draft.date),
@@ -443,6 +502,36 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                 }).toList(),
               ),
             ],
+            const SizedBox(height: 14),
+            _recurringToggleRow(
+              label: '정기결제로 등록',
+              value: draft.isRecurring,
+              color: AppColors.expense,
+              onChanged: (v) => setLocalState(() {
+                draft.isRecurring = v;
+                if (v) draft.billingCycle ??= 'monthly';
+              }),
+            ),
+            if (draft.isRecurring) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 6, runSpacing: 6,
+                children: [
+                  _draftChip(
+                    label: '매달',
+                    selected: draft.billingCycle != 'yearly',
+                    color: AppColors.expense,
+                    onSelected: () => setLocalState(() => draft.billingCycle = 'monthly'),
+                  ),
+                  _draftChip(
+                    label: '매년',
+                    selected: draft.billingCycle == 'yearly',
+                    color: AppColors.expense,
+                    onSelected: () => setLocalState(() => draft.billingCycle = 'yearly'),
+                  ),
+                ],
+              ),
+            ],
           ],
         );
       case TransactionType.income:
@@ -464,6 +553,46 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
                 );
               }).toList(),
             ),
+            const SizedBox(height: 14),
+            _recurringToggleRow(
+              label: '정기수입으로 등록',
+              value: draft.isRecurring,
+              color: AppColors.income,
+              onChanged: (v) => setLocalState(() {
+                draft.isRecurring = v;
+                if (v) draft.recurringPayDay ??= draft.date.day;
+              }),
+            ),
+            if (draft.isRecurring) ...[
+              const SizedBox(height: 10),
+              const Text('매달 입금일', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: TextEditingController(text: '${draft.recurringPayDay ?? draft.date.day}')
+                  ..selection = TextSelection.collapsed(
+                    offset: '${draft.recurringPayDay ?? draft.date.day}'.length,
+                  ),
+                keyboardType: TextInputType.number,
+                style: const TextStyle(fontSize: 13, color: AppColors.ink),
+                decoration: InputDecoration(
+                  hintText: '예: 25 (25일)',
+                  isDense: true,
+                  filled: true,
+                  fillColor: AppColors.bg,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (v) {
+                  final day = int.tryParse(v);
+                  if (day != null && day >= 1 && day <= 31) {
+                    draft.recurringPayDay = day;
+                  }
+                },
+              ),
+            ],
           ],
         );
       case TransactionType.saving:
@@ -507,6 +636,27 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
           ],
         );
     }
+  }
+
+  Widget _recurringToggleRow({
+    required String label,
+    required bool value,
+    required Color color,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(label,
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+        ),
+        Switch(
+          value: value,
+          activeColor: color,
+          onChanged: onChanged,
+        ),
+      ],
+    );
   }
 
   Widget _draftChip({
