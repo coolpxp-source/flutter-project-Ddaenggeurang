@@ -49,14 +49,14 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     title: '이번 주 특가 상품',
     subtitle: '',
     icon: Icons.local_fire_department_rounded,
-    url: 'https://example.com/promo2',
+    productId: 'RCeRfuNh2RkBF86cglV8'
     ),
     (
     imagePath: 'assets/images/ad_banner_pick.png',
     title: '땡그랑 픽 아이템',
     subtitle: '',
     icon: Icons.star_rounded,
-    url: 'https://example.com/promo3',
+    productId: 'ptz6XNtW8z1R2zJrbNNN'
     ),
   ];
 
@@ -255,6 +255,12 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     '가구': Icons.weekend_rounded,
     '생활용품': Icons.local_cafe_rounded,
     '기타': Icons.category_rounded,
+  };
+
+  static const Map<String, Map<String, dynamic>> _badgeStyles = {
+    '인기': {'color': Color(0xFFE5735A), 'icon': Icons.local_fire_department_rounded},
+    '특가': {'color': Color(0xFFFF9166), 'icon': Icons.bolt_rounded},
+    '땡그랑 픽': {'color': Color(0xFF2F6BFF), 'icon': Icons.auto_awesome_rounded},
   };
 
   @override
@@ -689,10 +695,20 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
             final ad = _adBanners[i];
             return GestureDetector(
               onTap: () async {
-                final url = Uri.parse(ad.url);
-                if (await canLaunchUrl(url)) {
-                  await launchUrl(url, mode: LaunchMode.externalApplication);
-                }
+                final doc = await FirebaseFirestore.instance
+                    .collection('ddaengMarketItems')
+                    .doc(ad.productId)
+                    .get();
+
+                if (!doc.exists || !context.mounted) return;
+
+                final data = doc.data() as Map<String, dynamic>;
+                final comparisons = (data['priceComparisons'] as List<dynamic>? ?? [])
+                    .map((e) => Map<String, dynamic>.from(e as Map))
+                    .toList()
+                  ..sort((a, b) => (a['price'] as num).compareTo(b['price'] as num));
+
+                _showPriceComparisonSheet(context, data['name'] as String, comparisons);
               },
               child: ad.imagePath != null
                   ? ClipRRect(
@@ -954,6 +970,7 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
 
   Widget _dummyPriceCard(String itemId, Map<String, dynamic> item) {
     final isFav = _favoriteIds.contains(itemId);
+    final bool isDeal = item['badge'] == '특가';
     final comparisons = (item['priceComparisons'] as List<dynamic>? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList()
@@ -967,8 +984,23 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          border: isDeal
+              ? Border.all(color: const Color(0xFFFF6B1A).withOpacity(0.5), width: 1.4)
+              : null,
+          boxShadow: isDeal
+              ? [
+            BoxShadow(
+              color: const Color(0xFFFF6B1A).withOpacity(0.22),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ]
+              : [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Column(
@@ -994,6 +1026,12 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
                     ),
                   ),
                 ),
+                if (item['badge'] != null)
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: _productBadge(item['badge'] as String),
+                  ),
                 Positioned(
                   right: 6,
                   top: 6,
@@ -1433,6 +1471,77 @@ class _MarketHomeScreenState extends State<MarketHomeScreen> {
     if (diff.inDays < 7) return '${diff.inDays}일 전';
     if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}주 전';
     return '${dateTime.year}.${dateTime.month.toString().padLeft(2, '0')}.${dateTime.day.toString().padLeft(2, '0')}';
+  }
+
+  /// 상품 카드용 뱃지 (인기/특가/땡그랑 픽)
+  Widget _productBadge(String badge) {
+    switch (badge) {
+      case '특가':
+        return _gradientBadge(
+          icon: Icons.local_fire_department_rounded,
+          label: '특가',
+          colors: const [Color(0xFFFFC94D), Color(0xFFFF6B1A), Color(0xFFE5735A)],
+          shadowColor: const Color(0xFFFF6B1A),
+        );
+      case '인기':
+        return _gradientBadge(
+          icon: Icons.whatshot_rounded,
+          label: '인기',
+          colors: const [Color(0xFFFF8A80), Color(0xFFE5735A), Color(0xFFC0392B)],
+          shadowColor: const Color(0xFFE5735A),
+        );
+      case '땡그랑 픽':
+        return _gradientBadge(
+          icon: Icons.auto_awesome_rounded,
+          label: '땡그랑 픽',
+          colors: const [Color(0xFF6FA8FF), Color(0xFF2F6BFF), Color(0xFF1D4ED8)],
+          shadowColor: const Color(0xFF2F6BFF),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  /// 공통 그라데이션 뱃지 (인기/특가/땡그랑 픽 공용)
+  Widget _gradientBadge({
+    required IconData icon,
+    required String label,
+    required List<Color> colors,
+    required Color shadowColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.only(left: 5, right: 7, top: 3, bottom: 3),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor.withOpacity(0.35),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: Colors.white),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 9.5,
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _tagChip(String label, Color color, [IconData? icon]) {

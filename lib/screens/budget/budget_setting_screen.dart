@@ -6,6 +6,21 @@ import '../../utils/formatters.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'category_budget_setting_screen.dart';
 
+// ══════════════════════ 브랜드 색상 (온보딩 화면과 통일) ══════════════════════
+class _C {
+  static const navy = Color(0xFF0D2247);
+  static const blue = Color(0xFF2F6BFF);
+  static const blueDeep = Color(0xFF1D4ED8);
+  static const blueSoft = Color(0xFFEEF4FF);
+  static const gold = Color(0xFFFFC93C);
+  static const ink = Color(0xFF191F28);
+  static const inkSub = Color(0xFF8B95A1);
+  static const line = Color(0xFFEEEEF3);
+  static const bg = Color(0xFFF7F8FA);
+  static const red = Color(0xFFF04438);
+  static const redSoft = Color(0xFFFEF3F2);
+}
+
 class BudgetSettingScreen extends StatefulWidget {
   final String userId;
 
@@ -38,6 +53,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   // 카테고리별 예산
   Map<String, int> _categoryBudgets = {};
 
+  // 저번 달 전체 예산 (비교용)
+  int _previousBudgetTotal = 0;
+
   // 로딩 및 저장 상태
   bool _isLoading = true;
   bool _isSaving = false;
@@ -47,6 +65,13 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
     final DateTime now = DateTime.now();
 
     return '${now.year}-${now.month.toString().padLeft(2, '0')}';
+  }
+
+  /// 저번 달을 YYYY-MM 형식으로 반환
+  String get _previousMonth {
+    final DateTime now = DateTime.now();
+    final DateTime prev = DateTime(now.year, now.month - 1);
+    return '${prev.year}-${prev.month.toString().padLeft(2, '0')}';
   }
 
   /// 입력된 전체 예산
@@ -126,10 +151,17 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
         _budgetService.getSubscriptionTotal(
           widget.userId,
         ),
+
+        // 저번 달 예산 조회 (비교용, 없으면 null)
+        _budgetService.getBudget(
+          userId: widget.userId,
+          month: _previousMonth,
+        ),
       ]);
 
       final BudgetModel? budget = results[0] as BudgetModel?;
       final int subscriptionTotal = results[1] as int;
+      final BudgetModel? previousBudget = results[2] as BudgetModel?;
 
       if (!mounted) {
         return;
@@ -137,6 +169,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
 
       setState(() {
         _subscriptionTotal = subscriptionTotal;
+        _previousBudgetTotal = previousBudget?.totalBudget ?? 0;
 
         // 저장된 예산이 있으면 화면에 자동 반영
         if (budget != null) {
@@ -173,50 +206,119 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   Future<void> _selectStartDay() async {
     final int? selectedDay = await showModalBottomSheet<int>(
       context: context,
-      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (bottomSheetContext) {
-        return SafeArea(
-          child: SizedBox(
-            height: 360,
-            child: Column(
-              children: [
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text(
-                    '예산 시작일 선택',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.85,
+          expand: false,
+          builder: (context, scrollCtrl) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 12),
+                    width: 40,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: _C.line,
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: 31,
-                    itemBuilder: (context, index) {
-                      final int day = index + 1;
-
-                      return ListTile(
-                        title: Text('매월 $day일'),
-                        trailing: _startDay == day
-                            ? const Icon(
-                          Icons.check,
-                          color: Color(0xFF12B76A),
-                        )
-                            : null,
-                        onTap: () {
-                          Navigator.pop(
-                            bottomSheetContext,
-                            day,
-                          );
-                        },
-                      );
-                    },
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 18, 24, 14),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '예산 시작일 선택',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: _C.ink,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                      itemCount: 31,
+                      itemBuilder: (context, index) {
+                        final int day = index + 1;
+                        final bool sel = _startDay == day;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () =>
+                                  Navigator.pop(bottomSheetContext, day),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 140),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: sel ? _C.blueSoft : _C.bg,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: sel ? _C.navy : Colors.transparent,
+                                    width: 1.4,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        '매월 $day일',
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: sel
+                                              ? FontWeight.w800
+                                              : FontWeight.w600,
+                                          color: sel ? _C.navy : _C.ink,
+                                        ),
+                                      ),
+                                    ),
+                                    if (sel)
+                                      Container(
+                                        width: 26,
+                                        height: 26,
+                                        decoration: const BoxDecoration(
+                                          color: _C.blue,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        alignment: Alignment.center,
+                                        child: const Icon(
+                                          Icons.check_rounded,
+                                          color: Colors.white,
+                                          size: 17,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -383,20 +485,22 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(),
+          child: CircularProgressIndicator(color: _C.blue),
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: _C.bg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
+        elevation: 0,
         title: const Text(
           '예산 설정',
           style: TextStyle(
-            fontWeight: FontWeight.bold,
+            fontWeight: FontWeight.w800,
+            color: _C.ink,
           ),
         ),
         centerTitle: true,
@@ -414,94 +518,112 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
             children: [
               // 전체 예산 입력 카드
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: const Color(0xFFE4E7EC),
+                    color: _C.line,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
-                      color: Color(0x0D101828),
-                      blurRadius: 16,
-                      offset: Offset(0, 4),
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '$_currentMonth 전체 예산',
                       style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF667085),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: _C.inkSub,
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _totalBudgetController,
-                      autovalidateMode:
-                      AutovalidateMode.onUserInteraction,
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        // 입력과 동시에 천 단위 쉼표 표시
-                        ThousandsFormatter(),
-                      ],
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF12B76A),
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '0',
-                        suffixText: '원',
-                        filled: true,
-                        fillColor: Color(0xFFF0FDF4),
-                        border: OutlineInputBorder(
-                          borderSide: BorderSide.none,
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(12),
+                    const SizedBox(height: 14),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _totalBudgetController,
+                            autovalidateMode:
+                            AutovalidateMode.onUserInteraction,
+                            textAlign: TextAlign.left,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              // 입력과 동시에 천 단위 쉼표 표시
+                              ThousandsFormatter(),
+                            ],
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -0.8,
+                              color: _C.navy,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: '0',
+                              hintStyle: TextStyle(
+                                color: Color(0xFFCBD2D9),
+                                fontWeight: FontWeight.w900,
+                              ),
+                              isDense: true,
+                              contentPadding: EdgeInsets.zero,
+                              border: InputBorder.none,
+                            ),
+                            validator: (value) {
+                              final int amount = int.tryParse(
+                                value
+                                    ?.replaceAll(',', '')
+                                    .trim() ??
+                                    '',
+                              ) ??
+                                  0;
+                              if (amount <= 0) {
+                                return '전체 예산을 입력하세요.';
+                              }
+                              return null;
+                            },
                           ),
                         ),
-                      ),
-                      validator: (value) {
-                        final int amount = int.tryParse(
-                          value
-                              ?.replaceAll(',', '')
-                              .trim() ??
-                              '',
-                        ) ??
-                            0;
-
-                        if (amount <= 0) {
-                          return '전체 예산을 입력하세요.';
-                        }
-
-                        return null;
-                      },
+                        const Padding(
+                          padding: EdgeInsets.only(bottom: 5, left: 6),
+                          child: Text(
+                            '원',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: _C.inkSub,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // 숫자 금액 아래 한글 금액 표시
                     Text(
                       _totalBudget > 0
                           ? koreanAmount(_totalBudget)
                           : '금액을 입력해 주세요',
-                      textAlign: TextAlign.center,
+                      textAlign: TextAlign.left,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: _totalBudget > 0
-                            ? const Color(0xFF667085)
-                            : const Color(0xFF98A2B3),
+                            ? _C.blue
+                            : const Color(0xFFB0B8C1),
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              _buildMonthCompareChart(),
+              const SizedBox(height: 12),
 
               // 예산 시작일 설정
               _buildSettingTile(
@@ -517,18 +639,16 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF9FAFB),
+                  color: _C.redSoft,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFE4E7EC),
-                  ),
                 ),
                 child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
-                      Icons.info_outline,
-                      color: Color(0xFF667085),
+                      Icons.error_outline_rounded,
+                      color: _C.red,
+                      size: 20,
                     ),
                     SizedBox(width: 10),
                     Expanded(
@@ -537,7 +657,9 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                             '카테고리별로 나눌 수 있습니다.',
                         style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF667085),
+                          fontWeight: FontWeight.w600,
+                          color: _C.red,
+                          height: 1.4,
                         ),
                       ),
                     ),
@@ -547,40 +669,38 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               const SizedBox(height: 12),
 
               // 카테고리별 예산 설정 버튼
-              SizedBox(
-                height: 50,
-                child: OutlinedButton.icon(
-                  onPressed: _openCategorySetting,
-                  icon: const Icon(Icons.tune),
-                  label: Text(
-                    _categoryBudgets.isEmpty
-                        ? '카테고리 예산 설정'
-                        : '카테고리 예산 수정',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF12B76A),
-                    side: const BorderSide(
-                      color: Color(0xFF12B76A),
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+              _buildSettingTile(
+                title: _categoryBudgets.isEmpty
+                    ? '카테고리 예산 설정'
+                    : '카테고리 예산 수정',
+                subtitle: _categoryBudgets.isEmpty
+                    ? '카테고리별로 예산을 나눠보세요.'
+                    : '${_categoryBudgets.length}개 카테고리에 배분됨',
+                trailingText: '',
+                icon: Icons.tune_rounded,
+                onTap: _openCategorySetting,
               ),
               const SizedBox(height: 22),
 
               // 예산 계산 결과
               Container(
-                padding: const EdgeInsets.all(18),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                   border: Border.all(
                     color: _isCategoryBudgetExceeded
-                        ? const Color(0xFFF04438)
-                        : const Color(0xFFE4E7EC),
+                        ? _C.red
+                        : _C.line,
+                    width: _isCategoryBudgetExceeded ? 1.4 : 1,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
                 child: Column(
                   children: [
@@ -592,19 +712,21 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                     _buildAmountRow(
                       label: '고정지출',
                       amount: _fixedExpenseTotal,
+                      isExpense: true,
                     ),
                     const SizedBox(height: 12),
                     _buildAmountRow(
                       label: '구독료',
                       amount: _subscriptionTotal,
+                      isExpense: true,
                     ),
-                    const Divider(height: 28),
+                    Divider(height: 28, color: _C.line),
                     _buildAmountRow(
                       label: '가용 예산',
                       amount: _availableBudget,
                       valueColor: _isAvailableBudgetNegative
-                          ? const Color(0xFFF04438)
-                          : const Color(0xFF12B76A),
+                          ? _C.red
+                          : _C.blue,
                       isBold: true,
                     ),
                     if (_categoryBudgets.isNotEmpty) ...[
@@ -613,88 +735,28 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                         label: '카테고리 배분 합계',
                         amount: _categoryTotal,
                         valueColor: _isCategoryBudgetExceeded
-                            ? const Color(0xFFF04438)
-                            : const Color(0xFF101828),
+                            ? _C.red
+                            : _C.ink,
                       ),
                       const SizedBox(height: 12),
                       _buildAmountRow(
                         label: '미배분 예산',
                         amount: _availableBudget - _categoryTotal,
                         valueColor: _isCategoryBudgetExceeded
-                            ? const Color(0xFFF04438)
-                            : const Color(0xFF2F6BFF),
+                            ? _C.red
+                            : _C.blueDeep,
                       ),
                     ],
 
                     // 예산 초과 실시간 안내
                     if (_isCategoryBudgetExceeded) ...[
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3F2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              size: 20,
-                              color: Color(0xFFF04438),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '예산을 초과했어요!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFF04438),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildWarningBanner('예산을 초과했어요!'),
                     ],
 
                     if (_isAvailableBudgetNegative) ...[
                       const SizedBox(height: 16),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3F2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.warning_amber_rounded,
-                              size: 20,
-                              color: Color(0xFFF04438),
-                            ),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '전체 예산이 고정지출과 구독료보다 적어요!',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFF04438),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildWarningBanner('전체 예산이 고정지출과 구독료보다 적어요!'),
                     ],
                   ],
                 ),
@@ -704,16 +766,16 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
               // 저장 버튼
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 54,
                 child: FilledButton(
                   // 예산 초과 시 저장 버튼 비활성화
                   onPressed: _isSaveDisabled ? null : _saveBudget,
                   style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF101828),
-                    disabledBackgroundColor: const Color(0xFFD0D5DD),
-                    disabledForegroundColor: Colors.white,
+                    backgroundColor: _C.navy,
+                    disabledBackgroundColor: const Color(0xFFE5E8EB),
+                    disabledForegroundColor: const Color(0xFFB0B8C1),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: _isSaving
@@ -731,7 +793,7 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                         : '저장하기',
                     style: const TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
@@ -739,6 +801,187 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// 이번 달 vs 저번 달 예산 비교 미니 차트
+  Widget _buildMonthCompareChart() {
+    // 둘 다 0이면 비교할 데이터가 없으니 표시 안 함
+    if (_totalBudget <= 0 && _previousBudgetTotal <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    final int maxValue =
+    [_totalBudget, _previousBudgetTotal, 1].reduce((a, b) => a > b ? a : b);
+    final double prevRatio = _previousBudgetTotal / maxValue;
+    final double currRatio = _totalBudget / maxValue;
+
+    final bool increased = _totalBudget >= _previousBudgetTotal;
+    final int diff = (_totalBudget - _previousBudgetTotal).abs();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _C.line),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '저번 달 대비',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: _C.ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(
+                increased
+                    ? Icons.arrow_upward_rounded
+                    : Icons.arrow_downward_rounded,
+                size: 15,
+                color: increased ? _C.red : _C.blue,
+              ),
+              const SizedBox(width: 2),
+              Text(
+                _previousBudgetTotal == 0
+                    ? '저번 달 데이터 없음'
+                    : '${comma(diff)}원 ${increased ? '늘었어요' : '줄었어요'}',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: _C.inkSub,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _buildHBar(
+            label: '이번 달',
+            amount: _totalBudget,
+            ratio: currRatio,
+            color: _C.blue,
+            textColor: _C.blueDeep,
+          ),
+          const SizedBox(height: 14),
+          _buildHBar(
+            label: '저번 달',
+            amount: _previousBudgetTotal,
+            ratio: prevRatio,
+            color: const Color(0xFFD8E3FF),
+            textColor: _C.inkSub,
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 막대 하나 (라벨 + 가로 바 + 금액)
+  Widget _buildHBar({
+    required String label,
+    required int amount,
+    required double ratio,
+    required Color color,
+    required Color textColor,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: _C.inkSub,
+              ),
+            ),
+            Text(
+              '${comma(amount)}원',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: textColor,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              Container(
+                height: 14,
+                width: double.infinity,
+                color: _C.bg,
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOutCubic,
+                height: 14,
+                width: MediaQuery.of(context).size.width *
+                    ratio.clamp(0.03, 1.0) *
+                    0.72, // 카드 패딩 감안한 대략적 비율
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 예산 초과 경고 배너
+  Widget _buildWarningBanner(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12,
+      ),
+      decoration: BoxDecoration(
+        color: _C.redSoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            size: 20,
+            color: _C.red,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: _C.red,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -753,25 +996,31 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   }) {
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(16),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: const Color(0xFFE4E7EC),
+              color: _C.line,
             ),
           ),
           child: Row(
             children: [
-              CircleAvatar(
-                backgroundColor: const Color(0xFFF0FDF4),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: _C.blueSoft,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
                 child: Icon(
                   icon,
-                  color: const Color(0xFF12B76A),
+                  color: _C.blue,
                   size: 20,
                 ),
               ),
@@ -783,7 +1032,8 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                     Text(
                       title,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
+                        color: _C.ink,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -791,23 +1041,26 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
                       subtitle,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF98A2B3),
+                        fontWeight: FontWeight.w500,
+                        color: _C.inkSub,
                       ),
                     ),
                   ],
                 ),
               ),
-              Text(
-                trailingText,
-                style: const TextStyle(
-                  color: Color(0xFF12B76A),
-                  fontWeight: FontWeight.bold,
+              if (trailingText.isNotEmpty) ...[
+                Text(
+                  trailingText,
+                  style: const TextStyle(
+                    color: _C.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
+                const SizedBox(width: 4),
+              ],
               const Icon(
-                Icons.chevron_right,
-                color: Color(0xFF98A2B3),
+                Icons.chevron_right_rounded,
+                color: Color(0xFFB0B8C1),
               ),
             ],
           ),
@@ -820,9 +1073,13 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
   Widget _buildAmountRow({
     required String label,
     required int amount,
-    Color valueColor = const Color(0xFF101828),
+    Color valueColor = _C.ink,
     bool isBold = false,
+    bool isExpense = false,
   }) {
+    // 지출성 항목(고정지출, 구독료)은 금액 앞에 '-' 표시
+    final String prefix = isExpense && amount > 0 ? '-' : '';
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -832,16 +1089,16 @@ class _BudgetSettingScreenState extends State<BudgetSettingScreen> {
             fontSize: 14,
             fontWeight:
             isBold ? FontWeight.bold : FontWeight.normal,
-            color: const Color(0xFF667085),
+            color: _C.inkSub,
           ),
         ),
         Text(
-          '${comma(amount)}원',
+          '$prefix${comma(amount)}원',
           style: TextStyle(
             fontSize: isBold ? 17 : 14,
             fontWeight:
             isBold ? FontWeight.bold : FontWeight.w600,
-            color: valueColor,
+            color: isExpense && amount > 0 ? _C.red : valueColor,
           ),
         ),
       ],
