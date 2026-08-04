@@ -185,10 +185,7 @@ List<String> _keywordCandidates(String normalizedCategory, String normalizedMerc
   addIfMatch(RegExp('여행|숙박|호텔|모텔|에어비앤비'), ['여행']);
   addIfMatch(RegExp('게임|취미|스팀|플스'), ['게임']);
   addIfMatch(RegExp('학원|인강|강의|시험응시료|토익|자격증'), ['학원']);
-  addIfMatch(
-    RegExp('구독|ott|넷플릭스|왓챠|웨이브|디즈니'),
-    ['ott', '구독'],
-  );
+  addIfMatch(RegExp('구독|ott|넷플릭스|왓챠|웨이브|디즈니'), ['ott', '구독'],);
   addIfMatch(RegExp('음원|멜론|지니|스포티파이'), ['음원']);
   addIfMatch(RegExp('통신|휴대폰|핸드폰요금'), ['휴대폰']);
   addIfMatch(RegExp('인터넷|와이파이'), ['인터넷']);
@@ -198,8 +195,33 @@ List<String> _keywordCandidates(String normalizedCategory, String normalizedMerc
   addIfMatch(RegExp('공과금|전기세|수도세|가스비'), ['공과금']);
   addIfMatch(RegExp('경조사|축의금|조의금'), ['경조사']);
   addIfMatch(RegExp('선물'), ['선물']);
+  addIfMatch(RegExp('급여|월급|급여이체|월급이체'), ['정기급여', '급여']);
   // 어떤 키워드에도 안 걸리면 최후 폴백으로 '미분류'류 카테고리를 시도
   result.addAll(['미분류', '기타']);
 
   return result;
+}
+
+/// expense/income/saving 카테고리를 한 번에 묶어서 들고 다니기 위한 값 객체.
+/// draft_mapper와 DraftReviewScreen이 Firestore를 각자 따로 조회하지 않고
+/// 이 객체 하나를 공유해서 쓰도록 하기 위함.
+class AllCategoryOptions {
+  final List<CategoryOption> expense;
+  final List<CategoryOption> income;
+  final List<CategoryOption> saving;
+
+  const AllCategoryOptions({
+    required this.expense,
+    required this.income,
+    required this.saving,
+  });
+}
+
+Future<AllCategoryOptions> loadAllCategoryOptions({required String userId}) async {
+  final List<List<CategoryOption>> results = await Future.wait([
+    loadCategoryOptions(userId: userId, transactionType: 'expense'),
+    loadCategoryOptions(userId: userId, transactionType: 'income'),
+    loadCategoryOptions(userId: userId, transactionType: 'saving'),
+  ]);
+  return AllCategoryOptions(expense: results[0], income: results[1], saving: results[2]);
 }

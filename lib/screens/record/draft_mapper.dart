@@ -15,17 +15,12 @@ import 'parsed_record_draft.dart';
 /// 호출부에서 await 필요.
 Future<List<ParsedRecordDraft>> mapParsedExpensesToDrafts(
     List<ParsedExpense> parsedList, {
-      required String userId,
+      required AllCategoryOptions categories,
     }) async {
   final DateTime now = DateTime.now();
-
-  // transactionType은 3종류뿐이라 항목 개수와 상관없이 딱 3번만 조회한다.
-  final List<CategoryOption> expenseOptions =
-  await loadCategoryOptions(userId: userId, transactionType: 'expense');
-  final List<CategoryOption> incomeOptions =
-  await loadCategoryOptions(userId: userId, transactionType: 'income');
-  final List<CategoryOption> savingOptions =
-  await loadCategoryOptions(userId: userId, transactionType: 'saving');
+  final expenseOptions = categories.expense;
+  final incomeOptions = categories.income;
+  final savingOptions = categories.saving;
 
   String matchedName(List<CategoryOption> options, String? matchedId) {
     if (matchedId == null) return '미분류';
@@ -79,7 +74,7 @@ Future<List<ParsedRecordDraft>> mapParsedExpensesToDrafts(
         memo: displayMemo(item),
         categoryName: matchedName(savingOptions, matchedId),
         amount: item.amount,
-        categoryId: matchedId ?? 'uncategorized',
+        categoryId: matchedId ?? 'deposit',
       );
     } else {
       final String? matchedId = matchCategoryId(

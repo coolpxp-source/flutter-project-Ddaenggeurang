@@ -5,11 +5,13 @@ import '../../models/transaction_type.dart';
 import '../../models/expense_model.dart';
 import '../../models/income_model.dart';
 import '../../models/saving_model.dart';
+import '../../models/emotion_tag_model.dart';
 import '../../services/expense_service.dart';
 import '../../services/income_service.dart';
 import '../../services/saving_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'parsed_record_draft.dart';
+import 'category_matcher.dart';
 
 /// 파싱된 항목들을 확인 · 수정 · 선택해서 일괄 저장하는 공통 화면.
 ///
@@ -18,8 +20,13 @@ import 'parsed_record_draft.dart';
 /// push해서 재사용합니다. (텍스트를 어떻게 모았는지는 여기서 신경 쓰지 않음)
 class DraftReviewScreen extends StatefulWidget {
   final List<ParsedRecordDraft> initialDrafts;
+  final AllCategoryOptions categories;
 
-  const DraftReviewScreen({super.key, required this.initialDrafts});
+  const DraftReviewScreen({
+    super.key,
+    required this.initialDrafts,
+    required this.categories
+  });
 
   @override
   State<DraftReviewScreen> createState() => _DraftReviewScreenState();
@@ -108,6 +115,35 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  final Map<ParsedRecordDraft, TextEditingController> _accountNameControllers = {};
+
+  TextEditingController _accountNameController(ParsedRecordDraft draft) {
+    return _accountNameControllers.putIfAbsent(
+      draft,
+          () => TextEditingController(text: draft.accountName ?? ''),
+    );
+  }
+
+  final Map<ParsedRecordDraft, TextEditingController> _memoControllers = {};
+
+  TextEditingController _memoController(ParsedRecordDraft draft) {
+    return _memoControllers.putIfAbsent(
+      draft,
+          () => TextEditingController(text: draft.memo),
+    );
+  }
+
+  @override
+  void dispose() {
+    for (final c in _accountNameControllers.values) {
+      c.dispose();
+    }
+    for (final c in _memoControllers.values) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   // ─────────────────────── 스타일 헬퍼 ───────────────────────
@@ -218,112 +254,257 @@ class _DraftReviewScreenState extends State<DraftReviewScreen> {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         boxShadow: AppColors.cardShadow,
       ),
-      child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 14),
-        collapsedIconColor: AppColors.inkSub,
-        iconColor: AppColors.expenseDeep,
-        leading: Checkbox(
-          value: draft.isSelected,
-          activeColor: AppColors.expense,
-          onChanged: (v) => setState(() => draft.isSelected = v ?? true),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: typeColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(typeLabel,
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: typeColor)),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => _openEditModal(draft),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: draft.isSelected,
+                  activeColor: AppColors.expense,
+                  onChanged: (v) => setState(() => draft.isSelected = v ?? true),
+                ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: typeColor.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(typeLabel,
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: typeColor)),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text('${draft.memo} · ${draft.categoryName}',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(_formatDate(draft.date),
+                          style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('${draft.amount}원',
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                const SizedBox(width: 2),
+                Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.inkSub.withValues(alpha: 0.5)),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-                child: Text('${draft.memo} · ${draft.categoryName}',
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13.5, color: AppColors.ink))),
-          ],
+          ),
         ),
-        subtitle: Text(_formatDate(draft.date),
-            style: const TextStyle(fontSize: 11.5, color: AppColors.inkSub)),
-        trailing: Text('${draft.amount}원',
-            style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
-        children: [_buildDraftEditor(draft)],
       ),
     );
   }
 
-// TODO(퉁치기 편집 UI 개선): 지금은 지출 성격 칩 / 수입·저축 가짜 카테고리 칩만
-// 있어서 AI가 잘못 뽑은 카테고리를 실제로 못 고침. 특히 변동비 감정태그(emotionTag)는
-// UI 자체가 없어서 항상 null로 저장되는 중 (필수 규칙이 이 경로에서만 안 지켜짐).
-// → 퉁치기 전용 바텀시트로 교체 예정: 대분류/소분류 실제 카테고리 드롭다운 +
-//   변동비일 때만 감정태그 필수 노출 + 수입/저축도 진짜 categoryId 기반으로 교체.
-// 단, 착수 전에 정기결제/구독 메뉴(subscription_add/edit_screen)가 퉁치기 결과와
-// 연결되어 있는지부터 확인 필요.
-  Widget _buildDraftEditor(ParsedRecordDraft draft) {
+  void _openEditModal(ParsedRecordDraft draft) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (modalContext, modalSetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(modalContext).viewInsets.bottom + 20,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE5E8EB),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Text('${draft.amount}원',
+                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                    const SizedBox(height: 2),
+                    Text(_formatDate(draft.date),
+                        style: const TextStyle(fontSize: 12, color: AppColors.inkSub)),
+                    const SizedBox(height: 18),
+
+                    const Text('메모',
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _memoController(draft),
+                      style: const TextStyle(fontSize: 13.5, color: AppColors.ink),
+                      decoration: InputDecoration(
+                        hintText: '메모를 입력하세요',
+                        filled: true,
+                        fillColor: AppColors.bg,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: (v) => draft.memo = v,
+                    ),
+                    const SizedBox(height: 18),
+
+                    _buildDraftEditor(draft, modalSetState),
+
+                    const SizedBox(height: 22),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(modalContext),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.ink,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text('완료', style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    ).then((_) {
+      // 모달 닫힌 뒤 리스트 행의 memo/categoryName 표시를 갱신
+      if (mounted) setState(() {});
+    });
+  }
+
+  Widget _buildDraftEditor(ParsedRecordDraft draft, StateSetter setLocalState) {
     switch (draft.type) {
       case TransactionType.expense:
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: ExpenseNature.values.map((n) {
-            final selected = draft.nature == n;
-            return _draftChip(
-              label: n.label,
-              selected: selected,
-              color: AppColors.expense,
-              onSelected: () => setState(() => draft.nature = n),
-            );
-          }).toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('지출 성격', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6, runSpacing: 6,
+              children: ExpenseNature.values.map((n) {
+                final selected = draft.nature == n;
+                return _draftChip(
+                  label: n.label, selected: selected, color: AppColors.expense,
+                  onSelected: () => setLocalState(() => draft.nature = n),
+                );
+              }).toList(),
+            ),
+            if (draft.nature == ExpenseNature.variable) ...[
+              const SizedBox(height: 14),
+              const Text('감정태그', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6, runSpacing: 6,
+                children: EmotionTag.values.map((tag) {
+                  final selected = draft.emotionTag == tag.code;
+                  return _draftChip(
+                    label: '${tag.emoji} ${tag.label}',
+                    selected: selected,
+                    color: AppColors.expense,
+                    onSelected: () => setLocalState(() => draft.emotionTag = tag.code),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
         );
       case TransactionType.income:
-        const incomeOptions = [
-          ('salary', '월급'),
-          ('freelance', '프리랜서'),
-          ('allowance', '용돈'),
-          ('etc', '기타'),
-        ];
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: incomeOptions.map((o) {
-            final selected = draft.categoryId == o.$1;
-            return _draftChip(
-              label: o.$2,
-              selected: selected,
-              color: AppColors.income,
-              onSelected: () => setState(() => draft.categoryId = o.$1),
-            );
-          }).toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('카테고리', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6, runSpacing: 6,
+              children: widget.categories.income.map((opt) {
+                final selected = draft.categoryId == opt.id;
+                return _draftChip(
+                  label: opt.name, selected: selected, color: AppColors.income,
+                  onSelected: () => setLocalState(() {
+                    draft.categoryId = opt.id;
+                    draft.categoryName = opt.name;
+                  }),
+                );
+              }).toList(),
+            ),
+          ],
         );
       case TransactionType.saving:
-        const savingOptions = [
-          ('housing_subscription', '청약'),
-          ('installment_saving', '적금'),
-          ('deposit', '예금'),
-          ('parking_account', '파킹통장'),
-          ('investment', '투자'),
-        ];
-        return Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: savingOptions.map((o) {
-            final selected = draft.categoryId == o.$1;
-            return _draftChip(
-              label: o.$2,
-              selected: selected,
-              color: AppColors.saving,
-              onSelected: () => setState(() => draft.categoryId = o.$1),
-            );
-          }).toList(),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('계좌명', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _accountNameController(draft),
+              style: const TextStyle(fontSize: 13, color: AppColors.ink),
+              decoration: InputDecoration(
+                hintText: '예: 국민은행 청년희망적금',
+                isDense: true,
+                filled: true,
+                fillColor: AppColors.bg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onChanged: (v) => draft.accountName = v.trim().isEmpty ? null : v.trim(),
+            ),
+            const SizedBox(height: 14),
+            const Text('카테고리', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.ink)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6, runSpacing: 6,
+              children: widget.categories.saving.map((opt) {
+                final selected = draft.categoryId == opt.id;
+                return _draftChip(
+                  label: opt.name, selected: selected, color: AppColors.saving,
+                  onSelected: () => setLocalState(() {
+                    draft.categoryId = opt.id;
+                    draft.categoryName = opt.name;
+                  }),
+                );
+              }).toList(),
+            ),
+          ],
         );
     }
   }

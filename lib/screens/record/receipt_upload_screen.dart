@@ -6,6 +6,7 @@ import '../../utils/app_colors.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import '../../services/ai_service.dart';
 import '../../services/receipt_ocr_service.dart';
+import 'category_matcher.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
 
@@ -85,9 +86,10 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
     setState(() => _isProcessing = true);
     try {
       final parsedList = await _aiService.parseBulkText(_extractedText!);
+      final categories = await loadAllCategoryOptions(userId: currentUser.uid);
       final drafts = await mapParsedExpensesToDrafts(
         parsedList,
-        userId: currentUser.uid,
+        categories: categories,
       );
 
       if (!mounted) return;
@@ -95,7 +97,10 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
 
       final saved = await Navigator.push<bool>(
         context,
-        MaterialPageRoute(builder: (_) => DraftReviewScreen(initialDrafts: drafts)),
+        MaterialPageRoute(builder: (_) => DraftReviewScreen(
+          initialDrafts: drafts,
+          categories: categories,
+        )),
       );
       if (saved == true && mounted) {
         setState(() {
