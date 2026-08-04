@@ -330,7 +330,7 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
                             const SizedBox(height: 4),
                             Text('$_selectedAgeGroup · $_selectedJob 기준',
-                                style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.85))),
+                                style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.85))),
                           ],
                         ),
                       ),
@@ -482,7 +482,7 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -622,7 +622,7 @@ class _PeerCompareScreenState extends State<PeerCompareScreen> {
           value: myValue,
           formattedValue: formattedMy,
           color: barColor,
-          trackColor: barColor.withOpacity(0.12),
+          trackColor: barColor.withValues(alpha: 0.12),
         ),
         const SizedBox(height: 12),
         bar(

@@ -1,4 +1,4 @@
-import 'package:ddaenggeurang/screens/community/My%20activity.dart';
+import 'package:ddaenggeurang/screens/community/my_activity.dart';
 import 'package:ddaenggeurang/screens/community/peer_compare_screen.dart';
 import 'package:ddaenggeurang/screens/community/saving_share_screen.dart';
 import 'package:ddaenggeurang/widgets/common/ddaeng_modal.dart';
@@ -34,7 +34,6 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
 
   static const _green = Color(0xFFFF8A3D);
   static const _greenLight = Color(0xFFFFF0E8);
-  static const _gradientStart = Color(0xFFFFA351);
   static const _gradientEnd = Color(0xFFFF6B1A);
 
   bool _showMarketHint = true;
@@ -140,7 +139,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: _green.withOpacity(0.3),
+                          color: _green.withValues(alpha: 0.3),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -249,7 +248,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 25),
+                  separatorBuilder: (_, _) => const SizedBox(width: 25),
                   itemBuilder: (context, i) {
                     final cat = _categories[i];
                     final selected = cat == _selectedCategory;
@@ -270,7 +269,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                               boxShadow: selected
                                   ? [
                                 BoxShadow(
-                                  color: catColor.withOpacity(0.3),
+                                  color: catColor.withValues(alpha: 0.3),
                                   blurRadius: 10,
                                   offset: const Offset(0, 4),
                                 ),
@@ -357,7 +356,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -531,10 +530,10 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.withOpacity(0.1)),
+          border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: Colors.black.withValues(alpha: 0.03),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -650,11 +649,11 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                 borderRadius: BorderRadius.circular(20),
                 border: isFirst
                     ? Border.all(color: const Color(0xFFFFD700), width: 2)
-                    : Border.all(color: Colors.grey.withOpacity(0.1)),
+                    : Border.all(color: Colors.grey.withValues(alpha: 0.1)),
                 boxShadow: isFirst
                     ? [
                   BoxShadow(
-                    color: const Color(0xFFFFD700).withOpacity(0.3),
+                    color: const Color(0xFFFFD700).withValues(alpha: 0.3),
                     blurRadius: 15,
                     offset: const Offset(0, 8),
                   ),
@@ -689,7 +688,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                     color: badgeColor,
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4, offset: const Offset(0, 2)),
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2)),
                     ],
                   ),
                   child: Text('$rank위',
@@ -727,7 +726,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),

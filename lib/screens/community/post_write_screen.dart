@@ -204,7 +204,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                         color: selected ? colorLight : Colors.white,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: selected ? color.withOpacity(0.4) : Colors.grey[200]!,
+                          color: selected ? color.withValues(alpha: 0.4) : Colors.grey[200]!,
                         ),
                       ),
                       child: Row(
@@ -455,7 +455,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -492,7 +492,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
@@ -541,7 +541,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: _selectedImages.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            separatorBuilder: (_, _) => const SizedBox(width: 8),
                             itemBuilder: (context, index) {
                               return Stack(
                                 children: [
@@ -590,7 +590,7 @@ class _PostWriteScreenState extends State<PostWriteScreen> {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withValues(alpha: 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
