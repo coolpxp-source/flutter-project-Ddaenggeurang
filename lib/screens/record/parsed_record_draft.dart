@@ -5,7 +5,6 @@ class ParsedRecordDraft {
   TransactionType type;
   DateTime date;
 
-  // 💡 기존의 label 대신 memo와 categoryName이 들어옵니다.
   String memo;
   String categoryName;
 
@@ -16,6 +15,17 @@ class ParsedRecordDraft {
   String? emotionTag;
   String? categoryId;
   String? accountName;
+
+  /// 정기결제(지출) / 정기수입(수입)로 등록할지 여부.
+  /// true면 저장 시 RecurringPaymentModel(지출) 또는
+  /// RecurringIncomeTemplate(수입)을 함께 생성한다.
+  bool isRecurring;
+
+  /// 정기결제 주기 — 지출이고 isRecurring일 때만 의미 있음. 'monthly' | 'yearly'
+  String? billingCycle;
+
+  /// 정기수입 매월 입금일 — 수입이고 isRecurring일 때만 의미 있음
+  int? recurringPayDay;
 
   ParsedRecordDraft({
     required this.type,
@@ -28,12 +38,15 @@ class ParsedRecordDraft {
     this.emotionTag,
     this.categoryId,
     this.accountName,
+    this.isRecurring = false,
+    this.billingCycle,
+    this.recurringPayDay,
   });
 
   factory ParsedRecordDraft.expense({
     required DateTime date,
-    required String memo,          // 💡 label 대신 memo 받기
-    required String categoryName,  // 💡 categoryName 받기
+    required String memo,
+    required String categoryName,
     required int amount,
     String categoryId = 'uncategorized',
     required ExpenseNature nature,
