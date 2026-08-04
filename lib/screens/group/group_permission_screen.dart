@@ -4,6 +4,7 @@ import '../../models/group_model.dart';
 import '../../services/group_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/services.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class GroupPermissionScreen extends StatefulWidget {
   const GroupPermissionScreen({
@@ -72,6 +73,7 @@ class _GroupPermissionScreenState
 
       _showMessage(
         e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -82,7 +84,10 @@ class _GroupPermissionScreenState
       String newRole,
       ) async {
     if (member['role'] == 'owner') {
-      _showMessage('그룹장은 권한을 변경할 수 없습니다.');
+      _showMessage(
+        '그룹장은 권한을 변경할 수 없습니다.',
+        type: AppSnackBarType.warning,
+      );
       return;
     }
 
@@ -109,6 +114,7 @@ class _GroupPermissionScreenState
 
       _showMessage(
         '${member['nickname']}님의 권한을 변경했습니다.',
+        type: AppSnackBarType.success,
       );
     } catch (e) {
       if (!mounted) {
@@ -117,6 +123,7 @@ class _GroupPermissionScreenState
 
       _showMessage(
         e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     } finally {
       if (mounted) {
@@ -185,7 +192,10 @@ class _GroupPermissionScreenState
         _hasGroupChanged = true;
       });
 
-      _showMessage('그룹 이름을 변경했습니다.');
+      _showMessage(
+        '그룹 이름을 변경했습니다.',
+        type: AppSnackBarType.success,
+      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -193,6 +203,7 @@ class _GroupPermissionScreenState
 
       _showMessage(
         e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -256,16 +267,20 @@ class _GroupPermissionScreenState
 
       _showMessage(
         e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }
 
-  // 안내 메시지 표시 메서드
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
     );
   }
 
@@ -428,7 +443,10 @@ class _GroupPermissionScreenState
                           return;
                         }
 
-                        _showMessage('초대코드를 복사했습니다.');
+                        _showMessage(
+                          '초대코드를 복사했습니다.',
+                          type: AppSnackBarType.info,
+                        );
                       },
                       borderRadius: BorderRadius.circular(8),
                       child: const Padding(

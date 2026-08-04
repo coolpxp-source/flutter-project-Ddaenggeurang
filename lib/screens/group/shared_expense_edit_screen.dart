@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/shared_expense_model.dart';
 import '../../services/group_service.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class SharedExpenseEditScreen extends StatefulWidget {
   final SharedExpenseModel expense;
@@ -115,13 +116,15 @@ class _SharedExpenseEditScreenState
     if (title.isEmpty) {
       _showMessage(
         '지출 제목을 입력해주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (amountText.isEmpty) {
       _showMessage(
-        '금액을 입력해주세요.',
+        '지출 제목을 입력해주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -132,14 +135,16 @@ class _SharedExpenseEditScreenState
     if (amount == null ||
         amount <= 0) {
       _showMessage(
-        '올바른 금액을 입력해주세요.',
+        '지출 제목을 입력해주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (payer.isEmpty) {
       _showMessage(
-        '결제자를 입력해주세요.',
+        '지출 제목을 입력해주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -179,22 +184,21 @@ class _SharedExpenseEditScreenState
       });
 
       _showMessage(
-        e.toString().replaceFirst(
-          'Exception: ',
-          '',
-        ),
+        e.toString().replaceFirst('Exception: ', ''),
+        type: AppSnackBarType.error,
       );
     }
   }
 
+  // 사용자 안내 스낵바 표시 메서드
   void _showMessage(
-      String message,
-      ) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
     );
   }
 

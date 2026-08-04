@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'psychology_test_result_screen.dart';
 import '../../services/psychology_test_service.dart';
+import '../../widgets/common/app_snack_bar.dart';
 class PsychologyTestProgressScreen extends StatefulWidget {
   const PsychologyTestProgressScreen({super.key});
 
@@ -17,6 +18,18 @@ class _PsychologyTestProgressScreenState
   final PsychologyTestService _psychologyTestService =
   PsychologyTestService();
   bool _isSavingResult = false;
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+      bottomMargin: 110,
+    );
+  }
 
   final List<Map<String, dynamic>> _questions = [
     {
@@ -239,10 +252,9 @@ class _PsychologyTestProgressScreenState
 
   void _goToNextQuestion() {
     if (_selectedOptionIndex == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('답변을 선택해 주세요.'),
-        ),
+      _showMessage(
+        '답변을 선택해 주세요.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -329,10 +341,17 @@ class _PsychologyTestProgressScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('테스트 결과 저장에 실패했습니다: $e'),
-        ),
+      debugPrint('소비심리 테스트 결과 저장 실패: $e');
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message.isEmpty
+            ? '테스트 결과 저장에 실패했습니다.'
+            : message,
+        type: AppSnackBarType.error,
       );
     } finally {
       if (mounted) {

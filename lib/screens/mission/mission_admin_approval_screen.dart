@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/mission_service.dart';
+import '../../widgets/common/app_snack_bar.dart';
+
 
 class MissionAdminApprovalScreen extends StatefulWidget {
   const MissionAdminApprovalScreen({super.key});
@@ -16,6 +18,17 @@ class _MissionAdminApprovalScreenState
 
   bool _isLoading = true;
   List<Map<String, dynamic>> _pendingProofs = [];
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
 
   void _showProofImage(
       String imageUrl,
@@ -82,6 +95,7 @@ class _MissionAdminApprovalScreenState
     _loadPendingProofs();
   }
 
+  // 승인 대기 중인 미션 인증 목록 조회 메서드
   Future<void> _loadPendingProofs() async {
     try {
       final proofs =
@@ -104,12 +118,11 @@ class _MissionAdminApprovalScreenState
         _isLoading = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '승인 대기 목록을 불러오지 못했습니다: $e',
-          ),
-        ),
+      debugPrint('승인 대기 목록 조회 실패: $e');
+
+      _showMessage(
+        '승인 대기 목록을 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
       );
     }
   }
@@ -154,48 +167,55 @@ class _MissionAdminApprovalScreenState
     );
   }
 
+  // 미션 인증 승인 처리 메서드
   Future<void> _approveProof(
       Map<String, dynamic> proof,
       ) async {
-    final verificationId =
+    final String verificationId =
     proof['id'] as String;
 
-    final success =
-    await _missionService
-        .approveMissionVerification(
-      verificationId,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '미션 인증 승인에 실패했습니다.',
-          ),
-        ),
+    try {
+      final bool success =
+      await _missionService.approveMissionVerification(
+        verificationId,
       );
 
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _pendingProofs.removeWhere(
-            (item) =>
-        item['id'] == verificationId,
+      if (!success) {
+        _showMessage(
+          '미션 인증 승인에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _pendingProofs.removeWhere(
+              (item) => item['id'] == verificationId,
+        );
+      });
+
+      _showMessage(
+        '미션 인증을 승인했습니다.',
+        type: AppSnackBarType.success,
       );
-    });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '미션 인증을 승인했습니다.',
-        ),
-      ),
-    );
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
   Future<void> _showRejectDialog(
@@ -274,6 +294,19 @@ class _MissionAdminApprovalScreenState
                 reasonController.text.trim();
 
                 if (reason.isEmpty) {
+                  Navigator.pop(dialogContext);
+
+                  Future.microtask(() {
+                    if (!mounted) {
+                      return;
+                    }
+
+                    _showMessage(
+                      '반려 사유를 입력해 주세요.',
+                      type: AppSnackBarType.warning,
+                    );
+                  });
+
                   return;
                 }
 
@@ -305,42 +338,49 @@ class _MissionAdminApprovalScreenState
       return;
     }
 
-    final success =
-    await _missionService
-        .rejectMissionVerification(
-      verificationId: proof['id'] as String,
-      reason: rejectReason,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '미션 인증 반려에 실패했습니다.',
-          ),
-        ),
+    try {
+      final bool success =
+      await _missionService.rejectMissionVerification(
+        verificationId: proof['id'] as String,
+        reason: rejectReason,
       );
 
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _pendingProofs.removeWhere(
-            (item) => item['id'] == proof['id'],
+      if (!success) {
+        _showMessage(
+          '미션 인증 반려에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      setState(() {
+        _pendingProofs.removeWhere(
+              (item) => item['id'] == proof['id'],
+        );
+      });
+
+      _showMessage(
+        '미션 인증을 반려했습니다.',
+        type: AppSnackBarType.success,
       );
-    });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          '미션 인증을 반려했습니다.',
-        ),
-      ),
-    );
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
   Widget _buildProofCard(Map<String, dynamic> proof) {

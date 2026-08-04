@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/avatar_item_model.dart';
 import '../../services/avatar_service.dart';
 import '../../widgets/avatar/avatar_item_card.dart';
+import '../../widgets/common/app_snack_bar.dart';
 
 class PointShopScreen extends StatefulWidget {
   const PointShopScreen({super.key});
@@ -13,6 +14,18 @@ class PointShopScreen extends StatefulWidget {
 
 class _PointShopScreenState extends State<PointShopScreen> {
   final AvatarService _avatarService = AvatarService.instance;
+
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
 
   final List<String> _slots = [
     'hair',
@@ -167,37 +180,54 @@ class _PointShopScreenState extends State<PointShopScreen> {
 
   // 아바타 상점 데이터 조회 메서드
   Future<void> _loadShop() async {
-    final results = await Future.wait([
-      _avatarService.getPoints(),
-      _avatarService.getLevel(),
-      _avatarService.getItems(),
-    ]);
+    try {
+      final List<dynamic> results = await Future.wait([
+        _avatarService.getPoints(),
+        _avatarService.getLevel(),
+        _avatarService.getItems(),
+      ]);
 
-    if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-    setState(() {
-      _points = results[0] as int;
-      _userLevel = results[1] as int;
-      _items = results[2] as List<AvatarItem>;
-      _isLoading = false;
-    });
+      setState(() {
+        _points = results[0] as int;
+        _userLevel = results[1] as int;
+        _items = results[2] as List<AvatarItem>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+
+      debugPrint('아바타 상점 데이터 조회 실패: $e');
+
+      _showMessage(
+        '아바타 상점 정보를 불러오지 못했습니다.',
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
   Future<void> _purchaseItem(AvatarItem item) async {
     if (item.isOwned) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('이미 보유 중인 아이템입니다.'),
-        ),
+      _showMessage(
+        '이미 보유 중인 아이템입니다.',
+        type: AppSnackBarType.info,
       );
       return;
     }
 
     if (_points < item.price) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('포인트가 부족합니다.'),
-        ),
+      _showMessage(
+        '포인트가 부족합니다.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
@@ -340,32 +370,52 @@ class _PointShopScreenState extends State<PointShopScreen> {
 
     if (confirmed != true) return;
 
-    final success = await _avatarService.purchaseItem(item.id);
+    try {
+      final bool success =
+      await _avatarService.purchaseItem(item.id);
 
-    if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
-    if (success) {
+      if (!success) {
+        _showMessage(
+          '아이템 구매에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
       setState(() {
         _points -= item.price;
 
-        final index = _items.indexWhere(
+        final int index = _items.indexWhere(
               (avatarItem) => avatarItem.id == item.id,
         );
 
         if (index != -1) {
-          _items[index] = item.copyWith(isOwned: true);
+          _items[index] = item.copyWith(
+            isOwned: true,
+          );
         }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${item.name} 구매 완료!'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          margin: const EdgeInsets.all(16),
-        ),
+      _showMessage(
+        '${item.name} 구매를 완료했습니다.',
+        type: AppSnackBarType.success,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
       );
     }
   }

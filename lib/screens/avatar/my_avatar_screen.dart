@@ -4,6 +4,8 @@ import '../../models/avatar_item_model.dart';
 import '../../services/avatar_service.dart';
 import 'point_shop_screen.dart';
 import '../../widgets/avatar/avatar_layered_character.dart';
+import '../../widgets/common/app_snack_bar.dart';
+
 class MyAvatarScreen extends StatefulWidget {
   const MyAvatarScreen({super.key});
 
@@ -13,6 +15,17 @@ class MyAvatarScreen extends StatefulWidget {
 
 class _MyAvatarScreenState extends State<MyAvatarScreen> {
   final AvatarService _avatarService = AvatarService.instance;
+  // 사용자 안내 스낵바 표시 메서드
+  void _showMessage(
+      String message, {
+        AppSnackBarType type = AppSnackBarType.info,
+      }) {
+    AppSnackBar.show(
+      context,
+      message: message,
+      type: type,
+    );
+  }
 
   final List<String> _slots = [
     'hair',
@@ -86,56 +99,83 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     }
   }
 
+  // 아바타 아이템 선택 처리 메서드
   Future<void> _selectItem(AvatarItem item) async {
-    final isLocked = _level < item.unlockLevel;
+    final bool isLocked = _level < item.unlockLevel;
 
     if (isLocked) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Lv.${item.unlockLevel}부터 사용할 수 있습니다.',
-          ),
-        ),
+      _showMessage(
+        'Lv.${item.unlockLevel}부터 사용할 수 있습니다.',
+        type: AppSnackBarType.warning,
       );
       return;
     }
 
     if (!item.isOwned) {
+      _showMessage(
+        '보유하지 않은 아이템입니다. 포인트 상점으로 이동합니다.',
+        type: AppSnackBarType.info,
+      );
+
       await _openPointShop();
+      return;
+    }
+
+    if (item.isEquipped) {
+      _showMessage(
+        '이미 착용 중인 아이템입니다.',
+        type: AppSnackBarType.info,
+      );
       return;
     }
 
     await _equipItem(item);
   }
 
+  // 아바타 아이템 착용 처리 메서드
   Future<void> _equipItem(AvatarItem item) async {
-    final success = await _avatarService.equipItem(item.id);
+    try {
+      final bool success =
+      await _avatarService.equipItem(item.id);
 
-    if (!mounted) {
-      return;
-    }
+      if (!mounted) {
+        return;
+      }
 
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('아이템 착용에 실패했습니다.'),
-        ),
+      if (!success) {
+        _showMessage(
+          '아이템 착용에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      await _reloadAvatarData();
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '${item.name} 착용을 완료했습니다.',
+        type: AppSnackBarType.success,
       );
-      return;
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
     }
-
-    await _reloadAvatarData();
-
-    if (!mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${item.name} 착용 완료!'),
-      ),
-    );
   }
+
   // 아바타 화면 데이터 새로고침 메서드
   Future<void> _reloadAvatarData() async {
     await _avatarService.initializeDefaultAvatar();
