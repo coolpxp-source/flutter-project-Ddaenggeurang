@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:add_2_calendar/add_2_calendar.dart';
+import 'package:ddaenggeurang/services/consultation_ad_service.dart';
+import 'package:ddaenggeurang/widgets/common/ddaeng_modal.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/user_model.dart';
@@ -56,6 +58,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
   final _emotionService = EmotionSummaryService();
   final _questionCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
+  final _adService = ConsultationAdService();
   final List<_ChatEntry> _messages = [];
 
   UserModel? _user;
@@ -92,6 +95,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
     super.initState();
     _loadUser();
     _loadBudgetContext();
+    _adService.loadAd();
   }
 
   Future<void> _loadBudgetContext() async {
@@ -145,6 +149,7 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
   void dispose() {
     _questionCtrl.dispose();
     _scrollCtrl.dispose();
+    _adService.dispose();
     super.dispose();
   }
 
@@ -242,8 +247,24 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
         children: [
           _RemainingBanner(
             remaining: _service.consultRemaining,
+            adRemaining: _adService.adWatchesRemaining,
             onHistoryTap: () => Navigator.of(context)
                 .push(MaterialPageRoute(builder: (_) => const ConsultHistoryScreen())),
+              onWatchAdTap: () {
+                _adService.showAd(
+                  onRewarded: () {
+                    setState(() => _service.addBonusConsult());
+                  },
+                  onLimitReached: () {
+                    DdaengModal.alert(
+                      context,
+                      title: '오늘 광고 시청 횟수를 다 썼어요',
+                      message: '내일 다시 광고를 보고 상담 횟수를 충전할 수 있어요.',
+                      type: ModalType.warning,
+                    );
+                  },
+                );
+              }
           ),
           _BudgetContextCard(
             loaded: _budgetContextLoaded,
@@ -279,11 +300,19 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
 
 class _RemainingBanner extends StatelessWidget {
   final int remaining;
+  final int adRemaining;
   final VoidCallback onHistoryTap;
-  const _RemainingBanner({required this.remaining, required this.onHistoryTap});
+  final VoidCallback onWatchAdTap;
+  const _RemainingBanner({
+    required this.remaining,
+    required this.adRemaining,
+    required this.onHistoryTap,
+    required this.onWatchAdTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final bool adAvailable = adRemaining > 0;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -294,6 +323,32 @@ class _RemainingBanner extends StatelessWidget {
             child: Text('오늘 남은 상담 $remaining회',
                 style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _accent)),
           ),
+          InkWell( //광고 보기 버튼
+            onTap: onWatchAdTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: 15,
+                      color: adAvailable ? _accent : _inkSub,
+                  ),
+                  SizedBox(width: 3),
+                  Text('광고 보고 +1 ($adRemaining/${ConsultationAdService.maxAdWatchesPerDay})',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: adAvailable ? _accent : _inkSub,
+                      )
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
           InkWell(
             onTap: onHistoryTap,
             borderRadius: BorderRadius.circular(20),
