@@ -131,8 +131,13 @@ String? _brandKeyword(String normalizedMerchant) {
   final List<MapEntry<RegExp, String>> brandPatterns = <MapEntry<RegExp, String>>[
     MapEntry(RegExp('gs25|씨유|\\bcu\\b|세븐일레븐|이마트24'), '편의점'),
     MapEntry(RegExp('스타벅스|이디야|메가커피|투썸|커피빈|빽다방|컴포즈'), '카페'),
-    MapEntry(RegExp('배달의민족|배민|요기요|쿠팡이츠'), '배달'),
-    MapEntry(RegExp('이마트(?!24)|롯데마트|홈플러스|코스트코'), '마트'),
+    MapEntry(RegExp('배달의민족|배민|요기요|쿠팡이츠|우아한형제들|위대한상상|땡겨요|배달특급'), '배달'),
+    MapEntry(RegExp('이마트(?!24)|롯데마트|홈플러스|코스트코|농협|하나로마트|하나로클럽|nh마트|지에스더프레시|gs더프레시|노브랜드'), '마트'),
+    MapEntry(RegExp('티머니|로카모빌리티|이비카드|마이비'), '대중교통'),
+    MapEntry(RegExp('카카오모빌리티|우티|쏘카|그린카'), '택시'),
+    MapEntry(RegExp('넷플릭스|netflix|왓챠|웨이브|디즈니|구글페이먼트|google|apple|애플'), 'ott'),
+    MapEntry(RegExp('무신사|카카오스타일|크로키닷컴|에이블리코퍼레이션'), '의류'),
+    MapEntry(RegExp('네이버파이낸셜|n페이|비바리퍼블리카|토스페이먼츠|당근페이'), '페이'),
     MapEntry(RegExp('올리브영'), '화장품'),
     MapEntry(RegExp('cgv|메가박스|롯데시네마'), '영화'),
     MapEntry(RegExp('넷플릭스|왓챠|웨이브|디즈니'), 'ott'),
@@ -159,14 +164,18 @@ List<String> _keywordCandidates(String normalizedCategory, String normalizedMerc
 
   addIfMatch(RegExp('카페|커피|스타벅스|이디야|메가|투썸|커피빈|빽다방|컴포즈'), ['카페']);
   // 배달 전문 카테고리가 없는 사람은 자연스럽게 '식사'로 넘어가도록 둘 다 후보에 넣음
-  addIfMatch(RegExp('배달|배민|요기요|쿠팡이츠|배달의민족'), ['배달', '식사']);
+  addIfMatch(RegExp('배달|배민|요기요|쿠팡이츠|배달의민족|우아한형제들|위대한상상|땡겨요|배달특급'), ['배달', '식사']);
   // '식비'는 AI가 프롬프트상 매우 자주 쓰는 자유 텍스트라 '식사'와 별도로 반드시 포함
   addIfMatch(
     RegExp('식사|식비|밥|점심|저녁|식당|맛집|파스타|한식|중식|일식|양식|분식|치킨|피자|버거|국밥|김밥|고기'),
     ['식사'],
   );
-  addIfMatch(RegExp('마트|장보기|이마트|롯데마트|홈플러스|코스트코|생필품|생활용품'), ['마트']);
+  addIfMatch(RegExp('마트|장보기|이마트|롯데마트|홈플러스|코스트코|농협|하나로마트|하나로클럽|지에스더프레시|노브랜드|생필품|생활용품'), ['마트']);
   addIfMatch(RegExp('편의점|씨유|gs25|세븐일레븐|이마트24'), ['편의점']);
+  addIfMatch(RegExp('지하철|버스|전철|대중교통|교통카드|교통비|티머니|로카모빌리티'), ['대중교통']);
+  addIfMatch(RegExp('택시|카카오택시|카카오모빌리티|우티|우버|쏘카'), ['택시']);
+  addIfMatch(RegExp('옷|의류|잡화|패션|무신사|지그재그|에이블리|카카오스타일'), ['의류']);
+  addIfMatch(RegExp('구독|ott|넷플릭스|왓챠|웨이브|디즈니|구글페이먼트|google|apple|애플'), ['ott', '구독']);
   addIfMatch(RegExp('지하철|버스|전철|대중교통|교통카드|교통비'), ['대중교통']);
   addIfMatch(RegExp('택시|카카오택시|우버'), ['택시']);
   addIfMatch(RegExp('주유|기름|주유소'), ['주유']);

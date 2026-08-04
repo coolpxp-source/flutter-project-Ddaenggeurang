@@ -8,6 +8,7 @@ import '../../services/ai_service.dart';
 import '../../services/receipt_ocr_service.dart';
 import 'category_matcher.dart';
 import 'draft_mapper.dart';
+import 'point_detector.dart';
 import 'draft_review_screen.dart';
 
 /// "영수증 촬영 업로드" 전용 진입 화면.
@@ -95,12 +96,22 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
 
     setState(() => _isProcessing = true);
     try {
-      final parsedList = await _aiService.parseBulkText(_extractedText!);
+      // 1. DB에서 카테고리를 '먼저' 불러옵니다.
       final categories = await loadAllCategoryOptions(userId: currentUser.uid);
+
+      // 2. 불러온 지출 카테고리 이름들('배달', '야식' 등)만 리스트로 쏙 뽑아냅니다.
+      final userExpenseCategoryNames = categories.expense.map((e) => e.name).toList();
+
+      // 3. 그걸 AI에게 던져주면서 파싱을 시킵니다!
+      final parsedList = await _aiService.parseBulkText(
+        _extractedText!,
+        userCategories: userExpenseCategoryNames,
+      );
       final drafts = await mapParsedExpensesToDrafts(
         parsedList,
         categories: categories,
       );
+      final points = detectPoints(_extractedText!);
 
       if (!mounted) return;
       setState(() => _isProcessing = false);
@@ -110,6 +121,7 @@ class _ReceiptUploadScreenState extends State<ReceiptUploadScreen> {
         MaterialPageRoute(builder: (_) => DraftReviewScreen(
           initialDrafts: drafts,
           categories: categories,
+          detectedPoints: points,
         )),
       );
       if (saved == true && mounted) {

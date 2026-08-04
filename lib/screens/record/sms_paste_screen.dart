@@ -7,6 +7,7 @@ import '../../services/ai_service.dart';
 import 'category_matcher.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
+import 'point_detector.dart';
 
 /// "문자내역 붙여넣기" 전용 진입 화면.
 /// 카드/은행 알림 문자를 복사해서 붙여넣으면 AI 파싱 → 확인 화면으로 진행됩니다.
@@ -60,12 +61,25 @@ class _SmsPasteScreenState extends State<SmsPasteScreen> {
 
     try {
       final text = _textController.text.trim();
-      final parsedList = await _aiService.parseBulkText(text);
+
+      // 1. 카테고리 먼저 로드
       final categories = await loadAllCategoryOptions(userId: currentUser.uid);
+
+      // 2. 유저 커스텀 지출 카테고리 이름만 추출
+      final userExpenseCategoryNames = categories.expense.map((e) => e.name).toList();
+
+      // 3. AI 파싱 시 userCategories 전달
+      final parsedList = await _aiService.parseBulkText(
+        text,
+        userCategories: userExpenseCategoryNames,
+      );
+
       final drafts = await mapParsedExpensesToDrafts(
         parsedList,
         categories: categories,
       );
+
+      final points = detectPoints(_textController.text);
 
       if (!mounted) return;
       setState(() => _isParsing = false);
@@ -73,8 +87,9 @@ class _SmsPasteScreenState extends State<SmsPasteScreen> {
       final saved = await Navigator.push<bool>(
         context,
         MaterialPageRoute(builder: (_) => DraftReviewScreen(
-          initialDrafts: drafts,
-          categories: categories,
+            initialDrafts: drafts,
+            categories: categories,
+            detectedPoints: points // 포인트 전달
         )),
       );
       if (saved == true && mounted) {

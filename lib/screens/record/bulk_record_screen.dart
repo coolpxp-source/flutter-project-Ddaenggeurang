@@ -6,6 +6,7 @@ import '../../services/ai_service.dart';
 import 'category_matcher.dart';
 import 'draft_mapper.dart';
 import 'draft_review_screen.dart';
+import 'point_detector.dart';
 
 /// "한번에 기록하기" 전용 화면.
 /// (영수증 촬영은 receipt_upload_screen, 문자 붙여넣기는 sms_paste_screen으로 분리됨)
@@ -45,12 +46,26 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
 
     try {
       final text = _textController.text.trim();
-      final parsedList = await _aiService.parseBulkText(text);
+
+      // 1. 카테고리 먼저 로드
       final categories = await loadAllCategoryOptions(userId: currentUser.uid);
+
+      // 2. 유저 커스텀 지출 카테고리 이름만 추출
+      final userExpenseCategoryNames = categories.expense.map((e) => e.name).toList();
+
+      // 3. AI 파싱 시 userCategories 전달
+      final parsedList = await _aiService.parseBulkText(
+        text,
+        userCategories: userExpenseCategoryNames,
+      );
+
       final drafts = await mapParsedExpensesToDrafts(
         parsedList,
         categories: categories,
       );
+
+      // 혹시 직접 입력할 때 '포인트 사용'이라고 적을 수도 있으니 일관되게 감지!
+      final points = detectPoints(_textController.text);
 
       if (!mounted) return;
       setState(() => _isParsing = false);
@@ -60,6 +75,7 @@ class _BulkRecordScreenState extends State<BulkRecordScreen> {
         MaterialPageRoute(builder: (_) => DraftReviewScreen(
           initialDrafts: drafts,
           categories: categories,
+          detectedPoints: points, // 포인트 전달
         )),
       );
       if (saved == true && mounted) {

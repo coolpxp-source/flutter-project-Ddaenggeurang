@@ -422,8 +422,15 @@ class AiService {
   }
 
   // ═══════════════ 8) 대량 텍스트 일괄 파싱 (퉁치기 / 한번에 기록하기용) ═══════════════
-  Future<List<ParsedExpense>> parseBulkText(String bulkText) async {
+  Future<List<ParsedExpense>> parseBulkText(String bulkText, {List<String>? userCategories}) async {
     final today = DateTime.now().toIso8601String().substring(0, 10);
+
+    // 유저 카테고리가 있으면 프롬프트 룰을 동적으로 생성
+    final categoryRule = (userCategories != null && userCategories.isNotEmpty)
+        ? '\n13. 현재 사용자가 직접 설정한 카테고리 목록: [${userCategories.join(', ')}]\n'
+        '반드시 이 목록에 있는 단어 중 문맥에 가장 잘 맞는 것을 우선적으로 선택해. '
+        '(예: 배달앱 결제내역인데 목록에 "배달"이 있다면 "식사" 대신 "배달"을 선택할 것)'
+        : '';
 
     final prompt = '''[작업: 대량지출파싱] 오늘 날짜는 $today야. 다음 텍스트를 분석해서 항목별로 분리해줘.
       1. 텍스트의 문맥(샀다, 들어왔다, 이체했다 등)을 파악해서 '지출', '수입', '저축' 중 하나로 분류해.
@@ -438,10 +445,59 @@ class AiService {
       6. 각 항목의 merchant/memo/category는 반드시 그 항목 자신의 문장에 나온
          내용만 담아야 해. 앞뒤에 있는 다른 날짜/다른 항목의 문장 내용을
          섞어서 넣지 마.
-      
+
+      ── 영수증(상품명·단가·수량·금액이 여러 줄 나열된 텍스트)을 만났을 때 ──
+      7. 영수증처럼 상품이 여러 줄 나열돼 있어도 절대로 상품 하나하나를
+         별개 항목으로 쪼개지 마. 영수증 전체를 통틀어 딱 1개의 항목으로만 만들어.
+      8. 영수증에서 실제로 쓸 정보는 딱 2가지, ①상호명(맨 위에 크게 적힌 가게 이름)과
+         ②최종 결제 총액, 이 둘뿐이야. 이 둘을 제외한 나머지 텍스트
+         (상품명, 단가, 수량, 개별 금액, 부가세, 공급가액, 주문합계, 판매총액 세부,
+         거래종류, 거래일시, 승인번호, 카드번호/카드사, 사업자번호, 대표자명,
+         주소, 포인트, 적립/사용, 바코드 숫자 등)는 전부 무시해. 이 문구들이
+         merchant/memo/category/amount 어디에도 절대 들어가면 안 돼.
+      9. amount(최종 총액)를 찾는 순서는 다음과 같아:
+         a) "Total"이라는 영문 라벨이 있으면 그 옆 숫자를 최우선으로 써.
+         b) 없으면 "합계금액", "받을금액", "청구금액" 옆 숫자를 써.
+         c) "부가세", "공급가액", "주문합계 세부내역"처럼 총액보다 작은
+            중간 계산값은 최종 총액이 아니니 amount로 쓰면 안 돼.
+         d) 개별 상품 금액들을 네가 직접 더해서 amount를 만들지 마.
+            (부가세·할인 때문에 오차가 남)
+      10. merchant는 영수증 맨 위 상호명만 짧게 적어. (예: "TOMNTOMS", "농협")
+      11. memo는 영수증일 때는 구매 품목을 적지 말고 merchant와 똑같은
+          상호명을 그대로 적어. (예: merchant가 "TOMNTOMS"면 memo도 "TOMNTOMS")
+      12. category는 반드시 상호명(merchant)을 보고 아래 매핑 중 가장 가까운
+          큰 분류 하나만 적어. 모르면 "미분류"라고 적고, 절대 "교통비"처럼
+          엉뚱한 카테고리를 지어내지 마.
+          - 대형마트/농협/하나로마트/슈퍼 → "마트/장보기"
+          - 편의점(GS25/CU/세븐일레븐/이마트24) → "편의점"
+          - 카페/베이커리 → "카페/디저트"
+          - 음식점/식당 → "식사"
+          - 약국 → "약국", 병원/의원 → "병원"
+          - 그 외 판단이 안 서면 → "미분류"$categoryRule
+
+      ── 영수증 예시 (반드시 이 패턴을 그대로 따라해) ──
+      입력 예시:
+        TOMNTOMS
+        사업자번호:1541600462 대표:강경광
+        상품명 단가 수량 금액
+        카페 아메리카노 4,100 1 4,100
+        >> Tall - 1 -
+        >> 일회용컵으로 - 1 -
+        아이스 카페 아메리카노 4,600 1 4,600
+        >> Tall - 1 -
+        >> 일회용컵으로 - 1 -
+        주문합계 8,600
+        공급가금액 7,818
+        부가세 782
+        Total 8,600
+        거래종류: 현금거래
+        거래일시: 2018-11-01 15:13:48
+      출력 예시(반드시 아래처럼 항목 1개로만, amount는 Total 값 8600으로):
+        [{"date": "2018-11-01", "transactionType": "지출", "amount": 8600, "merchant": "TOMNTOMS", "memo": "TOMNTOMS", "category": "카페/디저트", "type": "변동비"}]
+
       반드시 아래의 JSON 배열 형식으로만 출력해 (다른 말은 절대 금지):
       [{"date": "YYYY-MM-DD", "transactionType": "지출/수입/저축", "amount": 숫자, "merchant": "상호명 또는 장소명", "memo": "구매 내역(없으면 빈 문자열)", "category": "카테고리명", "type": "고정비/변동비"}]
-      
+
       입력텍스트: $bulkText''';
 
     // 로컬 모델이라 실행마다 편차가 있어서, 응답이 중간에 끊긴 것처럼 보이면
@@ -547,10 +603,20 @@ class AiService {
       final String? merchant = j['merchant'] as String?;
       if (amountNum == null || merchant == null) return;
 
+      final String memo = (j['memo'] as String? ?? '').trim();
+
+      // 방어 코드: 프롬프트를 지켰어도 로컬 모델 특성상 가끔
+      // "부가세", "거래종류: 현금거래" 같은 영수증 세부 라벨을 통째로
+      // merchant/memo로 뱉는 경우가 있어서, 그런 항목은 아예 버린다.
+      if (_looksLikeReceiptNoise(merchant) || _looksLikeReceiptNoise(memo)) {
+        debugPrint('[대량파싱] 영수증 노이즈로 판단해 항목 제외: merchant="$merchant" memo="$memo"');
+        return;
+      }
+
       result.add(ParsedExpense(
         amount: amountNum.toInt(),
         merchant: merchant,
-        memo: (j['memo'] as String? ?? '').trim(),
+        memo: memo,
         category: j['category'] as String? ?? '미분류',
         type: j['type'] as String? ?? '변동비',
         date: j['date'] as String?,
@@ -559,6 +625,30 @@ class AiService {
     } catch (_) {
       // 이 객체 하나만 깨진 것뿐이니 나머지 항목은 계속 시도한다
     }
+  }
+
+  /// 영수증에서 상품/총액이 아니라 세부 계산 항목·거래 메타정보가
+  /// merchant나 memo로 잘못 들어온 경우를 감지한다.
+  static final RegExp _receiptNoisePattern = RegExp(
+    r'부가세|공급가액|공급가금액|주문합계|거래종류|거래일시|승인번호|카드번호|카드사|'
+    r'사업자번호|대표자?\s*[:：]|사용가능포인트|적립포인트|바코드|잔여\s*포인트',
+  );
+
+  bool _looksLikeReceiptNoise(String text) {
+    final t = text.trim();
+    if (t.isEmpty) return false;
+
+    // 1. 기존 영수증 노이즈 검사
+    if (_receiptNoisePattern.hasMatch(t)) {
+      return true;
+    }
+
+    // 2. 고객명(***님) 패턴 검사
+    if (RegExp(r'^[가-힣a-zA-Z\*]+님$').hasMatch(t)) {
+      return true;
+    }
+
+    return false;
   }
 }
 
