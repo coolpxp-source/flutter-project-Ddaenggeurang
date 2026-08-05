@@ -80,6 +80,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
 
   String? _originalRecurringPaymentId;
   String? _lastRecurringPaymentId;
+  String? _originalInstallmentPlanId;
 
   Future<void> _fetchOriginalExpense(String docId) async {
     try {
@@ -102,6 +103,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           _originalRecurringPaymentId = originalExpense.recurringPaymentId;
           _lastRecurringPaymentId = originalExpense.lastRecurringPaymentId ?? originalExpense.recurringPaymentId;
           _isRecurring = _originalRecurringPaymentId != null;
+          _originalInstallmentPlanId = originalExpense.installmentPlanId;
         });
       }
     } catch (e) {
@@ -248,26 +250,59 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         recurringPaymentId = null;
       }
 
-      final newExpense = ExpenseModel(
-        expenseId: widget.editItem != null ? widget.editItem!.id : '',
-        userId: userId,
-        amount: amount,
-        categoryId: _selectedCategoryId!,
-        date: _selectedDate,
-        memo: _memoController.text.trim(),
-        nature: _selectedNature,
-        emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
-        installmentPlanId: _isInstallment ? 'temp_install_id' : null,
-        installmentInstallmentNo: _isInstallment ? 1 : null,
-        installmentTotalMonths: _isInstallment ? _installmentMonths : null,
-        recurringPaymentId: recurringPaymentId,
-        lastRecurringPaymentId: lastRecurringPaymentId,
-      );
+      // 할부 계획 ID 계산 — 이 지출 자기 자신의 문서 ID를 재사용해서
+      // 최소한 서로 다른 할부 구매끼리는 절대 겹치지 않도록 한다.
+      // (TODO: installmentPlans 전용 컬렉션 도입은 별도 확장 과제로 남겨둠 — 지금은 회차/총액 조회 UI가 없어 불필요)
+      String? installmentPlanId = _isInstallment ? _originalInstallmentPlanId : null;
 
       if (widget.editItem == null) {
-        await _expenseService.addExpense(newExpense);
+        // 신규 저장 — expenseId를 아직 몰라서 할부인 경우 저장 후 한 번 더 갱신한다.
+        final newExpense = ExpenseModel(
+          expenseId: '',
+          userId: userId,
+          amount: amount,
+          categoryId: _selectedCategoryId!,
+          date: _selectedDate,
+          memo: _memoController.text.trim(),
+          nature: _selectedNature,
+          emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+          installmentPlanId: null,
+          installmentInstallmentNo: _isInstallment ? 1 : null,
+          installmentTotalMonths: _isInstallment ? _installmentMonths : null,
+          recurringPaymentId: recurringPaymentId,
+          lastRecurringPaymentId: lastRecurringPaymentId,
+        );
+
+        final newExpenseId = await _expenseService.addExpense(newExpense);
+
+        if (_isInstallment && installmentPlanId == null) {
+          installmentPlanId = newExpenseId;
+          await _expenseService.updateExpense(newExpenseId, {
+            'installmentPlanId': installmentPlanId,
+          });
+        }
       } else {
-        await _expenseService.updateExpense(widget.editItem!.id, newExpense.toFirestore());
+        final String? installmentPlanId = _isInstallment
+            ? (_originalInstallmentPlanId ?? widget.editItem!.id)
+            : null;
+
+        final updatedExpense = ExpenseModel(
+          expenseId: widget.editItem!.id,
+          userId: userId,
+          amount: amount,
+          categoryId: _selectedCategoryId!,
+          date: _selectedDate,
+          memo: _memoController.text.trim(),
+          nature: _selectedNature,
+          emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+          installmentPlanId: installmentPlanId,
+          installmentInstallmentNo: _isInstallment ? 1 : null,
+          installmentTotalMonths: _isInstallment ? _installmentMonths : null,
+          recurringPaymentId: recurringPaymentId,
+          lastRecurringPaymentId: lastRecurringPaymentId,
+        );
+
+        await _expenseService.updateExpense(widget.editItem!.id, updatedExpense.toFirestore());
       }
 
       if (!mounted) return;
