@@ -61,18 +61,41 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     });
   }
 
+  String? _originalRecurringPaymentId;
+  String? _lastRecurringPaymentId;
+
   Future<void> _fetchOriginalIncome(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('incomes').doc(docId).get();
-      if (doc.exists && mounted) {
-        final original = IncomeModel.fromFirestore(doc);
-        setState(() {
-          _isRecurring = original.recurringIncomeTemplateId != null;
-          if (original.recurringPayDay != null) {
-            _payDay = original.recurringPayDay!;
-          }
-        });
+      if (!doc.exists || !mounted) return;
+
+      final original = IncomeModel.fromFirestore(doc);
+      final String? lastId =
+          original.lastRecurringIncomeTemplateId ?? original.recurringIncomeTemplateId;
+
+      int? restoredPayDay = original.recurringPayDay;
+
+      // 꺼져있는 상태(recurringIncomeTemplateId == null)라도 lastId가 있으면
+      // 그 템플릿 문서에서 payDay를 직접 읽어와 되살릴 값으로 미리 채워둔다.
+      if (original.recurringIncomeTemplateId == null && lastId != null) {
+        final templateDoc = await FirebaseFirestore.instance
+            .collection('recurringIncomeTemplates')
+            .doc(lastId)
+            .get();
+        if (templateDoc.exists) {
+          restoredPayDay = (templateDoc.data()?['payDay'] as num?)?.toInt();
+        }
       }
+
+      if (!mounted) return;
+      setState(() {
+        _originalRecurringPaymentId = original.recurringIncomeTemplateId;
+        _lastRecurringPaymentId = lastId;
+        _isRecurring = _originalRecurringPaymentId != null;
+        if (restoredPayDay != null) {
+          _payDay = restoredPayDay!;
+        }
+      });
     } catch (e) {
       debugPrint('원본 수입 내역 로드 실패: $e');
     }
@@ -140,9 +163,62 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       return;
     }
 
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await DdaengModal.alert(
+        context,
+        title: '로그인이 필요해요',
+        message: '로그인 후 다시 시도해 주세요.',
+        type: ModalType.warning,
+      );
+      return;
+    }
+
     try {
-      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
-      final String? recurringTemplateId = _isRecurring ? 'temp_recurring_income_id' : null;
+      final String userId = currentUser.uid;
+
+      String? recurringTemplateId = _originalRecurringPaymentId;
+      String? lastRecurringTemplateId = _lastRecurringPaymentId;
+
+      if (_isRecurring) {
+        if (recurringTemplateId != null) {
+          await _incomeService.updateRecurringTemplate(recurringTemplateId, {
+            'amount': _currentAmount,
+            'categoryId': _selectedCategoryId!,
+            'payDay': _payDay,
+            'memo': _memoController.text.trim(),
+          });
+        } else if (lastRecurringTemplateId != null) {
+          // 🔁 되살리기 — startDate는 건드리지 않아 원래 시작일 그대로 유지,
+          // payDay는 위에서 이미 복구해둔 값을 그대로 다시 저장
+          await _incomeService.updateRecurringTemplate(lastRecurringTemplateId, {
+            'isDeleted': false,
+            'deletedAt': null,
+            'isActive': true,
+            'amount': _currentAmount,
+            'categoryId': _selectedCategoryId!,
+            'payDay': _payDay,
+            'memo': _memoController.text.trim(),
+          });
+          recurringTemplateId = lastRecurringTemplateId;
+        } else {
+          recurringTemplateId = await _incomeService.addRecurringTemplate(
+            RecurringIncomeTemplate(
+              recurringIncomeTemplateId: '',
+              userId: userId,
+              categoryId: _selectedCategoryId!,
+              amount: _currentAmount,
+              payDay: _payDay,
+              startDate: _selectedDate,
+              memo: _memoController.text.trim(),
+            ),
+          );
+        }
+        lastRecurringTemplateId = recurringTemplateId;
+      } else if (recurringTemplateId != null) {
+        await _incomeService.deleteRecurringTemplate(recurringTemplateId);
+        recurringTemplateId = null;
+      }
 
       final newIncome = IncomeModel(
         incomeId: widget.editItem != null ? widget.editItem!.id : '',
@@ -152,6 +228,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         date: _selectedDate,
         memo: _memoController.text,
         recurringIncomeTemplateId: recurringTemplateId,
+        lastRecurringIncomeTemplateId: lastRecurringTemplateId,
         recurringPayDay: _isRecurring ? _payDay : null,
       );
 

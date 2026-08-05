@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../models/recurring_payment_model.dart';
+import '../../services/recurring_payment_service.dart';
 import '../../utils/app_colors.dart';
 import '../../models/expense_model.dart';
 import '../../services/expense_service.dart';
@@ -76,6 +78,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }
   }
 
+  String? _originalRecurringPaymentId;
+  String? _lastRecurringPaymentId;
+
   Future<void> _fetchOriginalExpense(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('expenses').doc(docId).get();
@@ -94,7 +99,9 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           if (_isInstallment && originalExpense.installmentTotalMonths != null) {
             _installmentMonths = originalExpense.installmentTotalMonths!;
           }
-          _isRecurring = originalExpense.recurringPaymentId != null;
+          _originalRecurringPaymentId = originalExpense.recurringPaymentId;
+          _lastRecurringPaymentId = originalExpense.lastRecurringPaymentId ?? originalExpense.recurringPaymentId;
+          _isRecurring = _originalRecurringPaymentId != null;
         });
       }
     } catch (e) {
@@ -198,6 +205,49 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     try {
       final String userId = currentUser.uid;
 
+      String? recurringPaymentId = _originalRecurringPaymentId;
+      String? lastRecurringPaymentId = _lastRecurringPaymentId;
+      final recurringService = RecurringPaymentService();
+
+      if (_isRecurring) {
+        if (recurringPaymentId != null) {
+          // 이미 활성 상태 — 최신 정보만 갱신
+          await recurringService.updateRecurringPayment(recurringPaymentId, {
+            'name': _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+            'amount': amount,
+            'categoryId': _selectedCategoryId!,
+          });
+        } else if (lastRecurringPaymentId != null) {
+          // 되살리기 — nextBillingDate는 건드리지 않아 기존 청구일 그대로 유지
+          await recurringService.updateRecurringPayment(lastRecurringPaymentId, {
+            'isDeleted': false,
+            'deletedAt': null,
+            'name': _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+            'amount': amount,
+            'categoryId': _selectedCategoryId!,
+          });
+          recurringPaymentId = lastRecurringPaymentId;
+        } else {
+          // 완전 신규 생성
+          final nextBillingDate = DateTime(_selectedDate.year, _selectedDate.month + 1, _selectedDate.day);
+          recurringPaymentId = await recurringService.addRecurringPayment(
+            RecurringPaymentModel(
+              recurringPaymentId: '',
+              userId: userId,
+              name: _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+              amount: amount,
+              billingCycle: BillingCycle.monthly,
+              nextBillingDate: nextBillingDate,
+              categoryId: _selectedCategoryId!,
+            ),
+          );
+        }
+        lastRecurringPaymentId = recurringPaymentId;
+      } else if (recurringPaymentId != null) {
+        await recurringService.deleteRecurringPayment(recurringPaymentId);
+        recurringPaymentId = null;
+      }
+
       final newExpense = ExpenseModel(
         expenseId: widget.editItem != null ? widget.editItem!.id : '',
         userId: userId,
@@ -210,9 +260,8 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
         installmentPlanId: _isInstallment ? 'temp_install_id' : null,
         installmentInstallmentNo: _isInstallment ? 1 : null,
         installmentTotalMonths: _isInstallment ? _installmentMonths : null,
-        // 할부(installmentPlanId)와 동일한 성격의 단순 플래그.
-        // 실제 구독 컬렉션과는 연결하지 않는다 (구독관리는 별개 기능).
-        recurringPaymentId: _isRecurring ? 'recurring' : null,
+        recurringPaymentId: recurringPaymentId,
+        lastRecurringPaymentId: lastRecurringPaymentId,
       );
 
       if (widget.editItem == null) {
