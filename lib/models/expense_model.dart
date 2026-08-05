@@ -63,6 +63,11 @@ class ExpenseModel {
   /// 정기결제에서 자동 생성된 경우 원본 정기결제 ID
   final String? recurringPaymentId;
 
+  /// 한 번이라도 정기결제로 연결된 적 있다면 계속 보존되는 ID.
+  /// (recurringPaymentId는 껐다 켰다에 따라 null이 되지만, 이건 남아서
+  /// "되살리기"를 할 때 어떤 문서를 되살릴지 찾는 용도로 쓴다)
+  final String? lastRecurringPaymentId;
+
   /// 자동 생성 금액을 사용자가 수정했는지 여부
   final bool isAmountAdjusted;
 
@@ -92,6 +97,7 @@ class ExpenseModel {
     this.installmentInstallmentNo,
     this.installmentTotalMonths,
     this.recurringPaymentId,
+    this.lastRecurringPaymentId,
     this.isAmountAdjusted = false,
     this.isDeleted = false,
     this.deletedAt,
@@ -127,6 +133,7 @@ class ExpenseModel {
       installmentInstallmentNo: (data['installmentInstallmentNo'] as num?)?.toInt(),
       installmentTotalMonths: (data['installmentTotalMonths'] as num?)?.toInt(),
       recurringPaymentId: data['recurringPaymentId'] as String?,
+      lastRecurringPaymentId: data['lastRecurringPaymentId'] as String?,
       isAmountAdjusted: data['isAmountAdjusted'] == true,
       isDeleted: data['isDeleted'] == true,
       deletedAt: _timestampToDateTime(data['deletedAt']),
@@ -150,6 +157,7 @@ class ExpenseModel {
       'installmentInstallmentNo': installmentInstallmentNo,
       'installmentTotalMonths': installmentTotalMonths,
       'recurringPaymentId': recurringPaymentId,
+      'lastRecurringPaymentId': lastRecurringPaymentId,
       'isAmountAdjusted': isAmountAdjusted,
       'isDeleted': isDeleted,
       'deletedAt': deletedAt == null ? null : Timestamp.fromDate(deletedAt!),
@@ -174,6 +182,7 @@ class ExpenseModel {
     int? installmentInstallmentNo,
     int? installmentTotalMonths,
     String? recurringPaymentId,
+    String? lastRecurringPaymentId,
     bool? isAmountAdjusted,
     bool? isDeleted,
     DateTime? deletedAt,
@@ -194,6 +203,7 @@ class ExpenseModel {
       installmentInstallmentNo: installmentInstallmentNo ?? this.installmentInstallmentNo,
       installmentTotalMonths: installmentTotalMonths ?? this.installmentTotalMonths,
       recurringPaymentId: recurringPaymentId ?? this.recurringPaymentId,
+      lastRecurringPaymentId: lastRecurringPaymentId ?? this.lastRecurringPaymentId,
       isAmountAdjusted: isAmountAdjusted ?? this.isAmountAdjusted,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,

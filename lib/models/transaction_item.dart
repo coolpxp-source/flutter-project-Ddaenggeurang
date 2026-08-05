@@ -37,6 +37,7 @@ class TransactionItem {
   // 활성 상태인지는 알 수 없어서, 상세 화면에서 실시간으로 조회하는 데 씀.
   final TransactionInvestmentDetail? investmentDetail; // 투자 상세 — 저축만 해당
   final int? returnedAmount;    // 만기/해지/매도 시 최종 환급 금액 — 저축만 해당
+  final String? categoryId;
 
   TransactionItem({
     required this.id,
@@ -57,5 +58,6 @@ class TransactionItem {
     this.recurringPaymentId,
     this.investmentDetail,
     this.returnedAmount,
+    this.categoryId,
   });
 }

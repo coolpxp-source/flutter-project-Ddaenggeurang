@@ -81,6 +81,7 @@ class TransactionService {
       installmentTotalMonths: expense.installmentTotalMonths,
       isRecurring: expense.recurringPaymentId != null,
       recurringPaymentId: expense.recurringPaymentId,
+      categoryId: expense.categoryId,
     );
   }
 
@@ -95,6 +96,7 @@ class TransactionService {
       parentCategory: _categoryParent(categoryMeta, income.categoryId),
       isRecurring: income.recurringIncomeTemplateId != null,
       recurringPayDay: income.recurringPayDay,
+      categoryId: income.categoryId,
     );
   }
 
@@ -112,6 +114,7 @@ class TransactionService {
       isRecurring: saving.isRecurring,
       investmentDetail: _mapInvestmentDetail(saving.investmentDetail),
       returnedAmount: saving.returnedAmount,
+      categoryId: saving.categoryId,
     );
   }
 

@@ -11,6 +11,7 @@ class IncomeModel {
   final DateTime date;
   final String? memo;
   final String? recurringIncomeTemplateId;
+  final String? lastRecurringIncomeTemplateId;
 
   /// 정기수입일 때 매달 입금되는 날짜 (예: 25일 → 25). recurringIncomeTemplateId가 있을 때만 의미 있음
   final int? recurringPayDay;
@@ -26,6 +27,7 @@ class IncomeModel {
     required this.date,
     this.memo,
     this.recurringIncomeTemplateId,
+    this.lastRecurringIncomeTemplateId,
     this.recurringPayDay,
     this.isDeleted = false,
     this.deletedAt,
@@ -47,6 +49,7 @@ class IncomeModel {
       date: (d['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       memo: d['memo'] as String?,
       recurringIncomeTemplateId: d['recurringIncomeTemplateId'] as String?,
+      lastRecurringIncomeTemplateId: d['lastRecurringIncomeTemplateId'] as String?,
       recurringPayDay: (d['recurringPayDay'] as num?)?.toInt(),
       isDeleted: d['isDeleted'] ?? false,
       deletedAt: (d['deletedAt'] as Timestamp?)?.toDate(),
@@ -62,6 +65,7 @@ class IncomeModel {
     'memo': memo,
     'recurringIncomeTemplateId': recurringIncomeTemplateId,
     'recurringPayDay': recurringPayDay,
+    'lastRecurringIncomeTemplateId': lastRecurringIncomeTemplateId,
     'isDeleted': isDeleted,
     'deletedAt': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
     'createdAt': createdAt != null
@@ -73,26 +77,29 @@ class IncomeModel {
     String? incomeId,
     String? userId,
     int? amount,
-    String? categoryId, // 변경
+    String? categoryId,
     DateTime? date,
     String? memo,
     String? recurringIncomeTemplateId,
+    String? lastRecurringIncomeTemplateId,
     int? recurringPayDay,
     bool? isDeleted,
     DateTime? deletedAt,
+    DateTime? createdAt,
   }) {
     return IncomeModel(
         incomeId: incomeId ?? this.incomeId,
         userId: userId ?? this.userId,
         amount: amount ?? this.amount,
-        categoryId: categoryId ?? this.categoryId, // 변경
+        categoryId: categoryId ?? this.categoryId,
         date: date ?? this.date,
         memo: memo ?? this.memo,
         recurringIncomeTemplateId: recurringIncomeTemplateId ?? this.recurringIncomeTemplateId,
+        lastRecurringIncomeTemplateId: lastRecurringIncomeTemplateId ?? this.lastRecurringIncomeTemplateId,
         recurringPayDay: recurringPayDay ?? this.recurringPayDay,
         isDeleted: isDeleted ?? this.isDeleted,
         deletedAt: deletedAt ?? this.deletedAt,
-        createdAt: createdAt
+        createdAt: createdAt ?? this.createdAt,
     );
   }
 }
@@ -114,7 +121,7 @@ class RecurringIncomeTemplate {
   RecurringIncomeTemplate({
     required this.recurringIncomeTemplateId,
     required this.userId,
-    required this.categoryId, // 변경
+    required this.categoryId,
     required this.amount,
     required this.payDay,
     this.isActive = true,
@@ -130,7 +137,7 @@ class RecurringIncomeTemplate {
     return RecurringIncomeTemplate(
       recurringIncomeTemplateId: doc.id,
       userId: d['userId'] ?? '',
-      categoryId: d['categoryId'] ?? '', // 변경
+      categoryId: d['categoryId'] ?? '',
       amount: (d['amount'] as num?)?.toInt() ?? 0,
       payDay: (d['payDay'] as num?)?.toInt() ?? 1,
       isActive: d['isActive'] ?? true,
@@ -144,7 +151,7 @@ class RecurringIncomeTemplate {
 
   Map<String, dynamic> toFirestore() => {
     'userId': userId.trim(),
-    'categoryId': categoryId, // 변경
+    'categoryId': categoryId,
     'amount': amount,
     'payDay': payDay,
     'isActive': isActive,
@@ -159,7 +166,7 @@ class RecurringIncomeTemplate {
 
   RecurringIncomeTemplate copyWith({
     String? userId,
-    String? categoryId, // 변경
+    String? categoryId,
     int? amount,
     int? payDay,
     bool? isActive,
@@ -167,10 +174,11 @@ class RecurringIncomeTemplate {
     String? memo,
     bool? isDeleted,
     DateTime? deletedAt,
+    DateTime? createdAt,
   }) {
     return RecurringIncomeTemplate(
       recurringIncomeTemplateId: recurringIncomeTemplateId,
-      categoryId: categoryId ?? this.categoryId, // 변경
+      categoryId: categoryId ?? this.categoryId,
       amount: amount ?? this.amount,
       payDay: payDay ?? this.payDay,
       isActive: isActive ?? this.isActive,
@@ -178,7 +186,7 @@ class RecurringIncomeTemplate {
       memo: memo ?? this.memo,
       isDeleted: isDeleted ?? this.isDeleted,
       deletedAt: deletedAt ?? this.deletedAt,
-      createdAt: createdAt,
+      createdAt: createdAt ?? this.createdAt,
       userId: userId ?? this.userId.trim(),
     );
   }

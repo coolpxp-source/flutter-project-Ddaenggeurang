@@ -40,6 +40,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   bool _isRecurring = false;
   int _payDay = 1;
   int _currentAmount = 0;
+  bool _categoryMatchFailed = false;
 
   @override
   void initState() {
@@ -61,18 +62,41 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
     });
   }
 
+  String? _originalRecurringPaymentId;
+  String? _lastRecurringPaymentId;
+
   Future<void> _fetchOriginalIncome(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('incomes').doc(docId).get();
-      if (doc.exists && mounted) {
-        final original = IncomeModel.fromFirestore(doc);
-        setState(() {
-          _isRecurring = original.recurringIncomeTemplateId != null;
-          if (original.recurringPayDay != null) {
-            _payDay = original.recurringPayDay!;
-          }
-        });
+      if (!doc.exists || !mounted) return;
+
+      final original = IncomeModel.fromFirestore(doc);
+      final String? lastId =
+          original.lastRecurringIncomeTemplateId ?? original.recurringIncomeTemplateId;
+
+      int? restoredPayDay = original.recurringPayDay;
+
+      // 꺼져있는 상태(recurringIncomeTemplateId == null)라도 lastId가 있으면
+      // 그 템플릿 문서에서 payDay를 직접 읽어와 되살릴 값으로 미리 채워둔다.
+      if (original.recurringIncomeTemplateId == null && lastId != null) {
+        final templateDoc = await FirebaseFirestore.instance
+            .collection('recurringIncomeTemplates')
+            .doc(lastId)
+            .get();
+        if (templateDoc.exists) {
+          restoredPayDay = (templateDoc.data()?['payDay'] as num?)?.toInt();
+        }
       }
+
+      if (!mounted) return;
+      setState(() {
+        _originalRecurringPaymentId = original.recurringIncomeTemplateId;
+        _lastRecurringPaymentId = lastId;
+        _isRecurring = _originalRecurringPaymentId != null;
+        if (restoredPayDay != null) {
+          _payDay = restoredPayDay!;
+        }
+      });
     } catch (e) {
       debugPrint('원본 수입 내역 로드 실패: $e');
     }
@@ -86,7 +110,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   }
 
   Future<void> _loadCategories() async {
-    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+    final String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      setState(() => _isLoadingCategories = false);
+      return;
+    }
     try {
       final db = FirebaseFirestore.instance;
       final defaultSnap = await db.collection('categories').where('transactionType', isEqualTo: 'income').get();
@@ -115,13 +143,17 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         _isLoadingCategories = false;
 
         if (widget.editItem != null && _incomeCategories.isNotEmpty) {
-          final matched = _incomeCategories.firstWhere(
-                (c) => c['name'] == widget.editItem!.title,
-            orElse: () => _incomeCategories.first,
-          );
-          _selectedCategoryId = matched['id'];
-          _selectedCategoryName = matched['name'];
-          _selectedParentCategory = matched['parentName']?.toString() ?? matched['parent']?.toString() ?? '미분류';
+          final matches = _incomeCategories.where((c) => c['id'] == widget.editItem!.categoryId).toList();
+          if (matches.isNotEmpty) {
+            final matched = matches.first;
+            _selectedCategoryId = matched['id'];
+            _selectedCategoryName = matched['name'];
+            _selectedParentCategory = matched['parentName']?.toString() ?? matched['parent']?.toString() ?? '미분류';
+          } else {
+            // 매칭되는 카테고리가 없으면(삭제·이름변경 등) 엉뚱한 카테고리로
+            // 조용히 대체하지 않고, 사용자가 직접 다시 선택하도록 비워둠
+            _categoryMatchFailed = true;
+          }
         }
       });
     } catch (e) {
@@ -140,9 +172,62 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       return;
     }
 
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await DdaengModal.alert(
+        context,
+        title: '로그인이 필요해요',
+        message: '로그인 후 다시 시도해 주세요.',
+        type: ModalType.warning,
+      );
+      return;
+    }
+
     try {
-      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
-      final String? recurringTemplateId = _isRecurring ? 'temp_recurring_income_id' : null;
+      final String userId = currentUser.uid;
+
+      String? recurringTemplateId = _originalRecurringPaymentId;
+      String? lastRecurringTemplateId = _lastRecurringPaymentId;
+
+      if (_isRecurring) {
+        if (recurringTemplateId != null) {
+          await _incomeService.updateRecurringTemplate(recurringTemplateId, {
+            'amount': _currentAmount,
+            'categoryId': _selectedCategoryId!,
+            'payDay': _payDay,
+            'memo': _memoController.text.trim(),
+          });
+        } else if (lastRecurringTemplateId != null) {
+          // 🔁 되살리기 — startDate는 건드리지 않아 원래 시작일 그대로 유지,
+          // payDay는 위에서 이미 복구해둔 값을 그대로 다시 저장
+          await _incomeService.updateRecurringTemplate(lastRecurringTemplateId, {
+            'isDeleted': false,
+            'deletedAt': null,
+            'isActive': true,
+            'amount': _currentAmount,
+            'categoryId': _selectedCategoryId!,
+            'payDay': _payDay,
+            'memo': _memoController.text.trim(),
+          });
+          recurringTemplateId = lastRecurringTemplateId;
+        } else {
+          recurringTemplateId = await _incomeService.addRecurringTemplate(
+            RecurringIncomeTemplate(
+              recurringIncomeTemplateId: '',
+              userId: userId,
+              categoryId: _selectedCategoryId!,
+              amount: _currentAmount,
+              payDay: _payDay,
+              startDate: _selectedDate,
+              memo: _memoController.text.trim(),
+            ),
+          );
+        }
+        lastRecurringTemplateId = recurringTemplateId;
+      } else if (recurringTemplateId != null) {
+        await _incomeService.deleteRecurringTemplate(recurringTemplateId);
+        recurringTemplateId = null;
+      }
 
       final newIncome = IncomeModel(
         incomeId: widget.editItem != null ? widget.editItem!.id : '',
@@ -152,6 +237,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         date: _selectedDate,
         memo: _memoController.text,
         recurringIncomeTemplateId: recurringTemplateId,
+        lastRecurringIncomeTemplateId: lastRecurringTemplateId,
         recurringPayDay: _isRecurring ? _payDay : null,
       );
 
@@ -253,8 +339,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       return parent == _selectedParentCategory;
     }).toList();
 
-    // 💡 핵심: 대분류 이름에 '정기' 문자가 포함되어 있으면 정기수입으로 간주
-    final bool isRegularIncome = _selectedParentCategory != null && _selectedParentCategory!.contains('정기');
+    // 💡 핵심: 대분류가 '정기'로 시작할 때만 정기수입으로 간주 ('비정기 수입'은 제외)
+    final bool isRegularIncome = _selectedParentCategory != null && _selectedParentCategory!.startsWith('정기');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -400,6 +486,21 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                 children: [
                   _sectionLabel('대분류',
                       icon: Icons.folder_outlined, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
+                  if (_categoryMatchFailed) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4E5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '기존 카테고리를 찾을 수 없어요. 대분류/소분류를 다시 선택해주세요.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
@@ -415,9 +516,10 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         _selectedParentCategory = newParent;
                         _selectedCategoryId = null;
                         _selectedCategoryName = null;
+                        _categoryMatchFailed = false;
 
                         // 💡 대분류가 정기수입이 아니면 스위치 끄기
-                        if (newParent == null || !newParent.contains('정기')) {
+                        if (newParent == null || !newParent.startsWith('정기')) {
                           _isRecurring = false;
                         }
                       });

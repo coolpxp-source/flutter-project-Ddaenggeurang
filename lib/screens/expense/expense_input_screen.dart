@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../models/recurring_payment_model.dart';
+import '../../services/recurring_payment_service.dart';
 import '../../utils/app_colors.dart';
 import '../../models/expense_model.dart';
 import '../../services/expense_service.dart';
@@ -76,6 +78,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     }
   }
 
+  String? _originalRecurringPaymentId;
+  String? _lastRecurringPaymentId;
+  String? _originalInstallmentPlanId;
+
   Future<void> _fetchOriginalExpense(String docId) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('expenses').doc(docId).get();
@@ -94,7 +100,10 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
           if (_isInstallment && originalExpense.installmentTotalMonths != null) {
             _installmentMonths = originalExpense.installmentTotalMonths!;
           }
-          _isRecurring = originalExpense.recurringPaymentId != null;
+          _originalRecurringPaymentId = originalExpense.recurringPaymentId;
+          _lastRecurringPaymentId = originalExpense.lastRecurringPaymentId ?? originalExpense.recurringPaymentId;
+          _isRecurring = _originalRecurringPaymentId != null;
+          _originalInstallmentPlanId = originalExpense.installmentPlanId;
         });
       }
     } catch (e) {
@@ -198,27 +207,102 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
     try {
       final String userId = currentUser.uid;
 
-      final newExpense = ExpenseModel(
-        expenseId: widget.editItem != null ? widget.editItem!.id : '',
-        userId: userId,
-        amount: amount,
-        categoryId: _selectedCategoryId!,
-        date: _selectedDate,
-        memo: _memoController.text.trim(),
-        nature: _selectedNature,
-        emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
-        installmentPlanId: _isInstallment ? 'temp_install_id' : null,
-        installmentInstallmentNo: _isInstallment ? 1 : null,
-        installmentTotalMonths: _isInstallment ? _installmentMonths : null,
-        // 할부(installmentPlanId)와 동일한 성격의 단순 플래그.
-        // 실제 구독 컬렉션과는 연결하지 않는다 (구독관리는 별개 기능).
-        recurringPaymentId: _isRecurring ? 'recurring' : null,
-      );
+      String? recurringPaymentId = _originalRecurringPaymentId;
+      String? lastRecurringPaymentId = _lastRecurringPaymentId;
+      final recurringService = RecurringPaymentService();
+
+      if (_isRecurring) {
+        if (recurringPaymentId != null) {
+          // 이미 활성 상태 — 최신 정보만 갱신
+          await recurringService.updateRecurringPayment(recurringPaymentId, {
+            'name': _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+            'amount': amount,
+            'categoryId': _selectedCategoryId!,
+          });
+        } else if (lastRecurringPaymentId != null) {
+          // 되살리기 — nextBillingDate는 건드리지 않아 기존 청구일 그대로 유지
+          await recurringService.updateRecurringPayment(lastRecurringPaymentId, {
+            'isDeleted': false,
+            'deletedAt': null,
+            'name': _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+            'amount': amount,
+            'categoryId': _selectedCategoryId!,
+          });
+          recurringPaymentId = lastRecurringPaymentId;
+        } else {
+          // 완전 신규 생성
+          final nextBillingDate = DateTime(_selectedDate.year, _selectedDate.month + 1, _selectedDate.day);
+          recurringPaymentId = await recurringService.addRecurringPayment(
+            RecurringPaymentModel(
+              recurringPaymentId: '',
+              userId: userId,
+              name: _memoController.text.trim().isNotEmpty ? _memoController.text.trim() : '정기결제',
+              amount: amount,
+              billingCycle: BillingCycle.monthly,
+              nextBillingDate: nextBillingDate,
+              categoryId: _selectedCategoryId!,
+            ),
+          );
+        }
+        lastRecurringPaymentId = recurringPaymentId;
+      } else if (recurringPaymentId != null) {
+        await recurringService.deleteRecurringPayment(recurringPaymentId);
+        recurringPaymentId = null;
+      }
+
+      // 할부 계획 ID 계산 — 이 지출 자기 자신의 문서 ID를 재사용해서
+      // 최소한 서로 다른 할부 구매끼리는 절대 겹치지 않도록 한다.
+      // (TODO: installmentPlans 전용 컬렉션 도입은 별도 확장 과제로 남겨둠 — 지금은 회차/총액 조회 UI가 없어 불필요)
+      String? installmentPlanId = _isInstallment ? _originalInstallmentPlanId : null;
 
       if (widget.editItem == null) {
-        await _expenseService.addExpense(newExpense);
+        // 신규 저장 — expenseId를 아직 몰라서 할부인 경우 저장 후 한 번 더 갱신한다.
+        final newExpense = ExpenseModel(
+          expenseId: '',
+          userId: userId,
+          amount: amount,
+          categoryId: _selectedCategoryId!,
+          date: _selectedDate,
+          memo: _memoController.text.trim(),
+          nature: _selectedNature,
+          emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+          installmentPlanId: null,
+          installmentInstallmentNo: _isInstallment ? 1 : null,
+          installmentTotalMonths: _isInstallment ? _installmentMonths : null,
+          recurringPaymentId: recurringPaymentId,
+          lastRecurringPaymentId: lastRecurringPaymentId,
+        );
+
+        final newExpenseId = await _expenseService.addExpense(newExpense);
+
+        if (_isInstallment && installmentPlanId == null) {
+          installmentPlanId = newExpenseId;
+          await _expenseService.updateExpense(newExpenseId, {
+            'installmentPlanId': installmentPlanId,
+          });
+        }
       } else {
-        await _expenseService.updateExpense(widget.editItem!.id, newExpense.toFirestore());
+        final String? installmentPlanId = _isInstallment
+            ? (_originalInstallmentPlanId ?? widget.editItem!.id)
+            : null;
+
+        final updatedExpense = ExpenseModel(
+          expenseId: widget.editItem!.id,
+          userId: userId,
+          amount: amount,
+          categoryId: _selectedCategoryId!,
+          date: _selectedDate,
+          memo: _memoController.text.trim(),
+          nature: _selectedNature,
+          emotionTag: _selectedNature == ExpenseNature.variable ? _selectedEmotion : null,
+          installmentPlanId: installmentPlanId,
+          installmentInstallmentNo: _isInstallment ? 1 : null,
+          installmentTotalMonths: _isInstallment ? _installmentMonths : null,
+          recurringPaymentId: recurringPaymentId,
+          lastRecurringPaymentId: lastRecurringPaymentId,
+        );
+
+        await _expenseService.updateExpense(widget.editItem!.id, updatedExpense.toFirestore());
       }
 
       if (!mounted) return;
