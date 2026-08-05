@@ -209,11 +209,9 @@ class AvatarService {
     // 기존 장착 상태는 유지하고 누락된 슬롯만 기본 아이템으로 설정
     final updatedEquippedItems = Map<String, dynamic>.from(equippedItems);
 
+    // 최초 사용자처럼 슬롯 키가 없는 경우에만 기본 아이템 장착
     for (final entry in defaultItems.entries) {
-      final currentItemId = updatedEquippedItems[entry.key];
-
-      if (currentItemId == null ||
-          currentItemId.toString().trim().isEmpty) {
+      if (!updatedEquippedItems.containsKey(entry.key)) {
         updatedEquippedItems[entry.key] = entry.value;
       }
     }
@@ -364,6 +362,38 @@ class AvatarService {
       return true;
     } catch (e) {
       debugPrint('아이템 착용 실패: $e');
+      return false;
+    }
+  }
+
+  // 선택한 아바타 슬롯의 장착 아이템을 해제하는 메서드
+  Future<bool> unequipSlot(String slot) async {
+    try {
+      final String userId = _currentUserId;
+
+      const allowedSlots = {
+        'hair',
+        'clothes',
+        'shoes',
+        'accessory',
+        'pet',
+      };
+
+      if (!allowedSlots.contains(slot)) {
+        return false;
+      }
+
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .update({
+        'equippedItems.$slot': '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      return true;
+    } catch (e) {
+      debugPrint('아이템 해제 실패: $e');
       return false;
     }
   }
