@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../utils/app_colors.dart';
 import '../../utils/formatters.dart';
 import '../../models/card_point_model.dart';
 import '../../services/card_point_service.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+
+const Color _mainColor = Color(0xFF6C63FF);
+const Color _mainSoftColor = Color(0xFFEDECFF);
+const Color _mainBorderSoftColor = Color(0xFFDAD7FF);
 
 class CardPointAddScreen extends StatefulWidget {
   const CardPointAddScreen({super.key});
@@ -13,6 +17,7 @@ class CardPointAddScreen extends StatefulWidget {
 }
 
 class _CardPointAddScreenState extends State<CardPointAddScreen> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _companyController = TextEditingController();
   final _cardNameController = TextEditingController();
   final _totalPointController = TextEditingController();
@@ -30,9 +35,10 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
   }
 
   Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
-    if (_companyController.text.trim().isEmpty || _cardNameController.text.trim().isEmpty) return;
 
     setState(() => _isSaving = true);
     try {
@@ -47,89 +53,163 @@ class _CardPointAddScreenState extends State<CardPointAddScreen> {
           expiringPoint: parseAmount(_expiringPointController.text),
         ),
       );
+
       if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '저장할 수 없어요',
+          message: e.toString().replaceFirst('Exception: ', ''),
+          type: ModalType.danger,
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8, left: 2),
-    child: Text(text,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
-  );
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    String? suffixText,
+  }) {
+    OutlineInputBorder border(Color color, {double width = 1}) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: color, width: width),
+    );
 
-  InputDecoration _deco(String hint) => InputDecoration(
-    filled: true,
-    fillColor: AppColors.bg,
-    hintText: hint,
-    hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.inkSub),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide.none,
-    ),
-  );
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
+      prefixIcon: Icon(prefixIcon, color: _mainColor),
+      suffixText: suffixText,
+      suffixStyle: const TextStyle(color: Color(0xFF555555), fontSize: 13, fontWeight: FontWeight.w700),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      border: border(const Color(0xFFE6E3E7)),
+      enabledBorder: border(const Color(0xFFE6E3E7)),
+      focusedBorder: border(_mainColor, width: 1.5),
+      errorBorder: border(Colors.redAccent),
+      focusedErrorBorder: border(Colors.redAccent, width: 1.5),
+    );
+  }
+
+  Widget _sectionTitle(String title, {required IconData icon}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: _mainColor),
+        const SizedBox(width: 6),
+        Text(title, style: const TextStyle(color: Color(0xFF333333), fontSize: 14, fontWeight: FontWeight.w800)),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F7FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        centerTitle: true,
+        backgroundColor: const Color(0xFFF8F7FA),
         surfaceTintColor: Colors.transparent,
-        title: const Text('카드 추가',
-            style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 16)),
+        foregroundColor: const Color(0xFF222222),
+        title: const Text('카드 추가', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _label('카드사'),
-            TextField(controller: _companyController, decoration: _deco('예: 신한카드')),
-            const SizedBox(height: 18),
-            _label('카드 이름'),
-            TextField(controller: _cardNameController, decoration: _deco('예: 딥드림 카드')),
-            const SizedBox(height: 18),
-            _label('보유 포인트'),
-            TextField(
-              controller: _totalPointController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyFormatter()],
-              decoration: _deco('0'),
-            ),
-            const SizedBox(height: 18),
-            _label('소멸예정 포인트'),
-            TextField(
-              controller: _expiringPointController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyFormatter()],
-              decoration: _deco('0'),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
-                  disabledBackgroundColor: const Color(0xFFE5E8EB),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                decoration: BoxDecoration(
+                  color: _mainSoftColor,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: _mainBorderSoftColor),
                 ),
-                child: _isSaving
-                    ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-                    : const Text('저장', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.credit_card_rounded, color: _mainColor, size: 22),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text('보유 중인 카드의 포인트 정보를\n등록해 주세요.',
+                          style: TextStyle(color: Color(0xFF4B4770), fontSize: 12, fontWeight: FontWeight.w600, height: 1.5)),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 26),
+              _sectionTitle('카드사', icon: Icons.apartment_rounded),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _companyController,
+                enabled: !_isSaving,
+                decoration: _inputDecoration(hintText: '예: 신한카드', prefixIcon: Icons.apartment_rounded),
+                validator: (v) => (v == null || v.trim().isEmpty) ? '카드사를 입력하세요.' : null,
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('카드 이름', icon: Icons.credit_card_rounded),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _cardNameController,
+                enabled: !_isSaving,
+                decoration: _inputDecoration(hintText: '예: 딥드림 카드', prefixIcon: Icons.credit_card_rounded),
+                validator: (v) => (v == null || v.trim().isEmpty) ? '카드 이름을 입력하세요.' : null,
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('보유 포인트', icon: Icons.stars_rounded),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _totalPointController,
+                enabled: !_isSaving,
+                keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyFormatter()],
+                decoration: _inputDecoration(hintText: '0', suffixText: 'P', prefixIcon: Icons.stars_rounded),
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('소멸예정 포인트', icon: Icons.timer_outlined),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _expiringPointController,
+                enabled: !_isSaving,
+                keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyFormatter()],
+                decoration: _inputDecoration(hintText: '0', suffixText: 'P', prefixIcon: Icons.timer_outlined),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: _mainColor,
+                    disabledBackgroundColor: const Color(0xFFC9C5FF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                    width: 23, height: 23,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                  )
+                      : const Text('저장', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
