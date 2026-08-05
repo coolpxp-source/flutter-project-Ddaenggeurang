@@ -109,7 +109,11 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   }
 
   Future<void> _loadCategories() async {
-    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+    final String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      setState(() => _isLoadingCategories = false);
+      return;
+    }
     try {
       final db = FirebaseFirestore.instance;
       final defaultSnap = await db.collection('categories').where('transactionType', isEqualTo: 'income').get();
@@ -493,7 +497,6 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         _selectedCategoryId = null;
                         _selectedCategoryName = null;
 
-                        // 💡 대분류가 정기수입이 아니면 스위치 끄기
                         if (newParent == null || !newParent.contains('정기')) {
                           _isRecurring = false;
                         }

@@ -65,7 +65,11 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
   }
 
   Future<void> _loadCategories() async {
-    final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+    final String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) {
+      setState(() => _isLoadingCategories = false);
+      return;
+    }
     try {
       final db = FirebaseFirestore.instance;
       final defaultSnap = await db.collection('categories').where('transactionType', isEqualTo: 'saving').get();
@@ -117,8 +121,19 @@ class _SavingInputScreenState extends State<SavingInputScreen> {
       }
     }
 
+    final User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      await DdaengModal.alert(
+        context,
+        title: '로그인이 필요해요',
+        message: '로그인 후 다시 시도해 주세요.',
+        type: ModalType.warning,
+      );
+      return;
+    }
+
     try {
-      final String userId = FirebaseAuth.instance.currentUser?.uid ?? 'test_user_id';
+      final String userId = currentUser.uid;
 
       InvestmentDetail? investmentDetail;
       if (_selectedCategoryName == '투자' || _selectedCategoryName == '주식') {
