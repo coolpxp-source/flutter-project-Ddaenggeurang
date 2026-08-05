@@ -435,9 +435,18 @@ class _InstallmentTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Text(
-                '${CurrencyFormatter.format(item.amount)}원',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${CurrencyFormatter.format(item.amount)}원',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
+                  ),
+                  const Text(
+                    '총액',
+                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: AppColors.inkSub),
+                  ),
+                ],
               ),
             ],
           ),
