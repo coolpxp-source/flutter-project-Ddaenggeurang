@@ -408,10 +408,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level':
-              1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
 
@@ -644,9 +641,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level': 1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
         },
@@ -991,9 +986,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level': 1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
         },
