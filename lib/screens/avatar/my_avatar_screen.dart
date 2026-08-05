@@ -168,10 +168,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
     }
 
     if (item.isEquipped) {
-      _showMessage(
-        '이미 착용 중인 아이템입니다.',
-        type: AppSnackBarType.info,
-      );
+      await _unequipItem(item);
       return;
     }
 
@@ -204,6 +201,50 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
 
       _showMessage(
         '${item.name} 착용을 완료했습니다.',
+        type: AppSnackBarType.success,
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      final String message = e
+          .toString()
+          .replaceFirst('Exception: ', '');
+
+      _showMessage(
+        message,
+        type: AppSnackBarType.error,
+      );
+    }
+  }
+
+  // 현재 장착 중인 아바타 아이템을 해제하는 메서드
+  Future<void> _unequipItem(AvatarItem item) async {
+    try {
+      final bool success =
+      await _avatarService.unequipSlot(item.slot);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (!success) {
+        _showMessage(
+          '아이템 해제에 실패했습니다.',
+          type: AppSnackBarType.error,
+        );
+        return;
+      }
+
+      await _reloadAvatarData();
+
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '${item.name} 아이템을 해제했습니다.',
         type: AppSnackBarType.success,
       );
     } catch (e) {
@@ -512,7 +553,7 @@ class _MyAvatarScreenState extends State<MyAvatarScreen> {
           ),
           const SizedBox(height: 4),
           const Text(
-            '저축왕 돼랑이',
+            '땡그랑 절약 메이트',
             style: TextStyle(
               color: Colors.white,
               fontSize: 23,
