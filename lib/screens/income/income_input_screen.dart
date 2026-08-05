@@ -40,6 +40,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
   bool _isRecurring = false;
   int _payDay = 1;
   int _currentAmount = 0;
+  bool _categoryMatchFailed = false;
 
   @override
   void initState() {
@@ -142,13 +143,17 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
         _isLoadingCategories = false;
 
         if (widget.editItem != null && _incomeCategories.isNotEmpty) {
-          final matched = _incomeCategories.firstWhere(
-                (c) => c['name'] == widget.editItem!.title,
-            orElse: () => _incomeCategories.first,
-          );
-          _selectedCategoryId = matched['id'];
-          _selectedCategoryName = matched['name'];
-          _selectedParentCategory = matched['parentName']?.toString() ?? matched['parent']?.toString() ?? '미분류';
+          final matches = _incomeCategories.where((c) => c['id'] == widget.editItem!.categoryId).toList();
+          if (matches.isNotEmpty) {
+            final matched = matches.first;
+            _selectedCategoryId = matched['id'];
+            _selectedCategoryName = matched['name'];
+            _selectedParentCategory = matched['parentName']?.toString() ?? matched['parent']?.toString() ?? '미분류';
+          } else {
+            // 매칭되는 카테고리가 없으면(삭제·이름변경 등) 엉뚱한 카테고리로
+            // 조용히 대체하지 않고, 사용자가 직접 다시 선택하도록 비워둠
+            _categoryMatchFailed = true;
+          }
         }
       });
     } catch (e) {
@@ -334,8 +339,8 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
       return parent == _selectedParentCategory;
     }).toList();
 
-    // 💡 핵심: 대분류 이름에 '정기' 문자가 포함되어 있으면 정기수입으로 간주
-    final bool isRegularIncome = _selectedParentCategory != null && _selectedParentCategory!.contains('정기');
+    // 💡 핵심: 대분류가 '정기'로 시작할 때만 정기수입으로 간주 ('비정기 수입'은 제외)
+    final bool isRegularIncome = _selectedParentCategory != null && _selectedParentCategory!.startsWith('정기');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -481,6 +486,21 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                 children: [
                   _sectionLabel('대분류',
                       icon: Icons.folder_outlined, iconColor: AppColors.utility, iconBg: AppColors.utilitySoft),
+                  if (_categoryMatchFailed) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4E5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '기존 카테고리를 찾을 수 없어요. 대분류/소분류를 다시 선택해주세요.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
@@ -496,8 +516,10 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
                         _selectedParentCategory = newParent;
                         _selectedCategoryId = null;
                         _selectedCategoryName = null;
+                        _categoryMatchFailed = false;
 
-                        if (newParent == null || !newParent.contains('정기')) {
+                        // 💡 대분류가 정기수입이 아니면 스위치 끄기
+                        if (newParent == null || !newParent.startsWith('정기')) {
                           _isRecurring = false;
                         }
                       });
