@@ -142,7 +142,7 @@ class TransactionDetailScreen extends StatelessWidget {
               } else if (item.type == 'income') {
                 targetScreen = IncomeInputScreen(editItem: item);
               } else if (item.type == 'saving') {
-                _showSavingStatusModal(context, item);
+                _handleSavingEdit(context, item);
                 return;
               }
 
@@ -634,45 +634,25 @@ class TransactionDetailScreen extends StatelessWidget {
                               if (selectedStatus != 'active' &&
                                   returnedAmount != null &&
                                   returnedAmount > 0) {
-                                String memoText = '';
-                                if (selectedStatus == 'matured') {
-                                  memoText = '${item.title} 만기 환급금';
-                                } else if (selectedStatus == 'cancelled') {
-                                  memoText = '${item.title} 해지 환급금';
-                                } else if (selectedStatus == 'sold') {
-                                  memoText = '${item.title} 매도 금액';
-                                }
+                                final bool recorded = await _recordReturnIncome(
+                                  ctx,
+                                  savingId: item.id,
+                                  title: item.title,
+                                  status: selectedStatus,
+                                  returnedAmount: returnedAmount,
+                                );
 
-                                // "기타수입" 카테고리를 이름으로 직접 조회 (하드코딩 ID 대신)
-                                String etcCategoryId = '';
-                                try {
-                                  final etcSnap = await FirebaseFirestore.instance
-                                      .collection('categories')
-                                      .where('transactionType', isEqualTo: 'income')
-                                      .where('parentName', isEqualTo: '비정기 수입')
-                                      .where('name', isEqualTo: '기타 수입')
-                                      .limit(1)
-                                      .get();
-                                  if (etcSnap.docs.isNotEmpty) {
-                                    etcCategoryId = etcSnap.docs.first.id;
-                                  }
-                                  debugPrint('🔍 기타수입 카테고리ID 조회 결과: $etcCategoryId');
-                                } catch (e) {
-                                  debugPrint('⚠️ 기타수입 카테고리 조회 실패: $e');
+                                if (!recorded && ctx.mounted) {
+                                  await DdaengModal.alert(
+                                    ctx,
+                                    title: '수입 기록을 건너뛰었어요',
+                                    message:
+                                    '카테고리를 선택하지 않아 환급금 수입 내역은 저장되지 않았어요.\n'
+                                        '저축/투자 상태 변경은 정상 반영됐어요.\n'
+                                        '내역을 다시 눌러 수입도 기록할 수 있어요.',
+                                    type: ModalType.warning,
+                                  );
                                 }
-
-                                await FirebaseFirestore.instance
-                                    .collection('incomes')
-                                    .add({
-                                  'userId':
-                                  FirebaseAuth.instance.currentUser?.uid ?? '',
-                                  'amount': returnedAmount,
-                                  'categoryId': etcCategoryId,
-                                  'date': Timestamp.now(),
-                                  'memo': memoText,
-                                  'isDeleted': false,
-                                  'createdAt': FieldValue.serverTimestamp(),
-                                });
                               }
 
                               if (ctx.mounted) {
@@ -713,6 +693,267 @@ class TransactionDetailScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  // ─────────────────────── 수입 카테고리 폴백 피커 ───────────────────────
+  // "기타 수입" 카테고리를 자동으로 못 찾았을 때, 유저가 직접 수입 카테고리를
+  // 고르게 하는 간단한 대분류/소분류 선택 모달. 취소 시 null 반환.
+  Future<String?> _pickIncomeCategoryFallback(BuildContext context) async {
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    List<Map<String, dynamic>> categories = [];
+
+    try {
+      final db = FirebaseFirestore.instance;
+      final defaultSnap =
+      await db.collection('categories').where('transactionType', isEqualTo: 'income').get();
+      final customSnap =
+      await db.collection('customCategories').where('userId', isEqualTo: userId).get();
+
+      List<String> hiddenIds = [];
+      final userDoc = await db.collection('users').doc(userId).get();
+      if (userDoc.exists && userDoc.data()!.containsKey('hiddenCategories')) {
+        hiddenIds = List<String>.from(userDoc.data()!['hiddenCategories']);
+      }
+
+      for (var doc in defaultSnap.docs) {
+        if (!hiddenIds.contains(doc.id)) categories.add({'id': doc.id, ...doc.data()});
+      }
+      for (var doc in customSnap.docs) {
+        final data = doc.data();
+        if (data['transactionType'] == 'income' && data['isHidden'] != true) {
+          categories.add({'id': doc.id, ...data});
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ 폴백 카테고리 로드 실패: $e');
+    }
+
+    if (categories.isEmpty || !context.mounted) return null;
+
+    String? selectedParent;
+    String? selectedId;
+
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final parents =
+            categories.map((c) => (c['parentName'] ?? c['parent'] ?? '미분류').toString()).toSet().toList();
+            final children = selectedParent == null
+                ? <Map<String, dynamic>>[]
+                : categories
+                .where((c) => (c['parentName'] ?? c['parent'] ?? '미분류') == selectedParent)
+                .toList();
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '기타 수입 카테고리를 찾지 못했어요',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '이 환급금을 어떤 수입 카테고리로 기록할지 선택해주세요.',
+                    style: TextStyle(fontSize: 12.5, color: AppColors.inkSub),
+                  ),
+                  const SizedBox(height: 18),
+                  DropdownButtonFormField<String>(
+                    value: selectedParent,
+                    hint: const Text('대분류 선택'),
+                    isExpanded: true,
+                    items: parents
+                        .map((p) => DropdownMenuItem<String>(value: p, child: Text(p)))
+                        .toList(),
+                    onChanged: (v) => setState(() {
+                      selectedParent = v;
+                      selectedId = null;
+                    }),
+                  ),
+                  if (selectedParent != null) ...[
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedId,
+                      hint: const Text('소분류 선택'),
+                      isExpanded: true,
+                      items: children
+                          .map((c) => DropdownMenuItem<String>(
+                        value: c['id']?.toString(),
+                        child: Text(c['name']?.toString() ?? '이름 없음'),
+                      ))
+                          .toList(),
+                      onChanged: (v) => setState(() => selectedId = v),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(ctx, null),
+                          child: const Text('취소'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.saving),
+                          onPressed: selectedId == null ? null : () => Navigator.pop(ctx, selectedId),
+                          child: const Text('선택 완료', style: TextStyle(color: Colors.white)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ─────────────────────── 환급금 수입 기록 헬퍼 ───────────────────────
+// 카테고리 자동조회(기본→커스텀) → 실패 시 피커 → 그래도 실패하면 false 반환.
+// 성공 시 incomes 문서 생성 + savings.returnIncomeRecorded = true 로 마킹.
+  Future<bool> _recordReturnIncome(
+      BuildContext ctx, {
+        required String savingId,
+        required String title,
+        required String status,
+        required int returnedAmount,
+      }) async {
+    String memoText = '';
+    if (status == 'matured') {
+      memoText = '$title 만기 환급금';
+    } else if (status == 'cancelled') {
+      memoText = '$title 해지 환급금';
+    } else if (status == 'sold') {
+      memoText = '$title 매도 금액';
+    }
+
+    String? etcCategoryId;
+    try {
+      final etcSnap = await FirebaseFirestore.instance
+          .collection('categories')
+          .where('transactionType', isEqualTo: 'income')
+          .where('parentName', isEqualTo: '비정기 수입')
+          .where('name', isEqualTo: '기타 수입')
+          .limit(1)
+          .get();
+      if (etcSnap.docs.isNotEmpty) {
+        etcCategoryId = etcSnap.docs.first.id;
+      } else {
+        final customSnap = await FirebaseFirestore.instance
+            .collection('customCategories')
+            .where('userId', isEqualTo: FirebaseAuth.instance.currentUser?.uid ?? '')
+            .where('transactionType', isEqualTo: 'income')
+            .where('parentName', isEqualTo: '비정기 수입')
+            .where('name', isEqualTo: '기타 수입')
+            .limit(1)
+            .get();
+        if (customSnap.docs.isNotEmpty) {
+          etcCategoryId = customSnap.docs.first.id;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ 기타수입 카테고리 조회 실패: $e');
+    }
+
+    if (etcCategoryId == null && ctx.mounted) {
+      etcCategoryId = await _pickIncomeCategoryFallback(ctx);
+    }
+
+    if (etcCategoryId == null) return false;
+
+    await FirebaseFirestore.instance.collection('incomes').add({
+      'userId': FirebaseAuth.instance.currentUser?.uid ?? '',
+      'amount': returnedAmount,
+      'categoryId': etcCategoryId,
+      'date': Timestamp.now(),
+      'memo': memoText,
+      'isDeleted': false,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    await FirebaseFirestore.instance
+        .collection('savings')
+        .doc(savingId)
+        .update({'returnIncomeRecorded': true});
+
+    return true;
+  }
+
+  // ─────────────────────── 저축 편집 진입 핸들러 ───────────────────────
+  // 이미 상태변경은 됐는데 수입 기록이 안 남아있는 건인지 최신 문서로 확인 후,
+  // 맞으면 먼저 "지금 수입으로 기록할지" 물어보고, 아니면 기존 상태변경 모달로.
+  Future<void> _handleSavingEdit(BuildContext context, TransactionItem item) async {
+    Map<String, dynamic>? data;
+    try {
+      final doc = await FirebaseFirestore.instance.collection('savings').doc(item.id).get();
+      data = doc.data();
+    } catch (e) {
+      debugPrint('⚠️ 저축 문서 조회 실패: $e');
+    }
+
+    final String? status = data?['status'] as String?;
+    final num? returnedAmountNum = data?['returnedAmount'] as num?;
+    final bool alreadyRecorded = data?['returnIncomeRecorded'] == true;
+
+    final bool needsIncomePrompt = status != null &&
+        status != 'active' &&
+        returnedAmountNum != null &&
+        returnedAmountNum > 0 &&
+        !alreadyRecorded;
+
+    if (needsIncomePrompt && context.mounted) {
+      final wantsToRecord = await DdaengModal.confirm(
+        context,
+        title: '수입 기록이 없어요',
+        message: '이 저축 항목은 상태 변경만 되어있고\n환급금 수입 기록은 아직 없어요.\n지금 수입으로 기록하시겠어요?',
+        type: ModalType.warning,
+        cancelText: '나중에',
+        confirmText: '기록하기',
+      );
+
+      if (wantsToRecord && context.mounted) {
+        final bool recorded = await _recordReturnIncome(
+          context,
+          savingId: item.id,
+          title: item.title,
+          status: status,
+          returnedAmount: returnedAmountNum.toInt(),
+        );
+
+        if (context.mounted) {
+          await DdaengModal.alert(
+            context,
+            title: recorded ? '기록 완료' : '수입 기록을 건너뛰었어요',
+            message: recorded
+                ? '환급금 수입 기록이 완료되었어요!'
+                : '카테고리를 선택하지 않아 환급금 수입 내역은 저장되지 않았어요.',
+            type: recorded ? ModalType.success : ModalType.warning,
+          );
+          if (recorded) Navigator.pop(context, true);
+        }
+        return;
+      }
+    }
+
+    if (context.mounted) {
+      _showSavingStatusModal(context, item);
+    }
   }
 
   // ─────────────────────── 삭제 확인 (DdaengModal.confirm) ───────────────────────
