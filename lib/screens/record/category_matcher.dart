@@ -176,15 +176,12 @@ List<String> _keywordCandidates(String normalizedCategory, String normalizedMerc
   addIfMatch(RegExp('택시|카카오택시|카카오모빌리티|우티|우버|쏘카'), ['택시']);
   addIfMatch(RegExp('옷|의류|잡화|패션|무신사|지그재그|에이블리|카카오스타일'), ['의류']);
   addIfMatch(RegExp('구독|ott|넷플릭스|왓챠|웨이브|디즈니|구글페이먼트|google|apple|애플'), ['ott', '구독']);
-  addIfMatch(RegExp('지하철|버스|전철|대중교통|교통카드|교통비'), ['대중교통']);
-  addIfMatch(RegExp('택시|카카오택시|우버'), ['택시']);
   addIfMatch(RegExp('주유|기름|주유소'), ['주유']);
   addIfMatch(RegExp('주차|통행료|하이패스'), ['주차']);
   addIfMatch(RegExp('정비|카센터|엔진오일'), ['차량정비']);
   addIfMatch(RegExp('병원|의원|진료'), ['병원']);
   addIfMatch(RegExp('약국'), ['약국']);
   addIfMatch(RegExp('영양제|비타민|건강기능식품'), ['영양제']);
-  addIfMatch(RegExp('옷|의류|잡화|패션'), ['의류']);
   addIfMatch(RegExp('화장품|올리브영|뷰티'), ['화장품']);
   addIfMatch(RegExp('미용실|헤어|파마|염색'), ['미용실']);
   addIfMatch(RegExp('전자기기|가전|디지털'), ['전자기기']);
@@ -194,7 +191,6 @@ List<String> _keywordCandidates(String normalizedCategory, String normalizedMerc
   addIfMatch(RegExp('여행|숙박|호텔|모텔|에어비앤비'), ['여행']);
   addIfMatch(RegExp('게임|취미|스팀|플스'), ['게임']);
   addIfMatch(RegExp('학원|인강|강의|시험응시료|토익|자격증'), ['학원']);
-  addIfMatch(RegExp('구독|ott|넷플릭스|왓챠|웨이브|디즈니'), ['ott', '구독'],);
   addIfMatch(RegExp('음원|멜론|지니|스포티파이'), ['음원']);
   addIfMatch(RegExp('통신|휴대폰|핸드폰요금'), ['휴대폰']);
   addIfMatch(RegExp('인터넷|와이파이'), ['인터넷']);

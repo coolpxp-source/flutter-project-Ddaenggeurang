@@ -828,7 +828,29 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       });
                     },
                   ),
-                  if (_isInstallment)
+                  if (_isInstallment) ...[
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4E5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline, size: 15, color: Color(0xFFB45309)),
+                          SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '위 "결제 금액"에는 카드사 총 결제금액(할부 원금)을 입력해주세요.\n월 납입액이 아니에요! 월 납입액은 아래에서 자동으로 계산돼요.',
+                              style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
                       child: Row(
@@ -859,6 +881,26 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                         ],
                       ),
                     ),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _amountController,
+                      builder: (context, value, _) {
+                        final int totalAmount = parseAmount(value.text);
+                        if (totalAmount <= 0) return const SizedBox.shrink();
+                        final int monthlyAmount = (totalAmount / _installmentMonths).round();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            '총 ${comma(totalAmount)}원 ÷ $_installmentMonths개월 = 월 ${comma(monthlyAmount)}원',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.expenseDeep,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   const Divider(height: 20, color: Color(0xFFF0EDF5)),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,

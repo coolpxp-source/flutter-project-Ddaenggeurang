@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../utils/app_colors.dart';
 import '../../utils/formatters.dart';
 import '../../models/card_point_model.dart';
 import '../../services/card_point_service.dart';
 import '../../widgets/common/ddaeng_modal.dart';
 import 'card_point_add_screen.dart';
 import 'card_point_detail_screen.dart';
+
+const Color _mainColor = Color(0xFF6C63FF);
+const Color _mainSoftColor = Color(0xFFEDECFF);
 
 class CardPointListScreen extends StatelessWidget {
   const CardPointListScreen({super.key});
@@ -17,79 +19,112 @@ class CardPointListScreen extends StatelessWidget {
     final service = CardPointService();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F7FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.ink,
         elevation: 0,
-        scrolledUnderElevation: 0,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('내 카드 포인트',
-            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.ink)),
         centerTitle: true,
+        backgroundColor: const Color(0xFFF8F7FA),
+        surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFF222222),
+        title: const Text('내 카드 포인트', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       ),
       floatingActionButton: userId == null
           ? null
           : FloatingActionButton(
-        backgroundColor: AppColors.ink,
+        backgroundColor: _mainColor,
+        foregroundColor: Colors.white,
         elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
         onPressed: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
         ),
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(Icons.add_rounded),
       ),
       body: userId == null
-          ? const Center(child: Text('로그인이 필요해요', style: TextStyle(color: AppColors.inkSub)))
+          ? const Center(child: Text('로그인이 필요해요', style: TextStyle(color: Color(0xFF999999))))
           : StreamBuilder<List<CardPointModel>>(
         stream: service.getCardPoints(userId: userId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.expense));
+            return const Center(child: CircularProgressIndicator(color: _mainColor));
           }
           final cards = snapshot.data ?? [];
-          if (cards.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      color: AppColors.bg,
-                      shape: BoxShape.circle,
+          final totalPoint = cards.fold<int>(0, (sum, c) => sum + c.totalPoint);
+          final expiringTotal = cards.fold<int>(0, (sum, c) => sum + c.expiringPoint);
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
+            children: [
+              _SummaryCard(totalPoint: totalPoint, cardCount: cards.length, expiringTotal: expiringTotal),
+              const SizedBox(height: 14),
+              _SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('내 카드 목록',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF222222))),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
+                          ),
+                          style: TextButton.styleFrom(foregroundColor: _mainColor),
+                          child: const Text('추가', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
                     ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.credit_card_outlined, size: 28, color: AppColors.inkSub),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('등록된 카드가 없어요',
-                      style: TextStyle(color: AppColors.inkSub, fontSize: 13.5)),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.ink,
-                      side: const BorderSide(color: Color(0xFFE8ECF3), width: 1.4),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('카드 추가하기',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                  ),
-                ],
+                    if (cards.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 30),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 64,
+                                height: 64,
+                                decoration: const BoxDecoration(color: _mainSoftColor, shape: BoxShape.circle),
+                                child: const Icon(Icons.credit_card_rounded, size: 30, color: _mainColor),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('등록된 카드가 없습니다.',
+                                  style: TextStyle(color: Color(0xFF555555), fontSize: 13)),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                height: 46,
+                                child: FilledButton.icon(
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(builder: (_) => const CardPointAddScreen()),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: _mainColor,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                  ),
+                                  icon: const Icon(Icons.add_rounded, size: 18),
+                                  label: const Text('카드 추가', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    else
+                      ...cards.map(
+                            (card) => Padding(
+                          padding: const EdgeInsets.only(top: 9),
+                          child: _CardPointTile(card: card),
+                        ),
+                      ),
+                    const _LongPressHint(),
+                  ],
+                ),
               ),
-            );
-          }
-          return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-            itemCount: cards.length,
-            itemBuilder: (context, index) => _CardPointCard(card: cards[index]),
+            ],
           );
         },
       ),
@@ -97,9 +132,76 @@ class CardPointListScreen extends StatelessWidget {
   }
 }
 
-class _CardPointCard extends StatelessWidget {
+class _SummaryCard extends StatelessWidget {
+  final int totalPoint;
+  final int cardCount;
+  final int expiringTotal;
+
+  const _SummaryCard({required this.totalPoint, required this.cardCount, required this.expiringTotal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF6C63FF), Color(0xFF9B93FF)],
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('보유 포인트 합계', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+          Text('${formatAmount(totalPoint)}P',
+              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              _SummaryItem(label: '등록 카드', value: '$cardCount개'),
+              const SizedBox(width: 8),
+              _SummaryItem(label: '소멸예정', value: '${formatAmount(expiringTotal)}P'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final String label;
+  final String value;
+  const _SummaryItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(color: Colors.white.withOpacity(0.18), borderRadius: BorderRadius.circular(14)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+            const SizedBox(height: 4),
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CardPointTile extends StatelessWidget {
   final CardPointModel card;
-  const _CardPointCard({required this.card});
+  const _CardPointTile({required this.card});
 
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await DdaengModal.confirm(
@@ -109,8 +211,9 @@ class _CardPointCard extends StatelessWidget {
       type: ModalType.danger,
       confirmText: '삭제',
     );
+    if (!confirmed) return;
 
-    if (confirmed) {
+    try {
       await CardPointService().deleteCard(userId: card.userId, cardId: card.cardId);
       if (context.mounted) {
         await DdaengModal.alert(
@@ -120,63 +223,129 @@ class _CardPointCard extends StatelessWidget {
           type: ModalType.success,
         );
       }
+    } catch (e) {
+      if (context.mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '삭제할 수 없어요',
+          message: e.toString().replaceFirst('Exception: ', ''),
+          type: ModalType.danger,
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => CardPointDetailScreen(card: card)),
-      ),
-      onLongPress: () => _confirmDelete(context),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: AppColors.cardShadow,
+    return Material(
+      color: const Color(0xFFF7F8FB),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => CardPointDetailScreen(card: card)),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(card.companyName,
-                          style: const TextStyle(fontSize: 12.5, color: AppColors.inkSub)),
-                      const SizedBox(height: 3),
-                      Text(card.cardName,
-                          style: const TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.ink)),
-                    ],
-                  ),
+        onLongPress: () => _confirmDelete(context),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(color: _mainSoftColor, borderRadius: BorderRadius.circular(13)),
+                child: const Icon(Icons.credit_card_rounded, color: _mainColor, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(card.cardName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Color(0xFF25272C), fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(card.companyName, style: const TextStyle(color: Color(0xFF9A9DA5), fontSize: 10)),
+                  ],
                 ),
-                if (card.expiringPoint > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE5E5),
-                      borderRadius: BorderRadius.circular(20),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text('${formatAmount(card.totalPoint)}P', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (card.expiringPoint > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: const Color(0xFFFFE5E5), borderRadius: BorderRadius.circular(20)),
+                        child: Text('${formatAmount(card.expiringPoint)}P 소멸예정',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.redAccent)),
+                      ),
                     ),
-                    child: Text('${CurrencyFormatter.format(card.expiringPoint)}P 소멸예정',
-                        style: const TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w700, color: Colors.redAccent)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Text('${CurrencyFormatter.format(card.totalPoint)}P',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.ink)),
-          ],
+                ],
+              ),
+              const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFFAAAAAA)),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _SectionCard extends StatelessWidget {
+  final Widget child;
+  const _SectionCard({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFF0EDF0)),
+        boxShadow: const [BoxShadow(color: Color(0x0A000000), blurRadius: 14, offset: Offset(0, 5))],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _LongPressHint extends StatelessWidget {
+  const _LongPressHint();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F2FF),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF8B85FF)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '카드를 꾹 눌러서 삭제할 수 있어요',
+              style: TextStyle(fontSize: 11, color: Colors.grey[600], fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String formatAmount(int amount) {
+  return amount.toString().replaceAllMapped(
+    RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+        (match) => '${match[1]},',
+  );
 }

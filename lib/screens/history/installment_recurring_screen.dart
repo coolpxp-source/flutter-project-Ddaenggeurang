@@ -4,13 +4,16 @@ import '../../utils/app_colors.dart';
 
 import '../../models/transaction_item.dart';
 import '../../services/transaction_service.dart';
-import '../../utils/formatters.dart';
 import '../../widgets/common/ddaeng_modal.dart';
+import '../../widgets/report/report_tiles.dart';
+import 'transaction_detail_screen.dart';
+import 'category_transaction_list_screen.dart';
 
 /// 할부/정기결제/정기수입/반복저축을 한눈에 모아보는 리포트 화면.
-///
-/// 디자인 톤은 구독관리 화면(subscription_list_screen.dart)의
-/// _SectionCard / _SubscriptionTile 스타일을 그대로 가져왔다.
+/// 카드포인트·구독관리 화면과 톤을 맞췄다: 상단 그라데이션 요약 카드 +
+/// 테두리 있는 화이트 섹션 카드 + 중립색 타일. 각 섹션은 최대 3개만
+/// 보여주고, "전체보기"를 누르면 카테고리별 전체 목록으로 이동한다.
+/// 타일을 꾹 누르면 공용 모달(DdaengModal)로 삭제 확인을 받는다.
 ///
 /// ⚠️ 여기서 계산하는 "할부 회차"는 이 화면 전용 표시용이다.
 /// 홈/카테고리 집계(총지출 등)는 여전히 구매 시점에 전액을 한 번에
@@ -27,10 +30,8 @@ class InstallmentRecurringScreen extends StatefulWidget {
       _InstallmentRecurringScreenState();
 }
 
-// 할부/정기결제 카드에서 로컬로 필요한 옅은 배경색.
-// (AppColors엔 expenseSoft가 없어서 expense.withValues(alpha: 0.15)로 대체해 쓴다.)
-// 아래는 그 외 순수 레이아웃용 중성색만 남김.
-const Color _progressTrackColor = Color(0xFFEDEAF2);
+/// 메인 화면(리포트)에서 각 섹션당 보여줄 최대 개수
+const int _kSectionPreviewCount = 3;
 
 class _InstallmentRecurringScreenState
     extends State<InstallmentRecurringScreen> {
@@ -137,14 +138,105 @@ class _InstallmentRecurringScreenState
     return diffMonths + 1;
   }
 
+  /// 타일 탭 → 상세화면 이동. 수정/삭제로 변경이 있었으면 리포트를 새로고침.
+  Future<void> _openDetail(TransactionItem item) async {
+    final bool? changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => TransactionDetailScreen(item: item)),
+    );
+    if (changed == true) {
+      _load();
+    }
+  }
+
+  /// 타일 꾹 누르기 → 공용 모달로 삭제 확인 후 삭제.
+  Future<void> _confirmDelete(TransactionItem item) async {
+    final confirmed = await DdaengModal.confirm(
+      context,
+      title: '내역 삭제',
+      message: '${item.title}을(를) 삭제할까요?',
+      type: ModalType.danger,
+      cancelText: '취소',
+      confirmText: '삭제',
+    );
+    if (!confirmed) return;
+
+    try {
+      await TransactionService().deleteTransaction(item.type, item.id);
+      if (!mounted) return;
+      await DdaengModal.alert(
+        context,
+        title: '삭제 완료',
+        message: '내역을 삭제했어요.',
+        type: ModalType.success,
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      await DdaengModal.alert(
+        context,
+        title: '삭제할 수 없어요',
+        message: '$e',
+        type: ModalType.danger,
+      );
+    }
+  }
+
+  /// "전체보기" 탭 → 카테고리 전체 목록 화면 이동. 거기서 변경이 있었으면 새로고침.
+  Future<void> _openCategoryList({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required Color background,
+    required List<TransactionItem> items,
+    required String emptyText,
+    bool isInstallment = false,
+  }) async {
+    final bool? changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CategoryTransactionListScreen(
+          title: title,
+          icon: icon,
+          color: color,
+          background: background,
+          items: items,
+          emptyText: emptyText,
+          isInstallment: isInstallment,
+          currentInstallmentNoBuilder:
+          isInstallment ? _currentInstallmentNo : null,
+        ),
+      ),
+    );
+    if (changed == true) {
+      _load();
+    }
+  }
+
+  int _sumAmount(List<TransactionItem> items) =>
+      items.fold<int>(0, (sum, item) => sum + item.amount);
+
+  /// 이번 달 실제로 청구 중인 할부 건만 골라 월 납입액을 합산한다.
+  int _sumActiveInstallmentMonthly() {
+    int total = 0;
+    for (final item in _installments) {
+      final int totalMonths = item.installmentTotalMonths ?? 1;
+      final int currentNo = _currentInstallmentNo(item.date);
+      if (currentNo >= 1 && currentNo <= totalMonths) {
+        total += (item.amount / totalMonths).round();
+      }
+    }
+    return total;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F7FA),
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F7FA),
         surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.ink,
         title: const Text(
@@ -160,70 +252,133 @@ class _InstallmentRecurringScreenState
         onRefresh: _load,
         color: AppColors.expenseDeep,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           children: [
-            _SectionCard(
-              child: _ReportSection(
+            _SummaryCard(
+              recurringExpenseTotal: _sumAmount(_recurringExpenses),
+              installmentMonthlyTotal: _sumActiveInstallmentMonthly(),
+              recurringIncomeTotal: _sumAmount(_recurringIncomes),
+              recurringSavingTotal: _sumAmount(_recurringSavings),
+              installmentActiveCount: _installments
+                  .where((item) {
+                final total = item.installmentTotalMonths ?? 1;
+                final no = _currentInstallmentNo(item.date);
+                return no >= 1 && no <= total;
+              }).length,
+            ),
+            const SizedBox(height: 14),
+            SectionCard(
+              child: ReportSection(
                 title: '할부 진행 중',
                 icon: Icons.credit_card_rounded,
                 color: AppColors.expenseDeep,
                 emptyText: '진행 중인 할부가 없어요',
+                totalCount: _installments.length,
+                onSeeAll: () => _openCategoryList(
+                  title: '할부 진행 중',
+                  icon: Icons.credit_card_rounded,
+                  color: AppColors.expenseDeep,
+                  background: AppColors.expense.withValues(alpha: 0.15),
+                  items: _installments,
+                  emptyText: '진행 중인 할부가 없어요',
+                  isInstallment: true,
+                ),
                 children: _installments
-                    .map((item) => _InstallmentTile(
+                    .take(_kSectionPreviewCount)
+                    .map((item) => InstallmentTile(
                   item: item,
                   currentNo: _currentInstallmentNo(item.date),
+                  onTap: () => _openDetail(item),
+                  onLongPress: () => _confirmDelete(item),
                 ))
                     .toList(),
               ),
             ),
             const SizedBox(height: 14),
-            _SectionCard(
-              child: _ReportSection(
+            SectionCard(
+              child: ReportSection(
                 title: '정기결제',
                 icon: Icons.repeat_rounded,
                 color: AppColors.expenseDeep,
                 emptyText: '등록된 정기결제가 없어요',
-                children: _recurringExpenses
-                    .map((item) => _RecurringTile(
-                  item: item,
-                  color: AppColors.expenseBox,
+                totalCount: _recurringExpenses.length,
+                onSeeAll: () => _openCategoryList(
+                  title: '정기결제',
+                  icon: Icons.repeat_rounded,
+                  color: AppColors.expenseDeep,
                   background: AppColors.expense.withValues(alpha: 0.15),
+                  items: _recurringExpenses,
+                  emptyText: '등록된 정기결제가 없어요',
+                ),
+                children: _recurringExpenses
+                    .take(_kSectionPreviewCount)
+                    .map((item) => RecurringTile(
+                  item: item,
+                  color: AppColors.expenseDeep,
+                  background: AppColors.expense.withValues(alpha: 0.15),
+                  onTap: () => _openDetail(item),
+                  onLongPress: () => _confirmDelete(item),
                 ))
                     .toList(),
               ),
             ),
             const SizedBox(height: 14),
-            _SectionCard(
-              child: _ReportSection(
+            SectionCard(
+              child: ReportSection(
                 title: '정기수입',
                 icon: Icons.repeat_rounded,
                 color: AppColors.income,
                 emptyText: '등록된 정기수입이 없어요',
+                totalCount: _recurringIncomes.length,
+                onSeeAll: () => _openCategoryList(
+                  title: '정기수입',
+                  icon: Icons.repeat_rounded,
+                  color: AppColors.income,
+                  background: AppColors.incomeSoft,
+                  items: _recurringIncomes,
+                  emptyText: '등록된 정기수입이 없어요',
+                ),
                 children: _recurringIncomes
-                    .map((item) => _RecurringTile(
+                    .take(_kSectionPreviewCount)
+                    .map((item) => RecurringTile(
                   item: item,
                   color: AppColors.income,
                   background: AppColors.incomeSoft,
+                  onTap: () => _openDetail(item),
+                  onLongPress: () => _confirmDelete(item),
                 ))
                     .toList(),
               ),
             ),
             const SizedBox(height: 14),
-            _SectionCard(
-              child: _ReportSection(
+            SectionCard(
+              child: ReportSection(
                 title: '반복저축',
                 icon: Icons.repeat_rounded,
                 color: AppColors.saving,
                 emptyText: '등록된 반복저축이 없어요',
+                totalCount: _recurringSavings.length,
+                onSeeAll: () => _openCategoryList(
+                  title: '반복저축',
+                  icon: Icons.repeat_rounded,
+                  color: AppColors.saving,
+                  background: AppColors.savingSoft,
+                  items: _recurringSavings,
+                  emptyText: '등록된 반복저축이 없어요',
+                ),
                 children: _recurringSavings
-                    .map((item) => _RecurringTile(
+                    .take(_kSectionPreviewCount)
+                    .map((item) => RecurringTile(
                   item: item,
                   color: AppColors.saving,
                   background: AppColors.savingSoft,
+                  onTap: () => _openDetail(item),
+                  onLongPress: () => _confirmDelete(item),
                 ))
                     .toList(),
               ),
             ),
+            const ReportLongPressHint(),
           ],
         ),
       ),
@@ -231,241 +386,97 @@ class _InstallmentRecurringScreenState
   }
 }
 
-/// 구독관리 화면의 _SectionCard와 동일한 스타일의 흰색 카드 프레임.
-class _SectionCard extends StatelessWidget {
-  final Widget child;
+/// 카드포인트/구독관리 화면 상단 요약 카드와 동일한 톤의 그라데이션 카드.
+class _SummaryCard extends StatelessWidget {
+  final int recurringExpenseTotal;
+  final int installmentMonthlyTotal;
+  final int recurringIncomeTotal;
+  final int recurringSavingTotal;
+  final int installmentActiveCount;
 
-  const _SectionCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppColors.cardShadow,
-      ),
-      child: child,
-    );
-  }
-}
-
-class _ReportSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final String emptyText;
-  final List<Widget> children;
-
-  const _ReportSection({
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.emptyText,
-    required this.children,
+  const _SummaryCard({
+    required this.recurringExpenseTotal,
+    required this.installmentMonthlyTotal,
+    required this.recurringIncomeTotal,
+    required this.recurringSavingTotal,
+    required this.installmentActiveCount,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), shape: BoxShape.circle),
-              alignment: Alignment.center,
-              child: Icon(icon, size: 14, color: color),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.ink),
-            ),
-          ],
+    final int monthlyOutflow = recurringExpenseTotal + installmentMonthlyTotal;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFA35C), Color(0xFFFF7A45)],
         ),
-        const SizedBox(height: 12),
-        if (children.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Center(
-              child: Text(
-                emptyText,
-                style: const TextStyle(color: AppColors.inkSub, fontSize: 13),
-              ),
-            ),
-          )
-        else
-          ...children.map(
-                (child) => Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: child,
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-/// 구독관리 _SubscriptionTile과 동일한 톤: 컬러 아이콘 박스 + 이름/보조텍스트 + 금액
-class _RecurringTile extends StatelessWidget {
-  final TransactionItem item;
-  final Color color;
-  final Color background;
-
-  const _RecurringTile({
-    required this.item,
-    required this.color,
-    required this.background,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: background.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(22),
       ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(13)),
-            child: Icon(Icons.repeat_rounded, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.recurringPayDay != null ? '매달 ${item.recurringPayDay}일' : '매달 반복',
-                  style: const TextStyle(color: AppColors.inkSub, fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            '${CurrencyFormatter.format(item.amount)}원',
-            style: TextStyle(fontWeight: FontWeight.bold, color: color),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 할부 전용 타일: 위 _RecurringTile 톤에 진행률바를 추가한 버전
-class _InstallmentTile extends StatelessWidget {
-  final TransactionItem item;
-  final int currentNo;
-
-  const _InstallmentTile({required this.item, required this.currentNo});
-
-  @override
-  Widget build(BuildContext context) {
-    final int totalMonths = item.installmentTotalMonths ?? 1;
-    final int monthlyAmount = (item.amount / totalMonths).round();
-
-    String statusText;
-    double progress;
-    Color statusColor;
-
-    if (currentNo <= 0) {
-      statusText = '다음 달부터 청구 시작';
-      progress = 0;
-      statusColor = AppColors.inkSub;
-    } else if (currentNo > totalMonths) {
-      statusText = '할부 완료';
-      progress = 1;
-      statusColor = AppColors.inkSub;
-    } else {
-      final int remaining = totalMonths - currentNo;
-      statusText = remaining == 0 ? '이번 달이 마지막 회차예요' : '$remaining개월 남음';
-      progress = currentNo / totalMonths;
-      statusColor = AppColors.expenseDeep;
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.expense.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const Text(
+            '이번 달 정기 지출',
+            style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${reportFormatAmount(monthlyOutflow)}원',
+            style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '정기결제 ${reportFormatAmount(recurringExpenseTotal)}원 · 할부 납입 ${reportFormatAmount(installmentMonthlyTotal)}원',
+            style: const TextStyle(color: Colors.white70, fontSize: 11),
+          ),
+          const SizedBox(height: 20),
           Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: AppColors.expense.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(13)),
-                child: const Icon(Icons.credit_card_rounded, color: AppColors.expenseDeep, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '월 ${CurrencyFormatter.format(monthlyAmount)}원 × $totalMonths개월',
-                      style: const TextStyle(color: AppColors.inkSub, fontSize: 10),
-                    ),
-                  ],
-                ),
-              ),
-              Text(
-                '${CurrencyFormatter.format(item.amount)}원',
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.ink),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: progress.clamp(0, 1),
-              minHeight: 6,
-              backgroundColor: _progressTrackColor,
-              valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                currentNo <= 0 ? '시작 전' : '${currentNo.clamp(1, totalMonths)}/$totalMonths회차',
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: statusColor),
-              ),
-              Text(
-                statusText,
-                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: statusColor),
-              ),
+              _SummaryItem(label: '할부 진행', value: '$installmentActiveCount건'),
+              const SizedBox(width: 8),
+              _SummaryItem(label: '정기수입', value: '${reportFormatAmount(recurringIncomeTotal)}원'),
+              const SizedBox(width: 8),
+              _SummaryItem(label: '반복저축', value: '${reportFormatAmount(recurringSavingTotal)}원'),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SummaryItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SummaryItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+            ),
+          ],
+        ),
       ),
     );
   }
