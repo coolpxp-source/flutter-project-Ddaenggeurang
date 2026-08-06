@@ -64,7 +64,6 @@ class MissionService {
       'checkedAt',
       descending: true,
     )
-        .limit(5)
         .get();
 
     for (final doc in attendanceSnapshot.docs) {
@@ -151,7 +150,7 @@ class MissionService {
       return bDate.compareTo(aDate);
     });
 
-    return rewards.take(5).toList();
+    return rewards;
   }
 
   Future<Set<int>> getMonthlyAttendanceDays({
@@ -408,10 +407,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level':
-              1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
 
@@ -644,9 +640,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level': 1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
         },
@@ -991,9 +985,7 @@ class MissionService {
             userRef,
             {
               'points': newPoints,
-              'level': 1 + (newPoints ~/ 100),
-              'updatedAt':
-              FieldValue.serverTimestamp(),
+              'updatedAt': FieldValue.serverTimestamp(),
             },
           );
         },

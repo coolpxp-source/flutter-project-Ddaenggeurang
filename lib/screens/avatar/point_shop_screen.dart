@@ -256,8 +256,8 @@ class _PointShopScreenState extends State<PointShopScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 74,
-                  height: 74,
+                  width: 120,
+                  height: 120,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
@@ -422,17 +422,20 @@ class _PointShopScreenState extends State<PointShopScreen> {
 
   // 구매 팝업에 아이템 실제 이미지를 출력하는 메서드
   Widget _buildPurchaseItemImage(AvatarItem item) {
-    final imageUrl = item.imageUrl.trim();
-    final assetPath = item.assetPath.trim();
+    final String imageUrl = item.imageUrl.trim();
+    final String assetPath = item.assetPath.trim();
 
     if (imageUrl.isNotEmpty) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.none,
-        errorBuilder: (_, _, _) {
-          return _buildPurchaseAssetOrIcon(item);
-        },
+      return _buildPurchasePreviewTransform(
+        item: item,
+        image: Image.network(
+          imageUrl,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, _, _) {
+            return _buildPurchaseAssetOrIcon(item);
+          },
+        ),
       );
     }
 
@@ -441,25 +444,84 @@ class _PointShopScreenState extends State<PointShopScreen> {
 
 // 구매 팝업에 로컬 에셋 또는 기본 아이콘을 출력하는 메서드
   Widget _buildPurchaseAssetOrIcon(AvatarItem item) {
-    if (item.assetPath.trim().isNotEmpty) {
-      return Image.asset(
-        item.assetPath,
-        fit: BoxFit.contain,
-        filterQuality: FilterQuality.none,
-        errorBuilder: (_, _, _) {
-          return Icon(
-            _slotIcon(item.slot),
-            color: Colors.white,
-            size: 36,
-          );
-        },
+    final String assetPath = item.assetPath.trim();
+
+    if (assetPath.isNotEmpty) {
+      return _buildPurchasePreviewTransform(
+        item: item,
+        image: Image.asset(
+          assetPath,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.none,
+          errorBuilder: (_, error, _) {
+            debugPrint('구매 팝업 에셋 로드 실패: $assetPath');
+            debugPrint('$error');
+
+            return Icon(
+              _slotIcon(item.slot),
+              color: Colors.white,
+              size: 44,
+            );
+          },
+        ),
       );
     }
 
     return Icon(
       _slotIcon(item.slot),
       color: Colors.white,
-      size: 36,
+      size: 44,
+    );
+  }
+
+  // 구매 팝업 미리보기의 슬롯별 확대 비율과 위치를 적용하는 메서드
+  Widget _buildPurchasePreviewTransform({
+    required AvatarItem item,
+    required Widget image,
+  }) {
+    double scale;
+    Alignment alignment;
+
+    switch (item.slot) {
+      case 'hair':
+        scale = 2.0;
+        alignment = const Alignment(0, -0.85);
+        break;
+
+      case 'clothes':
+        scale = 3.0;
+        alignment = const Alignment(0, 0.4);
+        break;
+
+      case 'shoes':
+        scale = 3.6;
+        alignment = const Alignment(0, 0.9);
+        break;
+
+      case 'accessory':
+        scale = 3.0;
+        alignment = const Alignment(0, -0.4);
+        break;
+
+      case 'pet':
+        scale = 2.8;
+        alignment = const Alignment(0.9, 0.65);
+        break;
+
+      default:
+        scale = 1.0;
+        alignment = Alignment.center;
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Transform.scale(
+        scale: scale,
+        alignment: alignment,
+        child: SizedBox.expand(
+          child: image,
+        ),
+      ),
     );
   }
 

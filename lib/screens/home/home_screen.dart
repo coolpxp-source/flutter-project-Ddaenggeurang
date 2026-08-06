@@ -46,6 +46,9 @@ import '../budget/budget_vs_expense_screen.dart';
 // 추가: 홈의 카테고리별 지출 카드에서 상세 집계 화면으로 이동하기 위한 import
 import '../category/category_summary_screen.dart';
 import '../../widgets/home/quick_add_fab.dart';
+import '../../models/group_model.dart';
+import '../../services/group_service.dart';
+import '../group/shared_expense_list_screen.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -363,6 +366,11 @@ class _ShimmerBlock extends StatelessWidget {
 class _HomeDashboardState extends State<_HomeDashboard> {
   bool _isGroupMode = false;
   DateTime _month = DateTime.now();
+  final GroupService _groupService = GroupService.instance;
+
+  List<GroupModel> _myGroups = [];
+  bool _isLoadingGroups = false;
+  bool _hasLoadedGroups = false;
   late DateTime _selectedDay = DateTime.now();
 
   // 첫 방문자 전용 스팟라이트 투어 — 대상 위젯 3곳의 위치만 알면 되므로
@@ -377,6 +385,43 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   void dispose() {
     _tourController.dispose();
     super.dispose();
+  }
+  // 현재 사용자가 참여 중인 그룹 목록을 불러오는 메서드
+  Future<void> _loadMyGroups() async {
+    if (_isLoadingGroups) {
+      return;
+    }
+
+    setState(() {
+      _isLoadingGroups = true;
+    });
+
+    try {
+      final List<GroupModel> groups =
+      await _groupService.getMyGroups();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _myGroups = groups;
+        _isLoadingGroups = false;
+        _hasLoadedGroups = true;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _myGroups = [];
+        _isLoadingGroups = false;
+        _hasLoadedGroups = true;
+      });
+
+      debugPrint('홈 그룹 목록 조회 실패: $error');
+    }
   }
 
   Future<void> _maybeStartTour() async {
@@ -479,13 +524,65 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                           const SizedBox(height: 12),
                           _ModeToggle(
                             isGroup: _isGroupMode,
-                            onChanged: (v) => setState(() => _isGroupMode = v),
+                            onChanged: (bool value) {
+                              setState(() {
+                                _isGroupMode = value;
+                              });
+
+                              if (value && !_hasLoadedGroups) {
+                                _loadMyGroups();
+                              }
+                            },
                           ),
                           if (_isGroupMode) ...[
                             const SizedBox(height: 10),
-                            _GroupManageBanner(
-                              onTap: () => Navigator.of(context).push(MaterialPageRoute(
-                                  builder: (_) => const GroupCreateJoinScreen())),
+
+                            // 새 그룹 생성 및 초대 코드 참여 화면 이동 버튼
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const GroupCreateJoinScreen(),
+                                    ),
+                                  );
+
+                                  if (!mounted) {
+                                    return;
+                                  }
+
+                                  await _loadMyGroups();
+                                },
+                                icon: const Icon(
+                                  Icons.group_add_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('새 그룹 만들기'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: _C.purple,
+                                  textStyle: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 6),
+
+                            _HomeGroupList(
+                              groups: _myGroups,
+                              isLoading: _isLoadingGroups,
+                              onGroupTap: (GroupModel group) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => SharedExpenseListScreen(
+                                      group: group,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                           const SizedBox(height: 16),
@@ -1180,6 +1277,253 @@ class _MonthHeader extends StatelessWidget {
   );
 }
 
+// 홈 화면에 참여 중인 그룹을 3개씩 표시하는 위젯
+class _HomeGroupList extends StatefulWidget {
+  const _HomeGroupList({
+    required this.groups,
+    required this.isLoading,
+    required this.onGroupTap,
+  });
+
+  final List<GroupModel> groups;
+  final bool isLoading;
+  final ValueChanged<GroupModel> onGroupTap;
+
+  @override
+  State<_HomeGroupList> createState() => _HomeGroupListState();
+}
+
+class _HomeGroupListState extends State<_HomeGroupList> {
+  static const int _pageSize = 3;
+
+  int _currentPage = 0;
+
+  // 전체 페이지 수를 계산
+  int get _totalPages {
+    if (widget.groups.isEmpty) {
+      return 0;
+    }
+
+    return (widget.groups.length / _pageSize).ceil();
+  }
+
+  // 현재 페이지에 표시할 그룹 목록을 반환
+  List<GroupModel> get _visibleGroups {
+    if (widget.groups.isEmpty) {
+      return [];
+    }
+
+    final int startIndex = _currentPage * _pageSize;
+    final int endIndex = (startIndex + _pageSize)
+        .clamp(0, widget.groups.length);
+
+    return widget.groups.sublist(startIndex, endIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeGroupList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 그룹 삭제 등으로 전체 페이지 수가 줄었을 때 페이지 위치 보정
+    final int lastPage =
+    _totalPages > 0 ? _totalPages - 1 : 0;
+
+    if (_currentPage > lastPage) {
+      _currentPage = lastPage;
+    }
+  }
+
+  // 이전 페이지로 이동
+  void _movePreviousPage() {
+    if (_currentPage <= 0) {
+      return;
+    }
+
+    setState(() {
+      _currentPage--;
+    });
+  }
+
+  // 다음 페이지로 이동
+  void _moveNextPage() {
+    if (_currentPage >= _totalPages - 1) {
+      return;
+    }
+
+    setState(() {
+      _currentPage++;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.isLoading) {
+      return const SizedBox(
+        height: 72,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: _C.purple,
+          ),
+        ),
+      );
+    }
+
+    if (widget.groups.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _C.cardShadow,
+        ),
+        child: const Row(
+          children: [
+            Icon(
+              Icons.group_off_rounded,
+              color: _C.inkSub,
+            ),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '참여 중인 그룹이 없어요.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _C.inkSub,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        ..._visibleGroups.map(_buildGroupCard),
+
+        if (_totalPages > 1) ...[
+          const SizedBox(height: 4),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                tooltip: '이전 그룹',
+                onPressed:
+                _currentPage > 0 ? _movePreviousPage : null,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.chevron_left_rounded,
+                ),
+              ),
+
+              Text(
+                '${_currentPage + 1} / $_totalPages',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _C.inkSub,
+                ),
+              ),
+
+              IconButton(
+                tooltip: '다음 그룹',
+                onPressed: _currentPage < _totalPages - 1
+                    ? _moveNextPage
+                    : null,
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(
+                  Icons.chevron_right_rounded,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  // 참여 중인 그룹 카드 생성
+  Widget _buildGroupCard(GroupModel group) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => widget.onGroupTap(group),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 13,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: _C.cardShadow,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: _C.purple,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.groups_rounded,
+                  size: 18,
+                  color: Colors.white,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: _C.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${group.memberCount}명 참여 · 공동지출 보기',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: _C.inkSub,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: _C.inkSub,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 // ─────────────────────── 개인/그룹 토글 ───────────────────────
 
 /// 그룹 모드 선택 시 뜨는 안내 배너 — 토글 자체는 보기 전환일 뿐이고,
@@ -2117,12 +2461,17 @@ class _RecentExpensesSectionState extends State<_RecentExpensesSection> {
           children: [
             const Text('최근 지출',
                 style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
-            Row(
-              children: const [
-                Text('전체보기',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
-                Icon(Icons.chevron_right_rounded, size: 16, color: _C.inkSub),
-              ],
+            InkWell(
+              borderRadius: BorderRadius.circular(8),
+              onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TransactionHistoryScreen())),
+              child: Row(
+                children: const [
+                  Text('전체보기',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: _C.inkSub),
+                ],
+              ),
             ),
           ],
         ),
@@ -2305,6 +2654,23 @@ class _LiveSpendingInsightSectionState extends State<_LiveSpendingInsightSection
     }
   }
 
+  // 소비심리 테스트 화면에서 돌아온 뒤 최신 결과를 다시 조회하는 메서드
+  Future<void> _openPsychologyTest() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const PsychologyTestStartScreen(),
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _future = _load();
+    });
+  }
+
   Future<_SpendingInsight> _load() async {
     final results = await Future.wait([
       PsychologyTestService().getLatestTestResult(),
@@ -2359,11 +2725,13 @@ class _LiveSpendingInsightSectionState extends State<_LiveSpendingInsightSection
             _WalletTeaserCard(nickname: widget.nickname, spendingType: typeLabel),
             const SizedBox(height: 16),
             _SpendingTendencyCard(
+              resultType: insight.resultType,
               type: typeLabel,
               tip: insight.resultType == null
                   ? '아직 소비심리 테스트를 안 하셨어요. 테스트하고 나만의 소비 유형을 확인해보세요!'
                   : insight.tip,
               hasResult: insight.resultType != null,
+              onTestTap: _openPsychologyTest,
             ),
           ],
         );
@@ -2371,6 +2739,7 @@ class _LiveSpendingInsightSectionState extends State<_LiveSpendingInsightSection
     );
   }
 }
+
 
 // ─────────────────────── 지갑멍 아바타 티저 카드 ───────────────────────
 
@@ -2444,21 +2813,98 @@ class _WalletTeaserCard extends StatelessWidget {
 // ─────────────────────── 소비 성향 카드 ───────────────────────
 
 class _SpendingTendencyCard extends StatelessWidget {
+  final String? resultType;
   final String type;
   final String tip;
   final bool hasResult;
-  const _SpendingTendencyCard({required this.type, required this.tip, required this.hasResult});
+  final Future<void> Function() onTestTap;
+
+  const _SpendingTendencyCard({
+    required this.resultType,
+    required this.type,
+    required this.tip,
+    required this.hasResult,
+    required this.onTestTap,
+  });
+  // 소비심리 유형별 대표 색상을 반환하는 메서드
+  Color _typeColor() {
+    switch (resultType) {
+      case 'impulsive_spender':
+        return const Color(0xFFFF6B81);
+
+      case 'emotion_spender':
+        return const Color(0xFFFFA94D);
+
+      case 'balanced_spender':
+        return const Color(0xFF8566FF);
+
+      case 'planned_spender':
+        return const Color(0xFF36BFA0);
+
+      default:
+        return const Color(0xFF9A9DAA);
+    }
+  }
+
+// 소비심리 유형별 연한 배경색을 반환하는 메서드
+  Color _typeBackgroundColor() {
+    switch (resultType) {
+      case 'impulsive_spender':
+        return const Color(0xFFFFEEF2);
+
+      case 'emotion_spender':
+        return const Color(0xFFFFF4E7);
+
+      case 'balanced_spender':
+        return const Color(0xFFF3F0FF);
+
+      case 'planned_spender':
+        return const Color(0xFFEAF9F5);
+
+      default:
+        return const Color(0xFFF4F5F7);
+    }
+  }
+
+// 소비심리 유형별 아이콘을 반환하는 메서드
+  IconData _typeIcon() {
+    switch (resultType) {
+      case 'impulsive_spender':
+        return Icons.bolt_rounded;
+
+      case 'emotion_spender':
+        return Icons.cloud_rounded;
+
+      case 'balanced_spender':
+        return Icons.balance_rounded;
+
+      case 'planned_spender':
+        return Icons.event_note_rounded;
+
+      default:
+        return Icons.psychology_alt_rounded;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final Color typeColor = _typeColor();
+    final Color backgroundColor = _typeBackgroundColor();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: _C.pinkSoft,
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: typeColor.withValues(alpha: 0.25),
+        ),
         boxShadow: [
-          BoxShadow(color: _C.pink.withValues(alpha: 0.1), blurRadius: 14, offset: const Offset(0, 6)),
+          BoxShadow(
+            color: typeColor.withValues(alpha: 0.12),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
         ],
       ),
       child: Column(
@@ -2466,25 +2912,36 @@ class _SpendingTendencyCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.favorite_rounded, size: 16, color: _C.pink),
+              Icon(
+                _typeIcon(),
+                size: 17,
+                color: typeColor,
+              ),
               const SizedBox(width: 6),
-              Text(hasResult ? '소비 성향: $type' : '소비 성향 미확인',
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFFB8395C))),
+              Text(
+                hasResult ? '소비 성향: $type' : '소비 성향 미확인',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: typeColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(tip,
-              style: const TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF8A5164),
-                  height: 1.5)),
+          Text(
+            tip,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              color: typeColor.withValues(alpha: 0.82),
+              height: 1.5,
+            ),
+          ),
           const SizedBox(height: 14),
           InkWell(
             borderRadius: BorderRadius.circular(14),
-            onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PsychologyTestStartScreen())),
+            onTap: onTestTap,
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -2493,19 +2950,35 @@ class _SpendingTendencyCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                      color: _C.pink.withValues(alpha: 0.16), blurRadius: 10, offset: const Offset(0, 4)),
+                    color: typeColor.withValues(alpha: 0.16),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
                 ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.psychology_alt_rounded, size: 16, color: _C.pink),
+                  Icon(
+                    Icons.psychology_alt_rounded,
+                    size: 16,
+                    color: typeColor,
+                  ),
                   const SizedBox(width: 6),
-                  Text(hasResult ? '테스트 다시 하기' : '소비심리 테스트하러가기',
-                      style: const TextStyle(
-                          fontSize: 12.5, fontWeight: FontWeight.w800, color: _C.pink)),
+                  Text(
+                    hasResult ? '테스트 다시 하기' : '소비심리 테스트하러가기',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: typeColor,
+                    ),
+                  ),
                   const SizedBox(width: 4),
-                  const Icon(Icons.arrow_forward_rounded, size: 14, color: _C.pink),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 14,
+                    color: typeColor,
+                  ),
                 ],
               ),
             ),

@@ -27,6 +27,60 @@ class _MissionListScreenState extends State<MissionListScreen> {
   Map<String, Map<String, dynamic>> _missionProgress = {};
 
   Set<int> _completedDays = {};
+
+  static const int _rewardPageSize = 3;
+
+  int _rewardCurrentPage = 0;
+
+  // 보상 내역의 전체 페이지 수를 계산하는 getter
+  int get _rewardTotalPages {
+    if (_recentRewards.isEmpty) {
+      return 0;
+    }
+
+    return (_recentRewards.length / _rewardPageSize).ceil();
+  }
+
+// 현재 페이지에 출력할 보상 내역을 반환하는 getter
+  List<Map<String, dynamic>> get _visibleRewards {
+    if (_recentRewards.isEmpty) {
+      return [];
+    }
+
+    final int startIndex =
+        _rewardCurrentPage * _rewardPageSize;
+
+    final int endIndex =
+    (startIndex + _rewardPageSize)
+        .clamp(0, _recentRewards.length);
+
+    return _recentRewards.sublist(
+      startIndex,
+      endIndex,
+    );
+  }
+  // 이전 보상 페이지로 이동하는 메서드
+  void _movePreviousRewardPage() {
+    if (_rewardCurrentPage <= 0) {
+      return;
+    }
+
+    setState(() {
+      _rewardCurrentPage--;
+    });
+  }
+
+// 다음 보상 페이지로 이동하는 메서드
+  void _moveNextRewardPage() {
+    if (_rewardCurrentPage >=
+        _rewardTotalPages - 1) {
+      return;
+    }
+
+    setState(() {
+      _rewardCurrentPage++;
+    });
+  }
   // 사용자 안내 스낵바 표시 메서드
   void _showMessage(
       String message, {
@@ -88,6 +142,7 @@ class _MissionListScreenState extends State<MissionListScreen> {
         _isLoading = false;
         _completedDays = completedDays;
         _recentRewards = recentRewards;
+        _rewardCurrentPage = 0;
       });
     } catch (e) {
       if (!mounted) {
@@ -877,41 +932,117 @@ class _MissionListScreenState extends State<MissionListScreen> {
                   fontSize: 13,
                 ),
               ),
-            )
-          else
-            ...List.generate(
-              _recentRewards.length,
-                  (index) {
-                final reward =
-                _recentRewards[index];
-
-                final isAttendance =
-                    reward['type'] == 'attendance';
-
-                return Column(
-                  children: [
-                    _buildRewardItem(
-                      icon: isAttendance
-                          ? Icons.calendar_month
-                          : Icons.emoji_events_outlined,
-                      title:
-                      reward['title'] as String,
-                      date: _formatRewardDate(
-                        reward['date'] as Timestamp?,
-                      ),
-                      points:
-                      '+${reward['points']} P',
-                      color: isAttendance
-                          ? const Color(0xFFFF68AE)
-                          : const Color(0xFF8566FF),
-                    ),
-                    if (index !=
-                        _recentRewards.length - 1)
-                      const Divider(height: 24),
-                  ],
-                );
-              },
             ),
+          Column(
+            children: [
+              ...List.generate(
+                _visibleRewards.length,
+                    (index) {
+                  final Map<String, dynamic> reward =
+                  _visibleRewards[index];
+
+                  final String rewardType =
+                      reward['type'] as String? ?? '';
+
+                  final Color rewardColor;
+                  final IconData rewardIcon;
+
+                  switch (rewardType) {
+                    case 'attendance':
+                      rewardColor = const Color(0xFFFF68AE);
+                      rewardIcon = Icons.calendar_month_rounded;
+                      break;
+
+                    case 'budget_success':
+                      rewardColor = const Color(0xFF8566FF);
+                      rewardIcon = Icons.savings_rounded;
+                      break;
+
+                    case 'photo_proof':
+                      rewardColor = const Color(0xFF5B8DEF);
+                      rewardIcon = Icons.camera_alt_rounded;
+                      break;
+
+                    default:
+                      rewardColor = const Color(0xFF36BFA0);
+                      rewardIcon = Icons.emoji_events_rounded;
+                  }
+
+                  return Column(
+                    children: [
+                      _buildRewardItem(
+                        icon: rewardIcon,
+                        title: reward['title'] as String? ?? '미션 보상',
+                        date: _formatRewardDate(
+                          reward['date'] as Timestamp?,
+                        ),
+                        points:
+                        '+${(reward['points'] as num?)?.toInt() ?? 0} P',
+                        color: rewardColor,
+                      ),
+
+                      if (index != _visibleRewards.length - 1)
+                        const Divider(
+                          height: 25,
+                          color: Color(0xFFEDEEF2),
+                        ),
+                    ],
+                  );
+                },
+              ),
+
+              if (_rewardTotalPages > 1) ...[
+                const SizedBox(height: 12),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      tooltip: '이전 보상',
+                      onPressed: _rewardCurrentPage > 0
+                          ? _movePreviousRewardPage
+                          : null,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.chevron_left_rounded,
+                      ),
+                    ),
+
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1EFFF),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        '${_rewardCurrentPage + 1} / $_rewardTotalPages',
+                        style: const TextStyle(
+                          color: Color(0xFF8566FF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+
+                    IconButton(
+                      tooltip: '다음 보상',
+                      onPressed:
+                      _rewardCurrentPage < _rewardTotalPages - 1
+                          ? _moveNextRewardPage
+                          : null,
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(
+                        Icons.chevron_right_rounded,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          )
         ],
       ),
     );
