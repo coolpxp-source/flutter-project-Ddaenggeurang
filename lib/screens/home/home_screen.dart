@@ -91,14 +91,15 @@ TextStyle _displayNumber({required double fontSize, required Color color, double
 }
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final NavTab? initialTab;
+  const HomeScreen({super.key, this.initialTab});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  NavTab _currentTab = NavTab.home;
+  late NavTab _currentTab;
   bool _fabOpen = false;
 
   // 홈 대시보드는 데이터를 FutureBuilder로 한 번만 읽어오므로, 지출 입력 등
@@ -109,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _currentTab = widget.initialTab ?? NavTab.home;
     HomeRefreshService.signal.addListener(_onHomeRefreshRequested);
     // 홈 화면(탭 전환이 아니라 앱 진입 시 한 번만 새로 만들어지는 최상위
     // 위젯)에 처음 들어왔을 때 하루 한 번 출석 룰렛을 띄운다.
