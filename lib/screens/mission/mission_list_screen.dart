@@ -210,22 +210,37 @@ class _MissionListScreenState extends State<MissionListScreen> {
         };
 
       case 'photo_proof':
-        final approvalStatus =
+        final DateTime now = DateTime.now();
+
+        final String currentMonth =
+            '${now.year}-'
+            '${now.month.toString().padLeft(2, '0')}';
+
+        final String? savedMonth =
+        progressData?['month'] as String?;
+
+        final String? savedApprovalStatus =
         progressData?['approvalStatus'] as String?;
 
-        final isApproved =
+        // 이전 달 기록은 현재 달 미션 상태에 반영하지 않음
+        final String? approvalStatus =
+        savedMonth == currentMonth
+            ? savedApprovalStatus
+            : null;
+
+        final bool isApproved =
             approvalStatus == 'approved';
 
         return {
           'id': mission.id,
           'title': mission.title,
           'description': approvalStatus == 'pending'
-              ? '관리자 승인 대기 중이에요'
+              ? '이번 달 인증이 관리자 승인 대기 중이에요'
               : approvalStatus == 'rejected'
-              ? '인증이 반려되었습니다. 다시 제출해 주세요'
+              ? '이번 달 인증이 반려되었습니다. 다시 제출해 주세요'
               : isApproved
-              ? '미션 인증이 승인되었습니다'
-              : '사진 인증 후 관리자 승인이 필요해요',
+              ? '이번 달 절약 인증을 완료했습니다'
+              : '이번 달 절약 행동을 사진으로 인증해 주세요',
           'progress': isApproved ? 1 : 0,
           'target': 1,
           'points': mission.points,
@@ -336,6 +351,17 @@ class _MissionListScreenState extends State<MissionListScreen> {
       }
 
       final progressData = _missionProgress[mission.id];
+
+      if (mission.type == 'photo_proof') {
+        final DateTime now = DateTime.now();
+
+        final String currentMonth =
+            '${now.year}-'
+            '${now.month.toString().padLeft(2, '0')}';
+
+        return progressData?['approvalStatus'] == 'approved' &&
+            progressData?['month'] == currentMonth;
+      }
 
       if (mission.requiresApproval) {
         return progressData?['approvalStatus'] == 'approved';

@@ -53,6 +53,14 @@ class MissionService {
     return '$month월 $day일 $hour:$minute';
   }
 
+  // 현재 연월을 YYYY-MM 형식으로 반환하는 메서드
+  String _currentMonthId() {
+    final DateTime now = DateTime.now();
+
+    return '${now.year}-'
+        '${now.month.toString().padLeft(2, '0')}';
+  }
+
   Future<List<Map<String, dynamic>>> getRecentMissionRewards() async {
     final rewards = <Map<String, dynamic>>[];
 
@@ -448,6 +456,10 @@ class MissionService {
           final verificationData =
           verificationSnapshot.data()!;
 
+          final String verificationMonth =
+              verificationData['month'] as String? ??
+                  _currentMonthId();
+
           final approvalStatus =
               verificationData['approvalStatus']
               as String? ??
@@ -497,14 +509,13 @@ class MissionService {
             progressRef,
             {
               'status': 'in_progress',
+              'month': verificationMonth,
               'completedAt': null,
               'pointsEarned': 0,
               'approvalStatus': 'rejected',
               'rejectionReason': reason,
             },
-            SetOptions(
-              merge: true,
-            ),
+            SetOptions(merge: true),
           );
         },
       );
@@ -540,6 +551,10 @@ class MissionService {
 
           final verificationData =
           verificationSnapshot.data()!;
+
+          final String verificationMonth =
+              verificationData['month'] as String? ??
+                  _currentMonthId();
 
           final approvalStatus =
               verificationData['approvalStatus']
@@ -625,14 +640,13 @@ class MissionService {
             progressRef,
             {
               'status': 'completed',
-              'completedAt':
-              FieldValue.serverTimestamp(),
+              'month': verificationMonth,
+              'completedAt': FieldValue.serverTimestamp(),
               'pointsEarned': rewardPoints,
               'approvalStatus': 'approved',
+              'rejectionReason': null,
             },
-            SetOptions(
-              merge: true,
-            ),
+            SetOptions(merge: true),
           );
 
           final newPoints = currentPoints + rewardPoints;
@@ -772,6 +786,31 @@ class MissionService {
           .collection('missionProgress')
           .doc(missionDefId);
 
+      final String currentMonth = _currentMonthId();
+
+      final progressSnapshot = await progressRef.get();
+      final progressData = progressSnapshot.data();
+
+      final String? savedMonth =
+      progressData?['month'] as String?;
+
+      final String? approvalStatus =
+      progressData?['approvalStatus'] as String?;
+
+      if (savedMonth == currentMonth &&
+          approvalStatus == 'pending') {
+        throw StateError(
+          '이번 달 인증은 이미 승인 대기 중입니다.',
+        );
+      }
+
+      if (savedMonth == currentMonth &&
+          approvalStatus == 'approved') {
+        throw StateError(
+          '이번 달 절약 인증 미션은 이미 완료했습니다.',
+        );
+      }
+
       final verificationRef = _firestore
           .collection('missionVerifications')
           .doc();
@@ -782,6 +821,7 @@ class MissionService {
         progressRef,
         {
           'status': 'in_progress',
+          'month': currentMonth,
           'completedAt': null,
           'pointsEarned': 0,
           'proofImageUrl': downloadUrl,
@@ -790,6 +830,7 @@ class MissionService {
           'verificationId': verificationRef.id,
           'submittedAt':
           FieldValue.serverTimestamp(),
+          'rejectionReason': null,
         },
         SetOptions(
           merge: true,
@@ -802,11 +843,11 @@ class MissionService {
           'userId': userId,
           'missionDefId': missionDefId,
           'missionTitle': missionTitle,
+          'month': currentMonth,
           'proofImageUrl': downloadUrl,
           'proofDescription': description,
           'approvalStatus': 'pending',
-          'submittedAt':
-          FieldValue.serverTimestamp(),
+          'submittedAt': FieldValue.serverTimestamp(),
           'approvedAt': null,
           'rejectedAt': null,
           'rejectionReason': null,
