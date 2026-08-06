@@ -811,7 +811,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: isCompletedSaving ? Colors.grey[400] : AppColors.ink,
+                            color: item.categoryDeleted
+                                ? Colors.grey[400]
+                                : (isCompletedSaving ? Colors.grey[400] : AppColors.ink),
                           ),
                         ),
                       ),

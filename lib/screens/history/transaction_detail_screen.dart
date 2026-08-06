@@ -270,7 +270,10 @@ class TransactionDetailScreen extends StatelessWidget {
                   _sectionLabel('기본 정보',
                       icon: Icons.event_rounded, iconColor: typeColor, iconBg: typeColor.withValues(alpha: 0.15)),
                   const SizedBox(height: 14),
-                  if (item.parentCategory != null && item.parentCategory!.isNotEmpty) ...[
+                  if (item.categoryDeleted) ...[
+                    _buildInfoRow('카테고리', '삭제된 카테고리'),
+                    const SizedBox(height: 14),
+                  ] else if (item.parentCategory != null && item.parentCategory!.isNotEmpty) ...[
                     _buildInfoRow('카테고리', '${item.parentCategory} · ${item.title}'),
                     const SizedBox(height: 14),
                   ],

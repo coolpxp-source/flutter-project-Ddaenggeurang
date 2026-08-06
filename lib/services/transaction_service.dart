@@ -49,12 +49,16 @@ class TransactionService {
   }
 
   String _categoryName(Map<String, _CategoryMeta> meta, String categoryId) {
-    return meta[categoryId]?.name ?? categoryId;
+    return meta[categoryId]?.name ?? '삭제된 카테고리';
   }
 
   String? _categoryParent(Map<String, _CategoryMeta> meta, String categoryId) {
     final parent = meta[categoryId]?.parentName;
     return (parent == null || parent.isEmpty) ? null : parent;
+  }
+
+  bool _isCategoryDeleted(Map<String, _CategoryMeta> meta, String categoryId) {
+    return !meta.containsKey(categoryId);
   }
 
   TransactionInvestmentDetail? _mapInvestmentDetail(InvestmentDetail? detail) {
@@ -82,6 +86,7 @@ class TransactionService {
       isRecurring: expense.recurringPaymentId != null,
       recurringPaymentId: expense.recurringPaymentId,
       categoryId: expense.categoryId,
+      categoryDeleted: _isCategoryDeleted(categoryMeta, expense.categoryId),
     );
   }
 
@@ -97,6 +102,7 @@ class TransactionService {
       isRecurring: income.recurringIncomeTemplateId != null,
       recurringPayDay: income.recurringPayDay,
       categoryId: income.categoryId,
+      categoryDeleted: _isCategoryDeleted(categoryMeta, income.categoryId),
     );
   }
 
@@ -115,6 +121,7 @@ class TransactionService {
       investmentDetail: _mapInvestmentDetail(saving.investmentDetail),
       returnedAmount: saving.returnedAmount,
       categoryId: saving.categoryId,
+      categoryDeleted: _isCategoryDeleted(categoryMeta, saving.categoryId),
     );
   }
 
