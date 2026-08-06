@@ -62,12 +62,26 @@ class _MissionProofUploadScreenState
         return;
       }
 
-      setState(() {
-        _approvalStatus =
-        data?['approvalStatus'] as String?;
+      final DateTime now = DateTime.now();
 
-        _rejectionReason =
-        data?['rejectionReason'] as String?;
+      final String currentMonth =
+          '${now.year}-'
+          '${now.month.toString().padLeft(2, '0')}';
+
+      final String? savedMonth =
+      data?['month'] as String?;
+
+      setState(() {
+        if (savedMonth == currentMonth) {
+          _approvalStatus =
+          data?['approvalStatus'] as String?;
+
+          _rejectionReason =
+          data?['rejectionReason'] as String?;
+        } else {
+          _approvalStatus = null;
+          _rejectionReason = null;
+        }
 
         _isInitialLoading = false;
       });
@@ -162,15 +176,11 @@ class _MissionProofUploadScreenState
         return;
       }
 
-      setState(() {
-        _isSubmitting = false;
-
-        if (success) {
-          _approvalStatus = 'pending';
-        }
-      });
-
       if (!success) {
+        setState(() {
+          _isSubmitting = false;
+        });
+
         _showMessage(
           '사진 인증 제출에 실패했습니다.',
           type: AppSnackBarType.error,
@@ -178,7 +188,15 @@ class _MissionProofUploadScreenState
         return;
       }
 
+      _descriptionController.clear();
       FocusScope.of(context).unfocus();
+
+      setState(() {
+        _isSubmitting = false;
+        _approvalStatus = 'pending';
+        _rejectionReason = null;
+        _selectedImage = null;
+      });
 
       _showMessage(
         '사진 인증이 제출되었습니다.',
