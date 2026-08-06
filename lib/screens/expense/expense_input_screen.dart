@@ -602,6 +602,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       }
 
                       final String label = koreanAmountText(amount);
+                      final String spokenAmount = koreanAmount(amount);
 
                       if (label.isEmpty) {
                         return const SizedBox.shrink();
@@ -614,16 +615,30 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                         child: Padding(
                           key: ValueKey<int>(amount),
                           padding: const EdgeInsets.only(top: 8),
-                          child: Align(
-                            alignment: Alignment.centerRight,
-                            child: Text(
-                              label,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.expenseDeep,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Text(
+                                  label,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.expenseDeep,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 4),
+                              Text(
+                                spokenAmount,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.expenseDeep,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
