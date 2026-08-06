@@ -162,7 +162,7 @@
 ---
 
 ## <a name="ppt"></a>📝 발표 PPT(PDF)
-(추가 예정)
+[발표 자료 PDF 보기](https://drive.google.com/file/d/1qgHQawyyK97bo4bSeEQplER-vPvDHPPJ/view?usp=sharing)
 
 ## <a name="video"></a>🎥 시연 영상
 (추가 예정)
