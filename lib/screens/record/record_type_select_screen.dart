@@ -3,6 +3,8 @@ import '../expense/expense_input_screen.dart';
 import '../income/income_input_screen.dart';
 import '../saving/saving_input_screen.dart';
 import '../record/bulk_record_screen.dart';
+import 'sms_paste_screen.dart';
+import 'receipt_upload_screen.dart';
 import '../../utils/app_colors.dart';
 
 /// 1단계 - "기록하고 싶은 메뉴를 선택하세요!"
@@ -82,6 +84,30 @@ class RecordTypeSelectScreen extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const BulkRecordScreen()),
                 ),
               ),
+              const SizedBox(height: 12),
+              _RecordTypeCard(
+                title: '문자내역 붙여넣기',
+                subtitle: '카드/은행 알림 문자로 자동 입력',
+                icon: Icons.sms_outlined,
+                color: AppColors.expenseDeep,
+                iconBg: AppColors.expense.withValues(alpha: 0.15),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SmsPasteScreen()),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _RecordTypeCard(
+                title: '영수증 촬영 업로드',
+                subtitle: '사진 찍으면 AI가 자동 정리',
+                icon: Icons.camera_alt_outlined,
+                color: AppColors.expenseDeep,
+                iconBg: AppColors.expense.withValues(alpha: 0.15),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ReceiptUploadScreen()),
+                ),
+              ),
             ],
           ),
         ),
@@ -90,10 +116,12 @@ class RecordTypeSelectScreen extends StatelessWidget {
   }
 
   // 다른 입력 화면들의 히어로 카드(그라데이션)와 통일한 안내 배너
+  // 카드가 6개로 늘어나 스크롤 영역이 길어진 만큼, 헤더는 세로 패딩과
+  // 아이콘/폰트 크기를 줄여서 목록이 화면에 더 많이 보이도록 압축했다.
   Widget _buildHeroBanner() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
@@ -101,36 +129,37 @@ class RecordTypeSelectScreen extends StatelessWidget {
           colors: [Color(0xFFFFC168), Color(0xFFFF7A45), Color(0xFFFF5C7A)],
           stops: [0.0, 0.55, 1.0],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFFF6A66).withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.22),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
-            child: const Text('🐶', style: TextStyle(fontSize: 28)),
+            child: const Text('🐶', style: TextStyle(fontSize: 20)),
           ),
-          const SizedBox(height: 14),
-          const Text(
-            '기록하고 싶은\n메뉴를 선택하세요!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 15.5,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              height: 1.4,
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              '기록하고 싶은\n메뉴를 선택하세요!',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.35,
+              ),
             ),
           ),
         ],
