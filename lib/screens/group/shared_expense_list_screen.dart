@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/group_model.dart';
 import '../../models/shared_expense_model.dart';
 import '../../services/group_service.dart';
+import '../../utils/app_colors.dart';
 import 'shared_expense_add_screen.dart';
 import 'shared_expense_edit_screen.dart';
 import '../../widgets/common/app_snack_bar.dart';
@@ -15,39 +16,26 @@ class SharedExpenseListScreen extends StatefulWidget {
 
   final GroupModel group;
 
-
   @override
-  State<SharedExpenseListScreen> createState() =>
-      _SharedExpenseListScreenState();
+  State<SharedExpenseListScreen> createState() => _SharedExpenseListScreenState();
 }
 
-class _SharedExpenseListScreenState
-    extends State<SharedExpenseListScreen> {
-  final GroupService _groupService =
-      GroupService.instance;
+class _SharedExpenseListScreenState extends State<SharedExpenseListScreen> {
+  final GroupService _groupService = GroupService.instance;
 
   List<SharedExpenseModel> _expenses = [];
   int _totalAmount = 0;
   bool _isLoadingExpenses = true;
   String _currentUserRole = 'viewer';
   bool _isLoadingRole = true;
-  // 공동지출 수정 권한 확인
+
   bool get _canEditExpense {
-    return _currentUserRole == 'owner' ||
-        _currentUserRole == 'editor';
-  }
-  // 사용자 안내 스낵바 표시 메서드
-  void _showMessage(
-      String message, {
-        AppSnackBarType type = AppSnackBarType.info,
-      }) {
-    AppSnackBar.show(
-      context,
-      message: message,
-      type: type,
-    );
+    return _currentUserRole == 'owner' || _currentUserRole == 'editor';
   }
 
+  void _showMessage(String message, {AppSnackBarType type = AppSnackBarType.info}) {
+    AppSnackBar.show(context, message: message, type: type);
+  }
 
   @override
   void initState() {
@@ -56,91 +44,50 @@ class _SharedExpenseListScreenState
     _loadExpenses();
   }
 
-  // 현재 사용자의 그룹 권한 조회 메서드
   Future<void> _loadCurrentUserRole() async {
     try {
-      final String role =
-      await GroupService.instance
-          .getCurrentUserGroupRole(
-        groupId: widget.group.id,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
+      final String role = await GroupService.instance.getCurrentUserGroupRole(groupId: widget.group.id);
+      if (!mounted) return;
       setState(() {
         _currentUserRole = role;
         _isLoadingRole = false;
       });
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _currentUserRole = 'viewer';
         _isLoadingRole = false;
       });
-
-      _showMessage(
-        '그룹 권한을 확인하지 못했습니다: $error',
-        type: AppSnackBarType.error,
-      );
+      _showMessage('그룹 권한을 확인하지 못했습니다: $error', type: AppSnackBarType.error);
     }
   }
 
-  // 공동지출 목록 조회 메서드
   Future<void> _loadExpenses() async {
     try {
-      final expenses = await _groupService.getSharedExpenses(
-        groupId: widget.group.id,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
+      final expenses = await _groupService.getSharedExpenses(groupId: widget.group.id);
+      if (!mounted) return;
       setState(() {
         _expenses = expenses;
-        _totalAmount = expenses.fold<int>(
-          0,
-              (sum, expense) => sum + expense.amount,
-        );
+        _totalAmount = expenses.fold<int>(0, (sum, expense) => sum + expense.amount);
         _isLoadingExpenses = false;
       });
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoadingExpenses = false;
-      });
-
-      _showMessage(
-        '공동지출 목록을 불러오지 못했습니다: $e',
-        type: AppSnackBarType.error,
-      );
+      if (!mounted) return;
+      setState(() => _isLoadingExpenses = false);
+      _showMessage('공동지출 목록을 불러오지 못했습니다: $e', type: AppSnackBarType.error);
     }
   }
 
   String _formatAmount(int amount) {
     final text = amount.toString();
     final buffer = StringBuffer();
-
     for (int index = 0; index < text.length; index++) {
-      final positionFromEnd =
-          text.length - index;
-
+      final positionFromEnd = text.length - index;
       buffer.write(text[index]);
-
-      if (positionFromEnd > 1 &&
-          positionFromEnd % 3 == 1) {
+      if (positionFromEnd > 1 && positionFromEnd % 3 == 1) {
         buffer.write(',');
       }
     }
-
     return buffer.toString();
   }
 
@@ -148,9 +95,7 @@ class _SharedExpenseListScreenState
     return '${date.month}월 ${date.day}일';
   }
 
-  IconData _getCategoryIcon(
-      String category,
-      ) {
+  IconData _getCategoryIcon(String category) {
     switch (category) {
       case '식비':
         return Icons.restaurant_rounded;
@@ -162,14 +107,12 @@ class _SharedExpenseListScreenState
     }
   }
 
-  Color _getCategoryColor(
-      String category,
-      ) {
+  Color _getCategoryColor(String category) {
     switch (category) {
       case '식비':
         return const Color(0xFFFFA94D);
       case '고정비':
-        return const Color(0xFF8566FF);
+        return AppColors.purple;
       case '생활비':
       default:
         return const Color(0xFFE66A9F);
@@ -179,72 +122,43 @@ class _SharedExpenseListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-      const Color(0xFFF7F6FA),
+      backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
         backgroundColor: Colors.white,
+        foregroundColor: AppColors.ink,
         surfaceTintColor: Colors.white,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           '공동 지출',
-          style: TextStyle(
-            color: Color(0xFF252735),
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.bold),
         ),
       ),
-      floatingActionButton:
-      !_isLoadingRole && _canEditExpense
+      floatingActionButton: !_isLoadingRole && _canEditExpense
           ? FloatingActionButton.extended(
         onPressed: () async {
-          final bool? isAdded =
-          await Navigator.push<bool>(
+          final bool? isAdded = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  SharedExpenseAddScreen(
-                    groupId: widget.group.id,
-                  ),
+              builder: (context) => SharedExpenseAddScreen(groupId: widget.group.id),
             ),
           );
 
           if (isAdded == true) {
             _loadExpenses();
-
-            if (!mounted) {
-              return;
-            }
-
-            _showMessage(
-              '공동 지출이 등록되었습니다.',
-              type: AppSnackBarType.success,
-            );
+            if (!mounted) return;
+            _showMessage('공동 지출이 등록되었습니다.', type: AppSnackBarType.success);
           }
         },
-        backgroundColor:
-        const Color(0xFFE66A9F),
+        backgroundColor: AppColors.purple,
         foregroundColor: Colors.white,
-        icon: const Icon(
-          Icons.add_rounded,
-        ),
-        label: const Text(
-          '지출 추가',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('지출 추가', style: TextStyle(fontWeight: FontWeight.bold)),
       )
           : null,
       body: SafeArea(
         child: ListView(
-          padding:
-          const EdgeInsets.fromLTRB(
-            18,
-            18,
-            18,
-            100,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 100),
           children: [
             _buildSummaryCard(),
             const SizedBox(height: 20),
@@ -261,74 +175,43 @@ class _SharedExpenseListScreenState
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [
-            Color(0xFFFFDCE9),
-            Color(0xFFE8E0FF),
-          ],
+          colors: [Color(0xFFF1EEFF), Color(0xFFE4DDFF)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius:
-        BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(26),
       ),
       child: Column(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             widget.group.name,
-            style: const TextStyle(
-              color: Color(0xFF786C72),
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
+            style: const TextStyle(color: AppColors.inkSub, fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           const Text(
             '이번 달 공동 지출',
-            style: TextStyle(
-              color: Color(0xFF332A30),
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: AppColors.ink, fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 7),
           Text(
             '${_formatAmount(_totalAmount)}원',
-            style: const TextStyle(
-              color: Color(0xFF252735),
-              fontSize: 30,
-              fontWeight: FontWeight.w900,
-            ),
+            style: const TextStyle(color: AppColors.ink, fontSize: 30, fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 18),
           Container(
-            padding:
-            const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 11,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             decoration: BoxDecoration(
-              color: Colors.white
-                  .withValues(alpha: 0.65),
-              borderRadius:
-              BorderRadius.circular(15),
+              color: Colors.white.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(15),
             ),
             child: Row(
               children: [
-                const Icon(
-                  Icons.receipt_long_rounded,
-                  color: Color(0xFFE66A9F),
-                  size: 20,
-                ),
+                const Icon(Icons.receipt_long_rounded, color: AppColors.purple, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   '총 ${_expenses.length}건의 공동 지출',
-                  style: const TextStyle(
-                    color: Color(0xFF655A5F),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: const TextStyle(color: AppColors.inkSub, fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -340,39 +223,28 @@ class _SharedExpenseListScreenState
 
   Widget _buildExpenseSection() {
     return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             const Expanded(
               child: Text(
                 '지출 내역',
-                style: TextStyle(
-                  color: Color(0xFF252735),
-                  fontSize: 18,
-                  fontWeight:
-                  FontWeight.w800,
-                ),
+                style: TextStyle(color: AppColors.ink, fontSize: 18, fontWeight: FontWeight.w800),
               ),
             ),
             Text(
               '${_expenses.length}건',
-              style: const TextStyle(
-                color: Color(0xFF999CA7),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+              style: const TextStyle(color: AppColors.inkSub, fontSize: 13, fontWeight: FontWeight.w700),
             ),
           ],
         ),
         const SizedBox(height: 14),
-        // 공동지출 목록 상태별 표시
         if (_isLoadingExpenses)
           const Center(
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 40),
-              child: CircularProgressIndicator(),
+              child: CircularProgressIndicator(color: AppColors.purple),
             ),
           )
         else if (_expenses.isEmpty)
@@ -388,38 +260,18 @@ class _SharedExpenseListScreenState
     );
   }
 
-  Widget _buildExpenseCard(
-      SharedExpenseModel expense,
-      ) {
-    final color =
-    _getCategoryColor(
-      expense.category,
-    );
+  Widget _buildExpenseCard(SharedExpenseModel expense) {
+    final color = _getCategoryColor(expense.category);
 
     return InkWell(
-      onTap: () {
-        _showExpenseDetail(expense);
-      },
-      borderRadius:
-      BorderRadius.circular(20),
+      onTap: () => _showExpenseDetail(expense),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding:
-        const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius:
-          BorderRadius.circular(20),
-          border: Border.all(
-            color:
-            const Color(0xFFE9E7EF),
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppColors.cardShadow,
         ),
         child: Row(
           children: [
@@ -427,136 +279,60 @@ class _SharedExpenseListScreenState
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                color:
-                color.withValues(
-                  alpha: 0.12,
-                ),
-                borderRadius:
-                BorderRadius.circular(
-                  16,
-                ),
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(16),
               ),
-              child: Icon(
-                _getCategoryIcon(
-                  expense.category,
-                ),
-                color: color,
-              ),
+              child: Icon(_getCategoryIcon(expense.category), color: color),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Expanded(
                         child: Text(
                           expense.title,
-                          style:
-                          const TextStyle(
-                            color:
-                            Color(
-                              0xFF252735,
-                            ),
-                            fontSize: 15,
-                            fontWeight:
-                            FontWeight
-                                .w800,
-                          ),
+                          style: const TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w800),
                         ),
                       ),
                       Text(
                         '${_formatAmount(expense.amount)}원',
-                        style:
-                        const TextStyle(
-                          color:
-                          Color(
-                            0xFF252735,
-                          ),
-                          fontSize: 15,
-                          fontWeight:
-                          FontWeight
-                              .w900,
-                        ),
+                        style: const TextStyle(color: AppColors.ink, fontSize: 15, fontWeight: FontWeight.w900),
                       ),
                     ],
                   ),
-                  const SizedBox(
-                    height: 6,
-                  ),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       Container(
-                        padding:
-                        const EdgeInsets
-                            .symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration:
-                        BoxDecoration(
-                          color:
-                          color.withValues(
-                            alpha: 0.1,
-                          ),
-                          borderRadius:
-                          BorderRadius
-                              .circular(
-                            10,
-                          ),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: Text(
                           expense.category,
-                          style:
-                          TextStyle(
-                            color: color,
-                            fontSize: 10,
-                            fontWeight:
-                            FontWeight
-                                .bold,
-                          ),
+                          style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      const SizedBox(
-                        width: 8,
-                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '${expense.paidByNickname} · ${_formatDate(expense.date)}',
-                          style:
-                          const TextStyle(
-                            color:
-                            Color(
-                              0xFF92949E,
-                            ),
-                            fontSize: 11,
-                          ),
+                          style: const TextStyle(color: AppColors.inkSub, fontSize: 11),
                         ),
                       ),
                     ],
                   ),
-                  if (expense.memo != null &&
-                      expense
-                          .memo!.isNotEmpty) ...[
-                    const SizedBox(
-                      height: 7,
-                    ),
+                  if (expense.memo != null && expense.memo!.isNotEmpty) ...[
+                    const SizedBox(height: 7),
                     Text(
                       expense.memo!,
                       maxLines: 1,
-                      overflow:
-                      TextOverflow
-                          .ellipsis,
-                      style:
-                      const TextStyle(
-                        color:
-                        Color(
-                          0xFF777A86,
-                        ),
-                        fontSize: 12,
-                      ),
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.inkSub, fontSize: 12),
                     ),
                   ],
                 ],
@@ -571,41 +347,27 @@ class _SharedExpenseListScreenState
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
-      padding:
-      const EdgeInsets.symmetric(
-        vertical: 40,
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 40),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-        BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppColors.cardShadow,
       ),
       child: const Column(
         children: [
-          Icon(
-            Icons.receipt_long_outlined,
-            color: Color(0xFFB5B7C0),
-            size: 44,
-          ),
+          Icon(Icons.receipt_long_outlined, color: AppColors.inkSub, size: 44),
           SizedBox(height: 12),
           Text(
             '아직 등록된 공동 지출이 없어요.',
-            style: TextStyle(
-              color: Color(0xFF777A86),
-              fontWeight: FontWeight.w700,
-            ),
+            style: TextStyle(color: AppColors.inkSub, fontWeight: FontWeight.w700),
           ),
         ],
       ),
     );
   }
 
-  void _showExpenseDetail(
-      SharedExpenseModel expense,
-      ) {
-    final color = _getCategoryColor(
-      expense.category,
-    );
+  void _showExpenseDetail(SharedExpenseModel expense) {
+    final color = _getCategoryColor(expense.category);
 
     showModalBottomSheet(
       context: context,
@@ -613,214 +375,122 @@ class _SharedExpenseListScreenState
       backgroundColor: Colors.transparent,
       builder: (bottomSheetContext) {
         return Container(
-          padding: const EdgeInsets.fromLTRB(
-            20,
-            14,
-            20,
-            28,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
           decoration: const BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.vertical(
-              top: Radius.circular(28),
-            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
           child: SafeArea(
             top: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Center(
                   child: Container(
                     width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: const Color(
-                        0xFFD8D6DE,
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(
-                        999,
-                      ),
+                      color: const Color(0xFFD8D6DE),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 22),
-
                 Row(
                   children: [
                     Container(
                       width: 52,
                       height: 52,
                       decoration: BoxDecoration(
-                        color: color.withValues(
-                          alpha: 0.12,
-                        ),
-                        borderRadius:
-                        BorderRadius.circular(
-                          16,
-                        ),
+                        color: color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: Icon(
-                        _getCategoryIcon(
-                          expense.category,
-                        ),
-                        color: color,
-                      ),
+                      child: Icon(_getCategoryIcon(expense.category), color: color),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             expense.title,
-                            style:
-                            const TextStyle(
-                              color: Color(
-                                0xFF252735,
-                              ),
-                              fontSize: 20,
-                              fontWeight:
-                              FontWeight
-                                  .w900,
-                            ),
+                            style: const TextStyle(color: AppColors.ink, fontSize: 20, fontWeight: FontWeight.w900),
                           ),
-                          const SizedBox(
-                            height: 4,
-                          ),
+                          const SizedBox(height: 4),
                           Text(
                             expense.category,
-                            style: TextStyle(
-                              color: color,
-                              fontSize: 13,
-                              fontWeight:
-                              FontWeight
-                                  .bold,
-                            ),
+                            style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 26),
-
                 _buildDetailRow(
                   icon: Icons.payments_outlined,
                   label: '금액',
-                  value:
-                  '${_formatAmount(expense.amount)}원',
+                  value: '${_formatAmount(expense.amount)}원',
                 ),
-
                 _buildDetailRow(
                   icon: Icons.person_outline,
                   label: '결제자',
-                  value:
-                  expense.paidByNickname,
+                  value: expense.paidByNickname,
                 ),
-
                 _buildDetailRow(
-                  icon:
-                  Icons.calendar_month_outlined,
+                  icon: Icons.calendar_month_outlined,
                   label: '날짜',
-                  value: _formatFullDate(
-                    expense.date,
-                  ),
+                  value: _formatFullDate(expense.date),
                 ),
-
-                if (expense.memo != null &&
-                    expense.memo!.isNotEmpty)
+                if (expense.memo != null && expense.memo!.isNotEmpty)
                   _buildDetailRow(
-                    icon:
-                    Icons.edit_note_outlined,
+                    icon: Icons.edit_note_outlined,
                     label: '메모',
                     value: expense.memo!,
                   ),
-
                 const SizedBox(height: 24),
-
                 if (_canEditExpense)
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: () async {
-                            Navigator.pop(
-                              bottomSheetContext,
-                            );
+                            Navigator.pop(bottomSheetContext);
 
-                            final bool? isUpdated =
-                            await Navigator.push<bool>(
+                            final bool? isUpdated = await Navigator.push<bool>(
                               context,
                               MaterialPageRoute(
-                                builder: (context) =>
-                                    SharedExpenseEditScreen(
-                                      expense: expense,
-                                    ),
+                                builder: (context) => SharedExpenseEditScreen(expense: expense),
                               ),
                             );
 
                             if (isUpdated == true) {
                               _loadExpenses();
-
-                              if (!mounted) {
-                                return;
-                              }
-
-                              _showMessage(
-                                '공동 지출이 수정되었습니다.',
-                                type: AppSnackBarType.success,
-                              );
+                              if (!mounted) return;
+                              _showMessage('공동 지출이 수정되었습니다.', type: AppSnackBarType.success);
                             }
                           },
-                          icon: const Icon(
-                            Icons.edit_outlined,
-                          ),
+                          icon: const Icon(Icons.edit_outlined),
                           label: const Text('수정'),
                           style: OutlinedButton.styleFrom(
-                            foregroundColor:
-                            const Color(0xFF8566FF),
-                            side: const BorderSide(
-                              color: Color(0xFF8566FF),
-                            ),
-                            padding:
-                            const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                            foregroundColor: AppColors.purple,
+                            side: const BorderSide(color: AppColors.purple),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            _confirmDeleteExpense(
-                              bottomSheetContext,
-                              expense,
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.delete_outline_rounded,
-                          ),
+                          onPressed: () => _confirmDeleteExpense(bottomSheetContext, expense),
+                          icon: const Icon(Icons.delete_outline_rounded),
                           label: const Text('삭제'),
-                          style:
-                          ElevatedButton.styleFrom(
-                            backgroundColor:
-                            const Color(0xFFE66A9F),
-                            foregroundColor:
-                            Colors.white,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFF5C5C),
+                            foregroundColor: Colors.white,
                             elevation: 0,
-                            padding:
-                            const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
                       ),
@@ -840,46 +510,23 @@ class _SharedExpenseListScreenState
     required String value,
   }) {
     return Padding(
-      padding: const EdgeInsets.only(
-        bottom: 16,
-      ),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
-        crossAxisAlignment:
-        CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 21,
-            color: const Color(
-              0xFF92949E,
-            ),
-          ),
+          Icon(icon, size: 21, color: AppColors.inkSub),
           const SizedBox(width: 12),
           SizedBox(
             width: 62,
             child: Text(
               label,
-              style: const TextStyle(
-                color: Color(
-                  0xFF92949E,
-                ),
-                fontSize: 13,
-                fontWeight:
-                FontWeight.w600,
-              ),
+              style: const TextStyle(color: AppColors.inkSub, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                color: Color(
-                  0xFF252735,
-                ),
-                fontSize: 14,
-                fontWeight:
-                FontWeight.w700,
-              ),
+              style: const TextStyle(color: AppColors.ink, fontSize: 14, fontWeight: FontWeight.w700),
             ),
           ),
         ],
@@ -887,98 +534,45 @@ class _SharedExpenseListScreenState
     );
   }
 
-  String _formatFullDate(
-      DateTime date,
-      ) {
-    return '${date.year}년 '
-        '${date.month}월 '
-        '${date.day}일';
+  String _formatFullDate(DateTime date) {
+    return '${date.year}년 ${date.month}월 ${date.day}일';
   }
 
-  Future<void> _confirmDeleteExpense(
-      BuildContext bottomSheetContext,
-      SharedExpenseModel expense,
-      ) async {
-    final bool? shouldDelete =
-    await showDialog<bool>(
+  Future<void> _confirmDeleteExpense(BuildContext bottomSheetContext, SharedExpenseModel expense) async {
+    final bool? shouldDelete = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text(
-            '공동 지출 삭제',
-          ),
-          content: Text(
-            '"${expense.title}" 지출 내역을 삭제할까요?',
-          ),
+          title: const Text('공동 지출 삭제'),
+          content: Text('"${expense.title}" 지출 내역을 삭제할까요?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  false,
-                );
-              },
-              child: const Text(
-                '취소',
-              ),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(
-                  dialogContext,
-                  true,
-                );
-              },
-              child: const Text(
-                '삭제',
-                style: TextStyle(
-                  color: Colors.red,
-                ),
-              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('삭제', style: TextStyle(color: Color(0xFFFF5C5C))),
             ),
           ],
         );
       },
     );
 
-    if (shouldDelete != true) {
-      return;
-    }
+    if (shouldDelete != true) return;
 
     try {
-      // 공동지출 Firestore 삭제
-      await _groupService.deleteSharedExpense(
-        groupId: expense.groupId,
-        expenseId: expense.id,
-      );
+      await _groupService.deleteSharedExpense(groupId: expense.groupId, expenseId: expense.id);
+      if (!mounted) return;
 
-      if (!mounted) {
-        return;
-      }
-
-      Navigator.pop(
-        bottomSheetContext,
-      );
-
+      Navigator.pop(bottomSheetContext);
       await _loadExpenses();
 
-      if (!mounted) {
-        return;
-      }
-
-      _showMessage(
-        '공동 지출이 삭제되었습니다.',
-        type: AppSnackBarType.success,
-      );
+      if (!mounted) return;
+      _showMessage('공동 지출이 삭제되었습니다.', type: AppSnackBarType.success);
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-
-      _showMessage(
-        e.toString().replaceFirst('Exception: ', ''),
-        type: AppSnackBarType.error,
-      );
+      if (!mounted) return;
+      _showMessage(e.toString().replaceFirst('Exception: ', ''), type: AppSnackBarType.error);
     }
   }
 }

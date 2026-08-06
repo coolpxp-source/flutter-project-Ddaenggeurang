@@ -49,6 +49,7 @@ import '../../widgets/home/quick_add_fab.dart';
 import '../../models/group_model.dart';
 import '../../services/group_service.dart';
 import '../group/shared_expense_list_screen.dart';
+import '../../models/shared_expense_model.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -375,6 +376,8 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   bool _hasLoadedGroups = false;
   late DateTime _selectedDay = DateTime.now();
 
+  String? _selectedGroupId;
+
   // 첫 방문자 전용 스팟라이트 투어 — 대상 위젯 3곳의 위치만 알면 되므로
   // GlobalKey만 붙이고, 하이라이트/툴팁은 별도 오버레이(spotlight_tour.dart)가 그린다.
   final _budgetHeroKey = GlobalKey();
@@ -390,40 +393,45 @@ class _HomeDashboardState extends State<_HomeDashboard> {
   }
   // 현재 사용자가 참여 중인 그룹 목록을 불러오는 메서드
   Future<void> _loadMyGroups() async {
-    if (_isLoadingGroups) {
-      return;
-    }
+    if (_isLoadingGroups) return;
 
-    setState(() {
-      _isLoadingGroups = true;
-    });
+    setState(() => _isLoadingGroups = true);
 
     try {
-      final List<GroupModel> groups =
-      await _groupService.getMyGroups();
+      final List<GroupModel> groups = await _groupService.getMyGroups();
+      if (!mounted) return;
 
-      if (!mounted) {
-        return;
+      final prefs = await SharedPreferences.getInstance();
+      String? savedId = prefs.getString('selectedGroupId');
+      if (savedId == null || !groups.any((g) => g.id == savedId)) {
+        savedId = groups.isNotEmpty ? groups.first.id : null;
+        if (savedId != null) {
+          await prefs.setString('selectedGroupId', savedId);
+        }
       }
 
       setState(() {
         _myGroups = groups;
         _isLoadingGroups = false;
         _hasLoadedGroups = true;
+        _selectedGroupId = savedId;
       });
     } catch (error) {
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _myGroups = [];
         _isLoadingGroups = false;
         _hasLoadedGroups = true;
       });
-
       debugPrint('홈 그룹 목록 조회 실패: $error');
     }
+  }
+
+  // 그룹 선택
+  Future<void> _selectGroup(String groupId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('selectedGroupId', groupId);
+    setState(() => _selectedGroupId = groupId);
   }
 
   Future<void> _maybeStartTour() async {
@@ -510,6 +518,9 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                           KeyedSubtree(key: _quickActionsKey, child: const _QuickActionsGrid()),
                           const SizedBox(height: 24),
 
+                          _CoachBubble(uid: widget.uid, tone: user.coachTone),
+                          const SizedBox(height: 24),
+
                           KeyedSubtree(
                             key: _categoryCardKey,
                             child: _CategorySpendingSection(uid: widget.uid, month: _month),
@@ -538,8 +549,32 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                           ),
                           if (_isGroupMode) ...[
                             const SizedBox(height: 10),
+                            _HomeGroupList(
+                              groups: _myGroups,
+                              isLoading: _isLoadingGroups,
+                              selectedGroupId: _selectedGroupId,
+                              onGroupSelect: (GroupModel group) => _selectGroup(group.id),
+                              onGroupDetail: (GroupModel group) {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => SharedExpenseListScreen(group: group),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                          const SizedBox(height: 16),
 
-                            // 새 그룹 생성 및 초대 코드 참여 화면 이동 버튼
+                          _LiveWeekCalendarStrip(
+                            uid: widget.uid,
+                            month: _month,
+                            selectedDay: _selectedDay,
+                            onSelect: (d) => setState(() => _selectedDay = d),
+                            isGroupMode: _isGroupMode,
+                            groupId: _selectedGroupId,
+                          ),
+                          const SizedBox(height: 20),
+                          if (_isGroupMode) ...[
                             Align(
                               alignment: Alignment.centerRight,
                               child: TextButton.icon(
@@ -563,6 +598,9 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                                 label: const Text('새 그룹 만들기'),
                                 style: TextButton.styleFrom(
                                   foregroundColor: _C.purple,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                   textStyle: const TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
@@ -570,37 +608,22 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                                 ),
                               ),
                             ),
-
-                            const SizedBox(height: 6),
-
-                            _HomeGroupList(
-                              groups: _myGroups,
-                              isLoading: _isLoadingGroups,
-                              onGroupTap: (GroupModel group) {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => SharedExpenseListScreen(
-                                      group: group,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
+                            const SizedBox(height: 12),
                           ],
-                          const SizedBox(height: 16),
 
-                          _LiveWeekCalendarStrip(
-                            uid: widget.uid,
-                            month: _month,
-                            selectedDay: _selectedDay,
-                            onSelect: (d) => setState(() => _selectedDay = d),
-                          ),
-                          const SizedBox(height: 20),
-
-                          _CoachBubble(uid: widget.uid, tone: user.coachTone),
-                          const SizedBox(height: 24),
-
-                          _RecentExpensesSection(uid: widget.uid),
+                          (_isGroupMode && _selectedGroupId != null)
+                              ? _GroupExpensesSection(
+                            groupId: _selectedGroupId!,
+                            onViewAll: () {
+                              final group = _myGroups.firstWhere((g) => g.id == _selectedGroupId);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => SharedExpenseListScreen(group: group),
+                                ),
+                              );
+                            },
+                          )
+                              : _RecentExpensesSection(uid: widget.uid),
                           const SizedBox(height: 20),
 
                           _LiveSpendingInsightSection(
@@ -1284,12 +1307,16 @@ class _HomeGroupList extends StatefulWidget {
   const _HomeGroupList({
     required this.groups,
     required this.isLoading,
-    required this.onGroupTap,
+    required this.selectedGroupId,
+    required this.onGroupSelect,
+    required this.onGroupDetail,
   });
 
   final List<GroupModel> groups;
   final bool isLoading;
-  final ValueChanged<GroupModel> onGroupTap;
+  final String? selectedGroupId;
+  final ValueChanged<GroupModel> onGroupSelect;
+  final ValueChanged<GroupModel> onGroupDetail;
 
   @override
   State<_HomeGroupList> createState() => _HomeGroupListState();
@@ -1300,61 +1327,35 @@ class _HomeGroupListState extends State<_HomeGroupList> {
 
   int _currentPage = 0;
 
-  // 전체 페이지 수를 계산
   int get _totalPages {
-    if (widget.groups.isEmpty) {
-      return 0;
-    }
-
+    if (widget.groups.isEmpty) return 0;
     return (widget.groups.length / _pageSize).ceil();
   }
 
-  // 현재 페이지에 표시할 그룹 목록을 반환
   List<GroupModel> get _visibleGroups {
-    if (widget.groups.isEmpty) {
-      return [];
-    }
-
+    if (widget.groups.isEmpty) return [];
     final int startIndex = _currentPage * _pageSize;
-    final int endIndex = (startIndex + _pageSize)
-        .clamp(0, widget.groups.length);
-
+    final int endIndex = (startIndex + _pageSize).clamp(0, widget.groups.length);
     return widget.groups.sublist(startIndex, endIndex);
   }
 
   @override
   void didUpdateWidget(covariant _HomeGroupList oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    // 그룹 삭제 등으로 전체 페이지 수가 줄었을 때 페이지 위치 보정
-    final int lastPage =
-    _totalPages > 0 ? _totalPages - 1 : 0;
-
+    final int lastPage = _totalPages > 0 ? _totalPages - 1 : 0;
     if (_currentPage > lastPage) {
       _currentPage = lastPage;
     }
   }
 
-  // 이전 페이지로 이동
   void _movePreviousPage() {
-    if (_currentPage <= 0) {
-      return;
-    }
-
-    setState(() {
-      _currentPage--;
-    });
+    if (_currentPage <= 0) return;
+    setState(() => _currentPage--);
   }
 
-  // 다음 페이지로 이동
   void _moveNextPage() {
-    if (_currentPage >= _totalPages - 1) {
-      return;
-    }
-
-    setState(() {
-      _currentPage++;
-    });
+    if (_currentPage >= _totalPages - 1) return;
+    setState(() => _currentPage++);
   }
 
   @override
@@ -1363,10 +1364,7 @@ class _HomeGroupListState extends State<_HomeGroupList> {
       return const SizedBox(
         height: 72,
         child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: _C.purple,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: _C.purple),
         ),
       );
     }
@@ -1374,10 +1372,7 @@ class _HomeGroupListState extends State<_HomeGroupList> {
     if (widget.groups.isEmpty) {
       return Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 16,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1385,19 +1380,12 @@ class _HomeGroupListState extends State<_HomeGroupList> {
         ),
         child: const Row(
           children: [
-            Icon(
-              Icons.group_off_rounded,
-              color: _C.inkSub,
-            ),
+            Icon(Icons.group_off_rounded, color: _C.inkSub),
             SizedBox(width: 10),
             Expanded(
               child: Text(
                 '참여 중인 그룹이 없어요.',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _C.inkSub,
-                ),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.inkSub),
               ),
             ),
           ],
@@ -1408,41 +1396,26 @@ class _HomeGroupListState extends State<_HomeGroupList> {
     return Column(
       children: [
         ..._visibleGroups.map(_buildGroupCard),
-
         if (_totalPages > 1) ...[
           const SizedBox(height: 4),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
                 tooltip: '이전 그룹',
-                onPressed:
-                _currentPage > 0 ? _movePreviousPage : null,
+                onPressed: _currentPage > 0 ? _movePreviousPage : null,
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.chevron_left_rounded,
-                ),
+                icon: const Icon(Icons.chevron_left_rounded),
               ),
-
               Text(
                 '${_currentPage + 1} / $_totalPages',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: _C.inkSub,
-                ),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _C.inkSub),
               ),
-
               IconButton(
                 tooltip: '다음 그룹',
-                onPressed: _currentPage < _totalPages - 1
-                    ? _moveNextPage
-                    : null,
+                onPressed: _currentPage < _totalPages - 1 ? _moveNextPage : null,
                 visualDensity: VisualDensity.compact,
-                icon: const Icon(
-                  Icons.chevron_right_rounded,
-                ),
+                icon: const Icon(Icons.chevron_right_rounded),
               ),
             ],
           ),
@@ -1451,22 +1424,23 @@ class _HomeGroupListState extends State<_HomeGroupList> {
     );
   }
 
-  // 참여 중인 그룹 카드 생성
   Widget _buildGroupCard(GroupModel group) {
+    final bool isSelected = group.id == widget.selectedGroupId;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => widget.onGroupTap(group),
+        onTap: () => widget.onGroupSelect(group),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 13,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? _C.purple : Colors.transparent,
+              width: 1.6,
+            ),
             boxShadow: _C.cardShadow,
           ),
           child: Row(
@@ -1474,50 +1448,44 @@ class _HomeGroupListState extends State<_HomeGroupList> {
               Container(
                 width: 34,
                 height: 34,
-                decoration: const BoxDecoration(
-                  color: _C.purple,
-                  shape: BoxShape.circle,
-                ),
+                decoration: const BoxDecoration(color: _C.purple, shape: BoxShape.circle),
                 alignment: Alignment.center,
-                child: const Icon(
-                  Icons.groups_rounded,
-                  size: 18,
-                  color: Colors.white,
-                ),
+                child: const Icon(Icons.groups_rounded, size: 18, color: Colors.white),
               ),
-
               const SizedBox(width: 12),
-
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      group.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: _C.ink,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            group.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 13.5, fontWeight: FontWeight.w700, color: _C.ink),
+                          ),
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 6),
+                          const Icon(Icons.check_circle_rounded, size: 15, color: _C.purple),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      '${group.memberCount}명 참여 · 공동지출 보기',
-                      style: const TextStyle(
-                        fontSize: 11.5,
-                        color: _C.inkSub,
-                      ),
+                      '${group.memberCount}명 참여 · 탭해서 선택',
+                      style: const TextStyle(fontSize: 11.5, color: _C.inkSub),
                     ),
                   ],
                 ),
               ),
-
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: _C.inkSub,
+              IconButton(
+                tooltip: '공동지출 내역 보기',
+                onPressed: () => widget.onGroupDetail(group),
+                icon: const Icon(Icons.receipt_long_rounded, size: 20, color: _C.inkSub),
               ),
             ],
           ),
@@ -1526,8 +1494,8 @@ class _HomeGroupListState extends State<_HomeGroupList> {
     );
   }
 }
-// ─────────────────────── 개인/그룹 토글 ───────────────────────
 
+// ─────────────────────── 개인/그룹 토글 ───────────────────────
 /// 그룹 모드 선택 시 뜨는 안내 배너 — 토글 자체는 보기 전환일 뿐이고,
 /// 실제 "새 그룹 만들기/참여하기" 이동은 이 버튼으로 분리한다.
 class _GroupManageBanner extends StatelessWidget {
@@ -1633,11 +1601,15 @@ class _LiveWeekCalendarStrip extends StatefulWidget {
   final DateTime month;
   final DateTime selectedDay;
   final ValueChanged<DateTime> onSelect;
+  final bool isGroupMode;
+  final String? groupId;
   const _LiveWeekCalendarStrip({
     required this.uid,
     required this.month,
     required this.selectedDay,
     required this.onSelect,
+    required this.isGroupMode,
+    required this.groupId,
   });
 
   @override
@@ -1656,15 +1628,36 @@ class _LiveWeekCalendarStripState extends State<_LiveWeekCalendarStrip> {
   @override
   void didUpdateWidget(covariant _LiveWeekCalendarStrip old) {
     super.didUpdateWidget(old);
-    if (old.month != widget.month || old.uid != widget.uid) {
+    if (old.month != widget.month ||
+        old.uid != widget.uid ||
+        old.isGroupMode != widget.isGroupMode ||
+        old.groupId != widget.groupId) {
       setState(() {
         _future = _load();
       });
     }
   }
 
-  Future<Map<int, int>> _load() => CategorySummaryService()
-      .getDailyTotals(userId: widget.uid, year: widget.month.year, month: widget.month.month);
+  Future<Map<int, int>> _load() {
+    if (widget.isGroupMode && widget.groupId != null) {
+      return _loadGroupDailyTotals(widget.groupId!);
+    }
+    return CategorySummaryService()
+        .getDailyTotals(userId: widget.uid, year: widget.month.year, month: widget.month.month);
+  }
+
+  // 그룹 공동지출을 선택된 월 기준으로 날짜별 합계로 집계한다.
+  // (그룹 지출은 CategorySummaryService 쪽 일별 집계 메서드가 없어서 직접 계산)
+  Future<Map<int, int>> _loadGroupDailyTotals(String groupId) async {
+    final expenses = await GroupService.instance.getSharedExpenses(groupId: groupId);
+    final Map<int, int> totals = {};
+    for (final e in expenses) {
+      if (e.date.year == widget.month.year && e.date.month == widget.month.month) {
+        totals[e.date.day] = (totals[e.date.day] ?? 0) + e.amount;
+      }
+    }
+    return totals;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2529,6 +2522,169 @@ class _RecentExpensesSectionState extends State<_RecentExpensesSection> {
           },
         ),
       ],
+    );
+  }
+}
+
+class _GroupExpensesSection extends StatefulWidget {
+  final String groupId;
+  final VoidCallback onViewAll;
+  const _GroupExpensesSection({required this.groupId, required this.onViewAll});
+
+  @override
+  State<_GroupExpensesSection> createState() => _GroupExpensesSectionState();
+}
+
+class _GroupExpensesSectionState extends State<_GroupExpensesSection> {
+  late Future<List<SharedExpenseModel>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _future = _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _GroupExpensesSection old) {
+    super.didUpdateWidget(old);
+    if (old.groupId != widget.groupId) {
+      setState(() {
+        _future = _load();
+      });
+    }
+  }
+
+  Future<List<SharedExpenseModel>> _load() async {
+    final expenses = await GroupService.instance.getSharedExpenses(groupId: widget.groupId);
+    expenses.sort((a, b) => b.date.compareTo(a.date));
+    return expenses.take(5).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        FutureBuilder<List<SharedExpenseModel>>(
+          future: _future,
+          builder: (context, snap) {
+            final items = snap.data ?? const [];
+            final showViewAll = snap.connectionState == ConnectionState.done && items.length >= 5;
+            return Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('최근 지출',
+                    style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: _C.ink)),
+                if (showViewAll)
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: widget.onViewAll,
+                    child: Row(
+                      children: const [
+                        Text('전체보기',
+                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                        Icon(Icons.chevron_right_rounded, size: 16, color: _C.inkSub),
+                      ],
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        FutureBuilder<List<SharedExpenseModel>>(
+          future: _future,
+          builder: (context, snap) {
+            if (snap.connectionState != ConnectionState.done) {
+              return const _ShimmerBlock(height: 160, radius: 18);
+            }
+            final items = snap.data ?? const [];
+            if (items.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                decoration: BoxDecoration(
+                  color: _C.card,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: _C.cardShadow,
+                ),
+                child: const Center(
+                  child: Text('아직 등록된 공동 지출이 없어요',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: _C.inkSub)),
+                ),
+              );
+            }
+            return Container(
+              decoration: BoxDecoration(
+                color: _C.card,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: _C.cardShadow,
+              ),
+              child: Column(
+                children: [
+                  for (final (i, e) in items.indexed) ...[
+                    if (i > 0)
+                      const Divider(height: 1, indent: 16, endIndent: 16, color: Color(0xFFF0EDF5)),
+                    _GroupExpenseRow(item: e),
+                  ],
+                ],
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _GroupExpenseRow extends StatelessWidget {
+  final SharedExpenseModel item;
+  const _GroupExpenseRow({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _colorForCategory(item.category);
+    final icon = _iconForCategory(item.category);
+    final date = '${item.date.month.toString().padLeft(2, '0')}.${item.date.day.toString().padLeft(2, '0')}';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 34,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)),
+          ),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color.withValues(alpha: 0.18), color.withValues(alpha: 0.08)],
+              ),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.title,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.ink)),
+                const SizedBox(height: 2),
+                Text('${item.paidByNickname} · $date',
+                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: _C.inkSub)),
+              ],
+            ),
+          ),
+          Text('-${comma(item.amount)}원',
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: _C.expense)),
+        ],
+      ),
     );
   }
 }
