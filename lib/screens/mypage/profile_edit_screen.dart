@@ -1,0 +1,780 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/coach_tone.dart';
+import '../../models/user_model.dart';
+import '../../services/user_service.dart';
+import '../../utils/formatters.dart';
+import '../../widgets/common/ddaeng_modal.dart';
+
+const _accent = Color(0xFFF5A623);
+const _accentSoft = Color(0xFFFFF0A6);
+const _ink = Color(0xFF221A16);
+const _inkSub = Color(0xFF8A7E77);
+const _bg = Color(0xFFFAF8F6);
+const _line = Color(0xFFF0E9E4);
+const _errorColor = Color(0xFFF04438);
+const _okColor = Color(0xFF12B76A);
+
+// 필드마다 성격에 맞는 포인트 컬러 — 마이페이지 홈의 메뉴 팔레트와 톤을 맞춘다.
+const _amberDeep = Color(0xFF8A5200);
+const _amberSoft = Color(0xFFFFF3DE);
+const _mint = Color(0xFF00A98A);
+const _mintSoft = Color(0xFFDBF7F3);
+const _pink = Color(0xFFFF6F91);
+const _pinkSoft = Color(0xFFFFE3EC);
+const _purple = Color(0xFF6C5CE7);
+const _purpleSoft = Color(0xFFEDE9FE);
+
+class ProfileEditScreen extends StatefulWidget {
+  const ProfileEditScreen({super.key});
+
+  @override
+  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
+}
+
+class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  final _userService = UserService();
+  final _nicknameCtrl = TextEditingController();
+  final _salaryCtrl = TextEditingController();
+
+  UserModel? _user;
+  String? _originalNickname;
+  String _ageGroup = '';
+  String? _job;
+  List<String> _ageGroups = ['10대', '20대', '30대', '40대', '50대', '60대 이상'];
+  List<String> _jobs = [];
+  Map<String, String> _jobIcons = {};
+
+  bool _loading = true;
+  bool _saving = false;
+  bool? _nicknameAvailable; // null = 원래값과 동일 혹은 미확인
+  bool _checkingNickname = false;
+  Timer? _debounce;
+
+  String get _uid => FirebaseAuth.instance.currentUser!.uid;
+  int get _nicknameLength => _nicknameCtrl.text.trim().length;
+
+  bool get _canSave =>
+      !_saving &&
+      _nicknameLength >= 2 &&
+      _nicknameLength <= 10 &&
+      _nicknameAvailable != false &&
+      _ageGroup.isNotEmpty &&
+      _job != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _nicknameCtrl.addListener(_onNicknameChanged);
+    _salaryCtrl.addListener(() => setState(() {}));
+  }
+
+  Future<void> _load() async {
+    try {
+      final user = await _userService.getUser(_uid);
+      if (user != null) {
+        _user = user;
+        _originalNickname = user.nickname;
+        _nicknameCtrl.text = user.nickname;
+        _salaryCtrl.text = comma(user.salary);
+        _ageGroup = user.ageGroup;
+        _job = user.job.isEmpty ? null : user.job;
+      }
+    } catch (_) {
+      // 내 프로필 정보 로드 실패 — 그래도 화면은 열어서 재시도할 수 있게 한다.
+    }
+
+    // metadata/options(연령대·직군 옵션)는 별도 문서라 실패해도 프로필 자체는
+    // 볼 수 있어야 하므로 독립적으로 try/catch한다 — 여기서 던지면 위 유저 정보까지
+    // 화면에 못 띄우고 로딩에 영원히 갇힌다(실제로 발생했던 버그).
+    try {
+      final optionsDoc =
+          await FirebaseFirestore.instance.collection('metadata').doc('options').get();
+      final options = optionsDoc.data();
+      if (options != null) {
+        if (options['ageGroups'] != null) {
+          _ageGroups = List<String>.from(options['ageGroups']);
+        }
+        if (options['jobs'] != null) {
+          _jobs = List<String>.from(options['jobs']);
+          if (!_jobs.contains('기타')) _jobs.add('기타');
+        }
+        if (options['jobIcons'] != null) {
+          _jobIcons = Map<String, String>.from(options['jobIcons']);
+        }
+      }
+    } catch (_) {
+      // 옵션 목록 로드 실패 — 최소한 "기타"는 고를 수 있게 fallback을 남긴다.
+      if (_jobs.isEmpty) _jobs = ['기타'];
+    }
+
+    if (mounted) setState(() => _loading = false);
+  }
+
+  void _onNicknameChanged() {
+    final text = _nicknameCtrl.text.trim();
+    _debounce?.cancel();
+    setState(() => _nicknameAvailable = null);
+    if (text == _originalNickname) return; // 원래 닉네임이면 검사 불필요
+    if (text.length < 2 || text.length > 10) return;
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      setState(() => _checkingNickname = true);
+      final taken = await _userService.isNicknameTaken(text, exceptUid: _uid);
+      if (!mounted || text != _nicknameCtrl.text.trim()) return;
+      setState(() {
+        _nicknameAvailable = !taken;
+        _checkingNickname = false;
+      });
+    });
+  }
+
+  Future<void> _save() async {
+    if (!_canSave) return;
+    setState(() => _saving = true);
+    try {
+      await _userService.updateProfile(
+        _uid,
+        nickname: _nicknameCtrl.text.trim(),
+        salary: parseAmount(_salaryCtrl.text),
+        ageGroup: _ageGroup,
+        job: _job,
+      );
+      // communityStats 동기화는 별도로 처리 — 실패해도 프로필 저장 자체를 막지 않는다
+      try {
+        final statRef = FirebaseFirestore.instance.collection('communityStats').doc(_uid);
+        final statDoc = await statRef.get();
+        if (statDoc.exists) {
+          await statRef.update({
+            'ageGroup': _ageGroup,
+            'job': _job,
+          });
+        }
+      } catch (e) {
+        debugPrint('communityStats 동기화 실패: $e');
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('프로필이 저장됐어요'),
+          backgroundColor: _accent,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      await DdaengModal.alert(context,
+          title: '저장에 실패했어요', message: '잠시 후 다시 시도해주세요', type: ModalType.danger);
+    }
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _nicknameCtrl.dispose();
+    _salaryCtrl.dispose();
+    super.dispose();
+  }
+
+  void _openAgeSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                width: 40,
+                height: 4,
+                decoration:
+                BoxDecoration(color: _line, borderRadius: BorderRadius.circular(10)),
+              ),
+              ConstrainedBox(                                          // ← 추가
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.6,
+                ),
+                child: ListView(
+                  shrinkWrap: true,
+                  children: _ageGroups.map((age) => ListTile(
+                    title: Text(age,
+                        style: TextStyle(
+                            fontWeight: age == _ageGroup ? FontWeight.w800 : FontWeight.w500,
+                            color: age == _ageGroup ? _accent : _ink)),
+                    trailing:
+                    age == _ageGroup ? const Icon(Icons.check, color: _accent) : null,
+                    onTap: () {
+                      setState(() => _ageGroup = age);
+                      Navigator.pop(context);
+                    },
+                  )).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openJobSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _JobPickerSheet(
+        jobs: _jobs,
+        jobIcons: _jobIcons,
+        selected: _job,
+        onSelect: (j) {
+          setState(() => _job = j);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        foregroundColor: _ink,
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('프로필 수정', style: TextStyle(fontWeight: FontWeight.w800)),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: _accent))
+          : SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _PreviewCard(user: _user, nickname: _nicknameCtrl.text),
+            const SizedBox(height: 24),
+
+            const _SectionLabel('기본 정보'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                      color: _ink.withValues(alpha: 0.045), blurRadius: 16, offset: const Offset(0, 6)),
+                ],
+              ),
+              child: Column(
+                children: [
+                  _FieldBlock(
+                    icon: Icons.badge_rounded,
+                    iconColor: _amberDeep,
+                    iconBg: _amberSoft,
+                    label: '닉네임',
+                    trailing: Text('$_nicknameLength/10',
+                        style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: _nicknameLength > 10 ? _errorColor : _inkSub)),
+                    footer: _nicknameAvailable == false
+                        ? const Text('이미 사용 중인 닉네임이에요',
+                            style:
+                                TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _errorColor))
+                        : _nicknameAvailable == true
+                            ? const Text('✓ 사용 가능한 닉네임이에요',
+                                style: TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w600, color: _okColor))
+                            : null,
+                    child: TextField(
+                      controller: _nicknameCtrl,
+                      maxLength: 10,
+                      style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600, color: _ink),
+                      decoration: InputDecoration(
+                        counterText: '',
+                        isDense: true,
+                        filled: true,
+                        fillColor: _bg,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        suffixIcon: _checkingNickname
+                            ? const Padding(
+                                padding: EdgeInsets.all(14),
+                                child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: _accent)),
+                              )
+                            : _nicknameAvailable == true
+                                ? const Icon(Icons.check_circle_rounded, color: _okColor)
+                                : _nicknameAvailable == false
+                                    ? const Icon(Icons.cancel_rounded, color: _errorColor)
+                                    : null,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _accent, width: 1.6)),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.savings_rounded,
+                    iconColor: _mint,
+                    iconBg: _mintSoft,
+                    label: '월 실수령액',
+                    footer: parseAmount(_salaryCtrl.text) > 0
+                        ? Text(koreanAmount(parseAmount(_salaryCtrl.text)),
+                            style: const TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w700, color: _mint))
+                        : null,
+                    child: TextField(
+                      controller: _salaryCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [ThousandsFormatter()],
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _ink),
+                      decoration: InputDecoration(
+                        suffixText: '원',
+                        isDense: true,
+                        filled: true,
+                        fillColor: _bg,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: _accent, width: 1.6)),
+                      ),
+                    ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.cake_rounded,
+                    iconColor: _pink,
+                    iconBg: _pinkSoft,
+                    label: '연령대',
+                    child: _PickerTile(
+                      onTap: _openAgeSheet,
+                      text: _ageGroup.isEmpty ? '선택해주세요' : _ageGroup,
+                      placeholder: _ageGroup.isEmpty,
+                    ),
+                  ),
+                  const Divider(height: 28, color: _line),
+                  _FieldBlock(
+                    icon: Icons.work_rounded,
+                    iconColor: _purple,
+                    iconBg: _purpleSoft,
+                    label: '직군',
+                    child: _PickerTile(
+                      onTap: _openJobSheet,
+                      text: _job ?? '직군을 선택해주세요',
+                      placeholder: _job == null,
+                      leadingEmoji: _job != null ? (_jobIcons[_job] ?? '✨') : null,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+              ),
+            ),
+            const SizedBox(height: 28),
+
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: _canSave ? _save : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accent,
+                  disabledBackgroundColor: const Color(0xFFFFE9A8),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child:
+                    CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white))
+                    : const Text('저장하기',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Center(
+              child: Text('입력한 정보는 코치가 나에게 맞는 조언을 해줄 때만 쓰여요',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: _inkSub)),
+            ),
+          ]
+              .animate(interval: 45.ms)
+              .fadeIn(duration: 320.ms, curve: Curves.easeOut)
+              .slideY(begin: 0.05, end: 0, curve: Curves.easeOutCubic),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────── 상단 프로필 미리보기 ───────────────────────
+
+class _PreviewCard extends StatelessWidget {
+  final UserModel? user;
+  final String nickname;
+  const _PreviewCard({required this.user, required this.nickname});
+
+  @override
+  Widget build(BuildContext context) {
+    final displayName = nickname.trim().isEmpty ? (user?.nickname ?? '') : nickname.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFB648), Color(0xFFFF7A45)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFFFF8A45).withValues(alpha: 0.3),
+              blurRadius: 18,
+              offset: const Offset(0, 10)),
+        ],
+      ),
+      // 텍스트를 포함한 콘텐츠는 ClipRRect로 감싸지 않는다 — home_screen.dart의
+      // _BudgetHero에서 확인된 렌더링 버그(ClipRRect가 그 안의 텍스트 첫 글자를
+      // 깨뜨림)를 피하기 위해, 둥근 모서리는 바깥 Container의 BoxDecoration만으로
+      // 처리하고 장식 원은 클리핑 없이 살짝 넘치게 둔다.
+      child: Stack(
+          children: [
+            Positioned(
+              top: -36,
+              right: -24,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Colors.white.withValues(alpha: 0.2), Colors.white.withValues(alpha: 0.0)],
+                  ),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 1.6),
+                  ),
+                  child: CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.white,
+                    backgroundImage:
+                        AssetImage(user?.coachTone.imagePath ?? CoachTone.ddaengjwi.imagePath),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(displayName,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 16.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                      const SizedBox(height: 2),
+                      Text(user?.email ?? '',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.85))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(text,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: _inkSub)),
+      );
+}
+
+/// 프로필 수정 카드 안의 필드 한 칸 — 컬러 아이콘 + 라벨(+옵션 트레일링) 위에
+/// 실제 입력 위젯을, 그 아래에 옵션 안내문(footer)을 쌓는다. 필드마다 흩어져
+/// 있던 흰 박스들을 카드 하나로 묶으면서 성격이 잘 드러나도록 아이콘에 색을 준다.
+class _FieldBlock extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final Widget child;
+  final Widget? trailing;
+  final Widget? footer;
+
+  const _FieldBlock({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.child,
+    this.trailing,
+    this.footer,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: Icon(icon, size: 14, color: iconColor),
+              ),
+              const SizedBox(width: 8),
+              Text(label,
+                  style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: _ink)),
+              const Spacer(),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+          if (footer != null) ...[
+            const SizedBox(height: 6),
+            Padding(padding: const EdgeInsets.only(left: 2), child: footer!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// 연령대/직군처럼 바텀시트를 여는 선택형 필드의 공통 모양.
+class _PickerTile extends StatelessWidget {
+  final VoidCallback onTap;
+  final String text;
+  final bool placeholder;
+  final String? leadingEmoji;
+
+  const _PickerTile({
+    required this.onTap,
+    required this.text,
+    required this.placeholder,
+    this.leadingEmoji,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: _bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            if (leadingEmoji != null) ...[
+              Text(leadingEmoji!, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 8),
+            ],
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: placeholder ? _inkSub : _ink)),
+            ),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: _inkSub),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────── 직군 검색 그리드 바텀시트 ───────────────────────
+
+class _JobPickerSheet extends StatefulWidget {
+  final List<String> jobs;
+  final Map<String, String> jobIcons;
+  final String? selected;
+  final ValueChanged<String> onSelect;
+
+  const _JobPickerSheet({
+    required this.jobs,
+    required this.jobIcons,
+    required this.selected,
+    required this.onSelect,
+  });
+
+  @override
+  State<_JobPickerSheet> createState() => _JobPickerSheetState();
+}
+
+class _JobPickerSheetState extends State<_JobPickerSheet> {
+  String _query = '';
+
+  String _iconOf(String j) => widget.jobIcons[j] ?? '✨';
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = widget.jobs
+        .where((j) => j.toLowerCase().contains(_query.toLowerCase()))
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 5,
+                decoration:
+                BoxDecoration(color: _line, borderRadius: BorderRadius.circular(10)),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(24, 18, 24, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('어떤 일을 하고 계신가요?',
+                      style: TextStyle(
+                          fontSize: 19, fontWeight: FontWeight.w800, color: _ink)),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 14, 24, 6),
+                child: TextField(
+                  onChanged: (v) => setState(() => _query = v),
+                  decoration: InputDecoration(
+                    hintText: '직군 검색',
+                    hintStyle: const TextStyle(color: _inkSub),
+                    prefixIcon: const Icon(Icons.search, color: _inkSub, size: 20),
+                    filled: true,
+                    fillColor: _bg,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: filtered.isEmpty
+                    ? const Center(
+                    child: Text('검색 결과가 없어요', style: TextStyle(color: _inkSub, fontSize: 14)))
+                    : GridView.builder(
+                  controller: scrollCtrl,
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 2.5,
+                  ),
+                  itemCount: filtered.length,
+                  itemBuilder: (context, i) {
+                    final job = filtered[i];
+                    final sel = job == widget.selected;
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => widget.onSelect(job),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 140),
+                          padding:
+                          const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: sel ? _accentSoft : _bg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: sel ? _accent : Colors.transparent, width: 1.4),
+                          ),
+                          child: Row(
+                            children: [
+                              Text(_iconOf(job), style: const TextStyle(fontSize: 19)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  job,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: sel ? FontWeight.w700 : FontWeight.w600,
+                                    color: sel ? _accent : const Color(0xFF333D4B),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

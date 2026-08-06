@@ -1,0 +1,133 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import '../models/market_product_model.dart';
+
+class MarketService {
+  final _db = FirebaseFirestore.instance;
+
+  // 상품 목록 (판매중인 것만, 최신순)
+  Stream<List<MarketProduct>> getProducts({String? category}) {
+    Query query = _db
+        .collection('marketProducts')
+        .orderBy('createdAt', descending: true);
+
+    if (category != null && category != '전체') {
+      query = query.where('category', isEqualTo: category);
+    }
+
+    return query.snapshots().map(
+          (s) => s.docs.map((d) => MarketProduct.fromFirestore(d)).toList(),
+    );
+  }
+
+  // 상품 상세 (단건 조회)
+  Future<MarketProduct?> getProduct(String productId) async {
+    final doc = await _db.collection('marketProducts').doc(productId).get();
+    if (!doc.exists) return null;
+    return MarketProduct.fromFirestore(doc);
+  }
+
+  // 상품 정보 수정
+  Future<void> updateProduct(String productId, Map<String, dynamic> updates) async {
+    updates['updatedAt'] = Timestamp.now();
+    await _db.collection('marketProducts').doc(productId).update(updates);
+  }
+
+  // 상품 삭제
+  Future<void> deleteProduct(String productId, List<String> imageUrls) async {
+    for (final url in imageUrls) {
+      try {
+        await FirebaseStorage.instance.refFromURL(url).delete();
+      } catch (e) {}
+    }
+    await FirebaseFirestore.instance.collection('marketProducts').doc(productId).delete();
+  }
+
+  // 판매자 기준 본인 상품 목록
+  Stream<List<MarketProduct>> getMyProducts(String sellerId) {
+    return _db
+        .collection('marketProducts')
+        .where('sellerId', isEqualTo: sellerId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((s) => s.docs.map((d) => MarketProduct.fromFirestore(d)).toList());
+  }
+
+  // 찜 토글
+  Future<void> toggleFavorite(String userId, String productId, bool isFavorite) async {
+    final ref = _db.collection('users').doc(userId).collection('favorites').doc(productId);
+    if (isFavorite) {
+      await ref.set({'createdAt': Timestamp.now()});
+    } else {
+      await ref.delete();
+    }
+  }
+
+// 찜한 상품 ID 목록 (실시간)
+  Stream<Set<String>> getFavoriteIds(String userId) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('favorites')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => d.id).toSet());
+  }
+
+  // 플리마켓 상품 등록
+  Future<void> addProduct({
+    required String sellerId,
+    required String sellerName,
+    required String title,
+    required num price,
+    required String description,
+    required List<String> images,
+    required String category,
+    String? verifiedDong,
+    bool isUrgent = false,
+    bool isNegotiable = false,
+    bool isDirectDeal = false,
+  }) async {
+    await _db.collection('marketProducts').add({
+      'sellerId': sellerId,
+      'sellerName': sellerName,
+      'title': title,
+      'price': price,
+      'description': description,
+      'images': images,
+      'status': 'selling',
+      'category': category,
+      'verifiedDong': verifiedDong,
+      'priceComparisons': [],
+      'locationGeo': null,
+      'isUrgent': isUrgent,
+      'isNegotiable': isNegotiable,
+      'isDirectDeal': isDirectDeal,
+      'createdAt': Timestamp.now(),
+    });
+  }
+
+  // [플리마켓 ] 좋아요한 상품 목록
+  Future<List<MarketProduct>> getFavoriteProducts(String userId) async {
+    final favIds = await getFavoriteIds(userId).first;
+    // 땡그랑마켓 더미 아이템(ddaeng_로 시작)은 실제 Firestore 문서가 없어서 제외
+    final realIds = favIds.where((id) => !id.startsWith('ddaeng_')).toList();
+    if (realIds.isEmpty) return [];
+
+    final snap = await _db
+        .collection('marketProducts')
+        .where(FieldPath.documentId, whereIn: realIds)
+        .get();
+    return snap.docs.map((d) => MarketProduct.fromFirestore(d)).toList();
+  }
+
+  // 판매 중, 거래 중, 판매 완료 뱃지
+  Future<void> updateProductStatus(String productId, ProductStatus status) {
+    return FirebaseFirestore.instance
+        .collection('marketProducts')
+        .doc(productId)
+        .update({
+      'status': status.value,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+}
