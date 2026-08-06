@@ -272,7 +272,7 @@ class _SharedExpenseAddScreenState extends State<SharedExpenseAddScreen> {
                 decoration: _inputDecoration(
                   label: '결제자',
                   icon: Icons.person_outline,
-                  hint: '예: 이태화',
+                  hint: '예: 홍길동',
                 ),
               ),
 

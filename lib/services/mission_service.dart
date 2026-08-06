@@ -64,7 +64,6 @@ class MissionService {
       'checkedAt',
       descending: true,
     )
-        .limit(5)
         .get();
 
     for (final doc in attendanceSnapshot.docs) {
@@ -151,7 +150,7 @@ class MissionService {
       return bDate.compareTo(aDate);
     });
 
-    return rewards.take(5).toList();
+    return rewards;
   }
 
   Future<Set<int>> getMonthlyAttendanceDays({
