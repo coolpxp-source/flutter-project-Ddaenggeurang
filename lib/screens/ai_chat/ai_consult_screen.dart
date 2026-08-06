@@ -241,15 +241,17 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
   @override
   Widget build(BuildContext context) {
     final imagePath = (_user?.coachTone ?? ai.CoachTone.ddaengjwi).imagePath;
-    return Container(
-      color: _bg,
-      child: Column(
-        children: [
-          _RemainingBanner(
-            remaining: _service.consultRemaining,
-            adRemaining: _adService.adWatchesRemaining,
-            onHistoryTap: () => Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const ConsultHistoryScreen())),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        color: _bg,
+        child: Column(
+          children: [
+            _RemainingBanner(
+              remaining: _service.consultRemaining,
+              adRemaining: _adService.adWatchesRemaining,
+              onHistoryTap: () => Navigator.of(context)
+                  .push(MaterialPageRoute(builder: (_) => const ConsultHistoryScreen())),
               onWatchAdTap: () {
                 _adService.showAd(
                   onRewarded: () {
@@ -264,35 +266,36 @@ class _AiConsultScreenState extends State<AiConsultScreen> {
                     );
                   },
                 );
-              }
-          ),
-          _BudgetContextCard(
-            loaded: _budgetContextLoaded,
-            hasData: _hasBudgetData,
-            budgetRemain: _budgetRemain,
-            usedPercent: _usedPercent,
-            impulsePercent: _impulsePercent,
-            daysToPayday: _daysToPayday,
-          ),
-          Expanded(
-            child: _messages.isEmpty
-                ? _EmptyState(imagePath: imagePath, onSuggestionTap: _pickSuggestion)
-                : ListView.builder(
-              controller: _scrollCtrl,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              itemCount: _messages.length + (_sending ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (i == _messages.length) return const _TypingBubble();
-                return _MessageBubble(
-                  entry: _messages[i],
-                  imagePath: imagePath,
-                  onFeedbackChanged: () => setState(() {}),
-                );
               },
             ),
-          ),
-          _InputBar(controller: _questionCtrl, sending: _sending, onSend: _send),
-        ],
+            _BudgetContextCard(
+              loaded: _budgetContextLoaded,
+              hasData: _hasBudgetData,
+              budgetRemain: _budgetRemain,
+              usedPercent: _usedPercent,
+              impulsePercent: _impulsePercent,
+              daysToPayday: _daysToPayday,
+            ),
+            Expanded(
+              child: _messages.isEmpty
+                  ? _EmptyState(imagePath: imagePath, onSuggestionTap: _pickSuggestion)
+                  : ListView.builder(
+                controller: _scrollCtrl,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                itemCount: _messages.length + (_sending ? 1 : 0),
+                itemBuilder: (context, i) {
+                  if (i == _messages.length) return const _TypingBubble();
+                  return _MessageBubble(
+                    entry: _messages[i],
+                    imagePath: imagePath,
+                    onFeedbackChanged: () => setState(() {}),
+                  );
+                },
+              ),
+            ),
+            _InputBar(controller: _questionCtrl, sending: _sending, onSend: _send),
+          ],
+        ),
       ),
     );
   }

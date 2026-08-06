@@ -11,6 +11,7 @@ import 'ranking_screen.dart';
 import 'post_detail_screen.dart';
 import 'post_write_screen.dart';
 import '../market/market_home_screen.dart';
+import '../home/home_screen.dart';
 import '../../widgets/common/app_header.dart';
 import '../../widgets/common/app_drawer.dart';
 import '../../services/avatar_service.dart';
@@ -314,9 +315,11 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
                             MaterialPageRoute(builder: (_) => const MarketHomeScreen()),
                           );
                         } else {
-                          // TODO: 리워드 광고 시청 → 상담 횟수 충전 로직 연결
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('곧 만나볼 수 있어요!')),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HomeScreen(initialTab: NavTab.aiConsult),
+                            ),
                           );
                         }
                       },
@@ -636,6 +639,7 @@ class _CommunityHomeScreenState extends State<CommunityHomeScreen> {
 
   Widget _buildRankCard(dynamic stat, int rank, Color badgeColor, bool isFirst) {
     return Column(
+
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Stack(
