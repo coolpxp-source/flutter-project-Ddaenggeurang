@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../utils/app_colors.dart';
 import '../../utils/formatters.dart';
 import '../../models/card_point_history_model.dart';
 import '../../services/card_point_service.dart';
-import '../../widgets/common/ddaeng_modal.dart';
+
+const Color _mainColor = Color(0xFF6C63FF);
+const Color _mainSoftColor = Color(0xFFEDECFF);
+const Color _mainBorderSoftColor = Color(0xFFDAD7FF);
 
 class CardPointHistoryAddScreen extends StatefulWidget {
   final String userId;
@@ -22,6 +24,7 @@ class CardPointHistoryAddScreen extends StatefulWidget {
 }
 
 class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final _merchantController = TextEditingController(text: widget.existing?.merchant);
   late final _pointController = TextEditingController(
     text: widget.existing != null ? CurrencyFormatter.format(widget.existing!.point) : null,
@@ -42,7 +45,7 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
   }
 
   Future<void> _save() async {
-    if (_merchantController.text.trim().isEmpty || _pointController.text.trim().isEmpty) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);
     try {
@@ -64,12 +67,39 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
       } else {
         await _service.addHistory(userId: widget.userId, cardId: widget.cardId, history: newHistory);
       }
-      if (mounted) Navigator.pop(context);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 10),
+                Text(_isEditMode ? '내역을 수정했어요.' : '내역을 추가했어요.'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF333333),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      Navigator.pop(context);
     } catch (e) {
-      if (mounted) {
-        await DdaengModal.alert(context,
-            title: '저장에 실패했어요', message: e.toString().replaceFirst('Exception: ', ''), type: ModalType.danger);
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('저장 중 오류가 발생했습니다.\n${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: const Color(0xFFE0483C),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -77,46 +107,137 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
 
   Future<void> _delete() async {
     if (!_isEditMode) return;
-    final confirmed = await DdaengModal.confirm(
-      context,
-      title: '내역 삭제',
-      message: '이 포인트 내역을 삭제할까요?',
-      type: ModalType.danger,
-      confirmText: '삭제',
+
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Container(
+            margin: const EdgeInsets.all(12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42, height: 4,
+                  decoration: BoxDecoration(color: const Color(0xFFE8E5E8), borderRadius: BorderRadius.circular(999)),
+                ),
+                const SizedBox(height: 22),
+                Container(
+                  width: 58, height: 58,
+                  decoration: const BoxDecoration(color: Color(0xFFFFECEA), shape: BoxShape.circle),
+                  child: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE0483C), size: 29),
+                ),
+                const SizedBox(height: 16),
+                const Text('내역을 삭제할까요?',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF222222))),
+                const SizedBox(height: 8),
+                const Text('이 포인트 내역이 목록에서 삭제됩니다.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 13, height: 1.45, color: Color(0xFF777777))),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext, false),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: const Color(0xFF666666),
+                          side: const BorderSide(color: Color(0xFFE5E2E5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        child: const Text('취소', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: () => Navigator.pop(sheetContext, true),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          backgroundColor: const Color(0xFFE0483C),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        child: const Text('삭제하기', style: TextStyle(fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
-    if (confirmed) {
-      setState(() => _isSaving = true);
-      try {
-        await _service.deleteHistory(userId: widget.userId, cardId: widget.cardId, history: widget.existing!);
-        if (mounted) Navigator.pop(context);
-      } catch (e) {
-        if (mounted) {
-          await DdaengModal.alert(context,
-              title: '삭제에 실패했어요', message: e.toString().replaceFirst('Exception: ', ''), type: ModalType.danger);
-        }
-      } finally {
-        if (mounted) setState(() => _isSaving = false);
+
+    if (confirmed != true) return;
+
+    setState(() => _isSaving = true);
+    try {
+      await _service.deleteHistory(userId: widget.userId, cardId: widget.cardId, history: widget.existing!);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text('삭제 중 오류가 발생했습니다.\n${e.toString().replaceFirst('Exception: ', '')}'),
+              backgroundColor: const Color(0xFFE0483C),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
       }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  Widget _label(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8, left: 2),
-    child: Text(text,
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.ink)),
-  );
+  InputDecoration _inputDecoration({
+    required String hintText,
+    required IconData prefixIcon,
+    String? suffixText,
+    Widget? suffixIcon,
+  }) {
+    OutlineInputBorder border(Color color, {double width = 1}) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(color: color, width: width),
+    );
 
-  InputDecoration _deco(String hint) => InputDecoration(
-    filled: true,
-    fillColor: AppColors.bg,
-    hintText: hint,
-    hintStyle: const TextStyle(fontSize: 13.5, color: AppColors.inkSub),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-    border: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: BorderSide.none,
-    ),
-  );
+    return InputDecoration(
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
+      prefixIcon: Icon(prefixIcon, color: _mainColor),
+      suffixText: suffixText,
+      suffixIcon: suffixIcon,
+      suffixStyle: const TextStyle(color: Color(0xFF555555), fontSize: 13, fontWeight: FontWeight.w700),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
+      border: border(const Color(0xFFE6E3E7)),
+      enabledBorder: border(const Color(0xFFE6E3E7)),
+      focusedBorder: border(_mainColor, width: 1.5),
+      errorBorder: border(Colors.redAccent),
+      focusedErrorBorder: border(Colors.redAccent, width: 1.5),
+    );
+  }
+
+  Widget _sectionTitle(String title, {required IconData icon}) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: _mainColor),
+        const SizedBox(width: 6),
+        Text(title, style: const TextStyle(color: Color(0xFF333333), fontSize: 14, fontWeight: FontWeight.w800)),
+      ],
+    );
+  }
 
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
@@ -124,6 +245,29 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
       initialDate: _date,
       firstDate: DateTime(2020),
       lastDate: DateTime.now(),
+      locale: const Locale('ko', 'KR'),
+      helpText: '날짜 선택',
+      cancelText: '취소',
+      confirmText: '선택',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _mainColor,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Color(0xFF222222),
+            ),
+            datePickerTheme: DatePickerThemeData(
+              backgroundColor: Colors.white,
+              headerBackgroundColor: _mainColor,
+              headerForegroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -131,118 +275,129 @@ class _CardPointHistoryAddScreenState extends State<CardPointHistoryAddScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F7FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
         elevation: 0,
-        scrolledUnderElevation: 0,
+        centerTitle: true,
+        backgroundColor: const Color(0xFFF8F7FA),
         surfaceTintColor: Colors.transparent,
+        foregroundColor: const Color(0xFF222222),
         title: Text(_isEditMode ? '포인트 내역 수정' : '포인트 내역 추가',
-            style: const TextStyle(color: AppColors.ink, fontWeight: FontWeight.w800, fontSize: 16)),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
         actions: [
           if (_isEditMode)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFE0483C)),
               onPressed: _isSaving ? null : _delete,
             ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('적립'),
-                    selected: _type == 'earn',
-                    onSelected: (_) => setState(() => _type = 'earn'),
-                    selectedColor: AppColors.income,
-                    backgroundColor: AppColors.bg,
-                    labelStyle: TextStyle(
-                      color: _type == 'earn' ? Colors.white : AppColors.ink,
-                      fontWeight: FontWeight.w700,
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('적립'),
+                      selected: _type == 'earn',
+                      onSelected: _isSaving ? null : (_) => setState(() => _type = 'earn'),
+                      selectedColor: _mainColor,
+                      backgroundColor: Colors.white,
+                      side: BorderSide(color: _mainBorderSoftColor),
+                      labelStyle: TextStyle(
+                        color: _type == 'earn' ? Colors.white : const Color(0xFF333333),
+                        fontWeight: FontWeight.w700,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      showCheckmark: false,
                     ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide.none,
-                    showCheckmark: false,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('사용'),
+                      selected: _type == 'use',
+                      onSelected: _isSaving ? null : (_) => setState(() => _type = 'use'),
+                      selectedColor: Colors.redAccent,
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0xFFF3D9D9)),
+                      labelStyle: TextStyle(
+                        color: _type == 'use' ? Colors.white : const Color(0xFF333333),
+                        fontWeight: FontWeight.w700,
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      showCheckmark: false,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('상호명', icon: Icons.storefront_rounded),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _merchantController,
+                enabled: !_isSaving,
+                decoration: _inputDecoration(hintText: '예: 스타벅스', prefixIcon: Icons.storefront_rounded),
+                validator: (v) => (v == null || v.trim().isEmpty) ? '상호명을 입력하세요.' : null,
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('포인트', icon: Icons.stars_rounded),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: _pointController,
+                enabled: !_isSaving,
+                keyboardType: TextInputType.number,
+                inputFormatters: [CurrencyFormatter()],
+                decoration: _inputDecoration(hintText: '0', suffixText: 'P', prefixIcon: Icons.stars_rounded),
+                validator: (v) => (v == null || v.trim().isEmpty) ? '포인트를 입력하세요.' : null,
+              ),
+              const SizedBox(height: 24),
+              _sectionTitle('날짜', icon: Icons.calendar_month_rounded),
+              const SizedBox(height: 10),
+              InkWell(
+                onTap: _isSaving ? null : _pickDate,
+                borderRadius: BorderRadius.circular(16),
+                child: InputDecorator(
+                  decoration: _inputDecoration(
+                    hintText: '날짜 선택',
+                    prefixIcon: Icons.calendar_month_rounded,
+                    suffixIcon: const Icon(Icons.chevron_right_rounded, color: _mainColor),
+                  ),
+                  child: Text(
+                    '${_date.year}.${_date.month.toString().padLeft(2, '0')}.${_date.day.toString().padLeft(2, '0')}',
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: Color(0xFF333333)),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ChoiceChip(
-                    label: const Text('사용'),
-                    selected: _type == 'use',
-                    onSelected: (_) => setState(() => _type = 'use'),
-                    selectedColor: Colors.redAccent,
-                    backgroundColor: AppColors.bg,
-                    labelStyle: TextStyle(
-                      color: _type == 'use' ? Colors.white : AppColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    side: BorderSide.none,
-                    showCheckmark: false,
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: _mainColor,
+                    disabledBackgroundColor: const Color(0xFFC9C5FF),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(17)),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            _label('상호명'),
-            TextField(controller: _merchantController, decoration: _deco('예: 스타벅스')),
-            const SizedBox(height: 18),
-            _label('포인트'),
-            TextField(
-              controller: _pointController,
-              keyboardType: TextInputType.number,
-              inputFormatters: [CurrencyFormatter()],
-              decoration: _deco('0'),
-            ),
-            const SizedBox(height: 18),
-            _label('날짜'),
-            InkWell(
-              onTap: _pickDate,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.bg,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.inkSub),
-                    const SizedBox(width: 10),
-                    Text('${_date.year}.${_date.month.toString().padLeft(2, '0')}.${_date.day.toString().padLeft(2, '0')}',
-                        style: const TextStyle(fontSize: 13.5, color: AppColors.ink)),
-                  ],
+                  child: _isSaving
+                      ? const SizedBox(
+                    width: 23, height: 23,
+                    child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                  )
+                      : Text(_isEditMode ? '수정 저장' : '저장',
+                      style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
                 ),
               ),
-            ),
-            const SizedBox(height: 28),
-            SizedBox(
-              height: 54,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.ink,
-                  disabledBackgroundColor: const Color(0xFFE5E8EB),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                  width: 20, height: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-                    : Text(_isEditMode ? '수정 저장' : '저장',
-                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

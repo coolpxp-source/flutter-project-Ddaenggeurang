@@ -13,6 +13,22 @@ import 'parsed_record_draft.dart';
 /// ⚠️ Firestore에서 실제 카테고리를 불러와 AI가 자유 텍스트로 뱉은
 /// 카테고리("카페비" 등)를 진짜 categoryId로 매칭하기 때문에 비동기(Future)임.
 /// 호출부에서 await 필요.
+
+/// AI가 뱉은 지출성격 텍스트("고정비"/"변동비"/"기타")를 ExpenseNature로 매핑.
+/// AI 응답이 예상 밖 텍스트거나 비어있으면 안전하게 variable로 폴백.
+ExpenseNature _mapNature(String? type) {
+  switch (type) {
+    case '고정비':
+      return ExpenseNature.fixed;
+    case '기타':
+      return ExpenseNature.other;
+    case '변동비':
+      return ExpenseNature.variable;
+    default:
+      return ExpenseNature.variable;
+  }
+}
+
 Future<List<ParsedRecordDraft>> mapParsedExpensesToDrafts(
     List<ParsedExpense> parsedList, {
       required AllCategoryOptions categories,
@@ -91,7 +107,7 @@ Future<List<ParsedRecordDraft>> mapParsedExpensesToDrafts(
         categoryName: matchedName(expenseOptions, matchedId),
         amount: item.amount,
         categoryId: matchedId ?? 'uncategorized',
-        nature: item.type == '고정비' ? ExpenseNature.fixed : ExpenseNature.variable,
+        nature: _mapNature(item.type),
       );
     }
   }).toList();
