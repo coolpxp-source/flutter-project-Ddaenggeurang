@@ -46,7 +46,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-. e n v
 
 # 자동 생성 파일 (매번 충돌 남)
 **/generated_plugin_registrant.*
@@ -61,10 +60,7 @@ app.*.map.json
 /web/
 
 # 환경변수 / 모델 파일
-.env
 *.gguf
-
- .env
 android/app/google-services.json
 lib/firebase_options.dart
 lib/main_test_*.dart
