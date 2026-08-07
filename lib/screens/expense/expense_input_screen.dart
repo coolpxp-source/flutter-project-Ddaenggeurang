@@ -81,6 +81,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
   String? _originalRecurringPaymentId;
   String? _lastRecurringPaymentId;
   String? _originalInstallmentPlanId;
+  bool _categoryMatchFailed = false;
 
   Future<void> _fetchOriginalExpense(String docId) async {
     try {
@@ -95,6 +96,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
             _selectedParentCategory = matchedCategory['parentName']?.toString() ?? matchedCategory['parent']?.toString();
           } catch (e) {
             debugPrint('카테고리 매칭 실패: $e');
+            _categoryMatchFailed = true;
           }
           _isInstallment = originalExpense.installmentPlanId != null;
           if (_isInstallment && originalExpense.installmentTotalMonths != null) {
@@ -682,6 +684,21 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       icon: Icons.folder_outlined,
                       iconColor: AppColors.utility,
                       iconBg: AppColors.utilitySoft),
+                  if (_categoryMatchFailed) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF4E5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Text(
+                        '기존 카테고리를 찾을 수 없어요. 대분류/소분류를 다시 선택해주세요.',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFFB45309)),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
                     value: parentCategories.contains(_selectedParentCategory) ? _selectedParentCategory : null,
@@ -698,6 +715,7 @@ class _ExpenseInputScreenState extends State<ExpenseInputScreen> {
                       setState(() {
                         _selectedParentCategory = newParent;
                         _selectedCategoryId = null;
+                        _categoryMatchFailed = false;
                       });
                     },
                   ),

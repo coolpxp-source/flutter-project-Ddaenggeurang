@@ -190,6 +190,40 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
     _loadAllCategories();
   }
 
+  Future<void> _confirmDeleteCustomCategory(Map<String, dynamic> category) async {
+    final confirmed = await DdaengModal.confirm(
+      context,
+      title: '카테고리 삭제',
+      message: '"${category['name']}" 카테고리를 삭제할까요?\n이미 기록된 내역은 그대로 남아있어요.',
+      type: ModalType.danger,
+      confirmText: '삭제',
+    );
+    if (!confirmed) return;
+
+    try {
+      await _db.collection('customCategories').doc(category['id']).delete();
+      await _loadAllCategories();
+      if (mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '삭제 완료',
+          message: '카테고리를 삭제했어요.',
+          type: ModalType.success,
+        );
+      }
+    } catch (e) {
+      debugPrint('커스텀 카테고리 삭제 에러: $e');
+      if (mounted) {
+        await DdaengModal.alert(
+          context,
+          title: '삭제할 수 없어요',
+          message: '$e',
+          type: ModalType.danger,
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -320,7 +354,7 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
         List<Map<String, dynamic>> children = grouped[parentName]!;
         String nature = children.isNotEmpty ? (children.first['nature'] ?? 'variable') : 'variable';
 
-        // 👇 [핵심 추가 3] 고유 Key를 생성하고, 기억해둔 상태가 없다면 기본값(true) 적용
+        // 고유 Key를 생성하고, 기억해둔 상태가 없다면 기본값(true) 적용
         String tileKey = 'tile_${type}_$parentName';
         bool isExpanded = _expansionStates[tileKey] ?? true;
 
@@ -337,10 +371,8 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
             key: PageStorageKey<String>(tileKey),
             title: Text(parentName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
 
-            // 👇 기억해둔 상태값을 여기에 주입!
             initiallyExpanded: isExpanded,
 
-            // 👇 접거나 펼칠 때마다 그 상태를 저장!
             onExpansionChanged: (expanded) {
               _expansionStates[tileKey] = expanded;
             },
@@ -356,11 +388,22 @@ class _CustomCategoriesScreenState extends State<CustomCategoriesScreen> with Si
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20),
                   title: Text(child['name'] ?? '이름 없음', style: const TextStyle(fontSize: 15, color: Colors.black87)),
                   subtitle: isCustom ? const Text('직접 추가함', style: TextStyle(color: Colors.indigo, fontSize: 11)) : null,
-                  trailing: Switch(
-                    value: isVisible,
-                    activeColor: Colors.white,
-                    activeTrackColor: const Color(0xFF6B8AFF),
-                    onChanged: (value) => _toggleVisibility(child, value),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isCustom)
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, size: 20, color: Color(0xFFE0483C)),
+                          onPressed: () => _confirmDeleteCustomCategory(child),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      Switch(
+                        value: isVisible,
+                        activeColor: Colors.white,
+                        activeTrackColor: const Color(0xFF6B8AFF),
+                        onChanged: (value) => _toggleVisibility(child, value),
+                      ),
+                    ],
                   ),
                 );
               }),

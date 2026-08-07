@@ -34,6 +34,17 @@ class CardPointService {
         .map((snap) => snap.docs.map((d) => CardPointHistoryModel.fromFirestore(d)).toList());
   }
 
+  /// 카드 단건 실시간 구독 — 상세화면 히어로 카드 갱신용
+  Stream<CardPointModel?> getCardPointById({
+    required String userId,
+    required String cardId,
+  }) {
+    return _cardPointsRef(userId)
+        .doc(cardId)
+        .snapshots()
+        .map((doc) => doc.exists ? CardPointModel.fromFirestore(doc) : null);
+  }
+
   CollectionReference<Map<String, dynamic>> _historyRef(String userId, String cardId) =>
       _cardPointsRef(userId).doc(cardId).collection('history');
 

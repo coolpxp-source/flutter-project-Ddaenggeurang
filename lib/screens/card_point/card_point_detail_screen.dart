@@ -42,39 +42,46 @@ class CardPointDetailScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 16, 20, 110),
         children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF6C63FF), Color(0xFF9B93FF)],
-              ),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(card.companyName,
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                Text('${formatAmount(card.totalPoint)}P',
-                    style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
-                if (card.expiringPoint > 0) ...[
-                  const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text('${formatAmount(card.expiringPoint)}P 소멸예정',
-                        style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+          StreamBuilder<CardPointModel?>(
+            stream: service.getCardPointById(userId: card.userId, cardId: card.cardId),
+            initialData: card,
+            builder: (context, cardSnap) {
+              final liveCard = cardSnap.data ?? card;
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF6C63FF), Color(0xFF9B93FF)],
                   ),
-                ],
-              ],
-            ),
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(liveCard.companyName,
+                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    Text('${formatAmount(liveCard.totalPoint)}P',
+                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800)),
+                    if (liveCard.expiringPoint > 0) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text('${formatAmount(liveCard.expiringPoint)}P 소멸예정',
+                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 14),
           _SectionCard(
