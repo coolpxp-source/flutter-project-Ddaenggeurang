@@ -51,7 +51,7 @@ class _IncomeInputScreenState extends State<IncomeInputScreen> {
 
     if (widget.editItem != null) {
       final item = widget.editItem!;
-      _amountController.text = item.amount.toString();
+      _amountController.text = comma(item.amount);
       _selectedDate = item.date;
       if (item.subtitle != null) _memoController.text = item.subtitle!;
       _currentAmount = item.amount;

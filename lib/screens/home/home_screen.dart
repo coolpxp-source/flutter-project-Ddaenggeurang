@@ -50,6 +50,7 @@ import '../../models/group_model.dart';
 import '../../services/group_service.dart';
 import '../group/shared_expense_list_screen.dart';
 import '../../models/shared_expense_model.dart';
+import '../group/group_permission_screen.dart';
 
 /// 홈 대시보드 전용 팔레트.
 /// 히어로는 앰버→코럴 그라데이션으로 임팩트를 주고, 나머지 카드는
@@ -557,7 +558,7 @@ class _HomeDashboardState extends State<_HomeDashboard> {
                               onGroupDetail: (GroupModel group) {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(
-                                    builder: (_) => SharedExpenseListScreen(group: group),
+                                    builder: (_) => GroupPermissionScreen(group: group),
                                   ),
                                 );
                               },

@@ -38,6 +38,7 @@ class TransactionItem {
   final TransactionInvestmentDetail? investmentDetail; // 투자 상세 — 저축만 해당
   final int? returnedAmount;    // 만기/해지/매도 시 최종 환급 금액 — 저축만 해당
   final String? categoryId;
+  final bool categoryDeleted; // 카테고리 문서가 삭제되어 매칭 실패했는지 여부
 
   TransactionItem({
     required this.id,
@@ -59,5 +60,6 @@ class TransactionItem {
     this.investmentDetail,
     this.returnedAmount,
     this.categoryId,
+    this.categoryDeleted = false,
   });
 }
