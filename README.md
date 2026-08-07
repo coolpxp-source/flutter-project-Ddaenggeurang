@@ -163,7 +163,7 @@
 [발표 자료 PDF 보기](https://drive.google.com/file/d/1qgHQawyyK97bo4bSeEQplER-vPvDHPPJ/view?usp=sharing)
 
 ## <a name="video"></a>🎥 시연 영상
-(추가 예정)
+[시연영상 링크](https://docs.google.com/videos/d/1BFmsLGcbzfGlX87t54SBVJFF-J2r8Fs_O1mDG1wQKW4/play?usp=sharing)
 
 ---
 
